@@ -1,0 +1,329 @@
+{
+  "schema_version": 1,
+  "ticket": 16,
+  "selection": "deimv2/l",
+  "variant": "json_mosaic",
+  "status": "accepted_native_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route remain pending",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f",
+  "source_commit": "657edda357539fb6640533ca3de557c5f91f5970",
+  "source_applicability": {
+    "ticket15_launch_source_map_identical": 459,
+    "readback_source_map_identical": 238,
+    "lock_launcher_assets_manifest_owner_identical": true,
+    "scope": "Reused unchanged ticket15 source/fixture/helper review; no new live calls or repeated unaffected gates"
+  },
+  "environment": "cy-it-ded7c4",
+  "project": "cy-it-ded7c4 ticket16",
+  "boot_id": "5e9f68d1-63db-4188-9995-e686745fda8c",
+  "namespace_uid": "4febab82-ebc6-41cc-b11b-a4364ffccc33",
+  "task_id": "df167ebc6ad74de79934650794dc59cc",
+  "output_model_id": "fb0b6253e6ed48c4a8aeda4b0018609e",
+  "checkpoint": {
+    "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/best_stg1.pth",
+    "sha256": "9ea4699d8aa3a6828ca266e510a2e9f417a692ac6e60d166546d89f54b19f2bf",
+    "thresholds": {
+      "1": 0.0,
+      "2": 0.041697606444358826,
+      "3": 0.029205908998847008,
+      "4": 0.0
+    }
+  },
+  "fixture": {
+    "canonical_manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+    "seed": 0,
+    "train_images": 160,
+    "val_images": 40,
+    "test_images": 40,
+    "heldout_backgrounds": 34,
+    "pixel_leakage": false
+  },
+  "initialization": {
+    "backbone_sha256": "8e720f25b9871695253f8392b4089aa27b2f48c22e4b769a7899f3ff886a882d",
+    "native_source_revision": "1d2ca42171570c713e78fc6a766ec5104b7f4724",
+    "initial_optimizer_parameter_sha256": "020a40c391e18e0e92829139b4012c987a16a3460b12c0364326a084c8d5be11"
+  },
+  "estimate": {
+    "status": "passed",
+    "fresh_forced": true,
+    "chosen_batch": 8,
+    "trials": [
+      {
+        "global_batch": 8,
+        "status": "success",
+        "trial_id": "31892f99cdfd44b3b4c64caf38a81345",
+        "actual_global_batch": 8,
+        "peak_memory_bytes": [
+          15755640832
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "duration_seconds": 33.38589397499982
+      },
+      {
+        "global_batch": 16,
+        "status": "oom",
+        "trial_id": "457cbfd70c0d45d19315ab7517c11213",
+        "actual_global_batch": null,
+        "peak_memory_bytes": [],
+        "warmup_steps": 0,
+        "measured_steps": 0,
+        "validation_steps": 0,
+        "duration_seconds": 23.587574696000047
+      },
+      {
+        "global_batch": 8,
+        "status": "success",
+        "trial_id": "acb3f56465ef4d828cae7db4edb63bc0",
+        "actual_global_batch": 8,
+        "peak_memory_bytes": [
+          15751446528
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "duration_seconds": 31.071053009000025
+      }
+    ],
+    "failure_class": "Allocator OOM at batch 16; no query or trial timeout"
+  },
+  "training": {
+    "status": "passed",
+    "epochs": [
+      0,
+      1
+    ],
+    "optimizer": {
+      "steps": 40,
+      "skipped_steps": 0,
+      "parameter_changed": true,
+      "initial_optimizer_parameters_sha256": "020a40c391e18e0e92829139b4012c987a16a3460b12c0364326a084c8d5be11"
+    },
+    "seed": 0,
+    "precision": "fp32",
+    "native_loss_count": 96,
+    "remote_scalar_loss_count": 186,
+    "native_seconds": 199.907630101,
+    "launcher_seconds": 203.3120357479993
+  },
+  "augmentation": {
+    "status": "passed",
+    "sha256": "049739959eebe7b4291c3b22a4d56b9eb3b105e277f0c422a5d956a89ec353ff",
+    "operations": [
+      "Mosaic p1 2x2 640",
+      "HorizontalFlip p1",
+      "RandomBrightnessContrast p1"
+    ],
+    "scope": "Selected snapshot, resolved/native recipe and unchanged executed adapter agree; no separate per-image mosaic trace"
+  },
+  "telemetry": {
+    "status": "passed",
+    "samples": 196,
+    "minimum_free_mib": 10362,
+    "guard_mib": 10240,
+    "maximum_completed_sample_gap_seconds": 1.0880566270006966,
+    "outer_query_timeout": false
+  },
+  "readback": {
+    "status": "passed",
+    "started_utc": "2026-11-16T20:53:20.574632+00:00",
+    "finished_utc": "2026-11-16T20:53:59.894615+00:00",
+    "helper_sha256": "25be67d9975f6c2266bd4681ae92219cca0bdb22c06facca7c344b4c5cb492ab",
+    "artifact_sha256": {
+      "gt_csv": "a840cea5395dda1807b40e566309c342a615249b35d191a9fc2667fb5fd424d3",
+      "metrics_best_confidences_val": "60a7c8cefec5e0f55b0dff7c0d8478b49cfb95605c2fe08aefeb59f9b8248b69",
+      "metrics_dashboard_dtrk_test": "5bf0add6d03eab613d8076f0cb9b241e9ef453bec2b0aa3088e3b8bc0b15337d",
+      "metrics_dashboard_dtrk_val": "4574a2feb235e6d3d57873bee9ff60fc9f58620135275c5216c7fb9ef6c14ebb",
+      "metrics_dashboard_full_test": "cb21c714a7fa08497691fbc798fd71489d3f5709dbc259ae3cf0ab14cfea29c7",
+      "metrics_dashboard_full_val": "2f650ff6eaf9c1c680c0f8aa7421de948d5be57af61dff16821a1ce4385d39bb",
+      "pipeline_outcome": "198647871262e3c362df6a3030c269ea9207e01ad06dc4b0f4bad73ddad9299c",
+      "predicts_csv": "3e9a28fa618081f9dbc4096f9f48565697752b7fa1a2d76f5de546c54584a673"
+    },
+    "forced_downloads": 9,
+    "native_epoch_loss_values": 96,
+    "remote_scalar_loss_values": 186,
+    "loss_field_semantics": "Producer verification.native_loss_values contains 186 remote scalar observations; readback.native_loss_values contains 96 native epoch values. Each was reconciled with its corresponding log."
+  },
+  "cpu_validation": {
+    "status": "passed",
+    "device": "cpu",
+    "split": "val",
+    "images": 40,
+    "background_images": 15,
+    "prediction_rows": 12000,
+    "counts": {
+      "1": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 8
+      },
+      "2": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 1
+      },
+      "3": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 48
+      },
+      "4": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 7
+      }
+    },
+    "prediction_sha256": "101593ec9153080960a75b6f9806d96509b23f621d0a22f2a0c608ed9a841cb5",
+    "limitation": "Native CY DEIM prediction plus CY fixed-threshold scoring; not upstream solver validation or accuracy qualification"
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T20:59:22.871472+00:00",
+    "directories_removed": [
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24346284
+      },
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/cache",
+        "files": 9,
+        "logical_bytes": 538064280
+      }
+    ],
+    "removed_logical_bytes": 562410564,
+    "protected_files_verified_before_after": 116,
+    "known_ticket16_pids_absent": [
+      1699102,
+      1699342,
+      1700129,
+      1790168,
+      1793430
+    ],
+    "matching_active_ticket16_processes": [],
+    "other_workload": "Ticket17 owns the serial GPU slot; its files, processes and shared assets are untouched. No global compute-empty claim.",
+    "acceptance_review_sha256": "bfaf0bc66e7a428bc35cac21095e112c8a8b6a752d404cffa6fdb15ece11460a",
+    "preserved": "Every checkpoint, artifact, CPU prediction, input/log/receipt, fixture, shared asset, prior case and service"
+  },
+  "checks": {
+    "preparation": "passed",
+    "fresh_admission": "passed",
+    "native_training": "passed",
+    "capacity_estimation": "passed",
+    "JSON_mosaic_recipe_identity": "passed",
+    "native_epoch_validation": "passed",
+    "source_applicability_reuse": "passed",
+    "remote_publication": "passed",
+    "CPU_native_prediction_fixed_threshold_scoring": "passed",
+    "sampled_reserve": "passed",
+    "launcher_worker_cleanup": "passed",
+    "independent_acceptance_review": "passed",
+    "protected_cache_cleanup": "passed"
+  },
+  "evidence_bindings": {
+    "launch_inputs": {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket16-20261116T204908Z-5d4b5460/inputs.json",
+      "sha256": "8757fab9dfbdcfcdc71aa74e2ad726bb0debfa92def759c7435300f129c206a9"
+    },
+    "launch_result": {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket16-20261116T204908Z-5d4b5460/result.json",
+      "sha256": "6a087841bab44b5e348b1aa2ced3ca48183a3b8fe7c31473bcf00b2276f32896"
+    },
+    "telemetry": {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket16-20261116T204908Z-5d4b5460/gpu-telemetry.jsonl",
+      "sha256": "f71ed61f4b7367c74df380f92babfa3cedea779421a8cf0b7b219ae6be990f68"
+    },
+    "preparation_result": {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket16-20261116T203222Z-c15b8ea6/result.json",
+      "sha256": "baeb7738ec70600d36e6cd91bca9a75af7b82d081d7a5b1643a0dd8939035eb3"
+    },
+    "admission": {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket16-admission-20261116.json",
+      "sha256": "00873228dfad5bfdec34189ade165c2b005d90e2a43062a09c1f9779cbb39b6a"
+    },
+    "native_summary": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/summary.json",
+      "sha256": "c853678249cf97070c138732a5d185c3bb9191e2266276840f36ca4c7d890017"
+    },
+    "native_verification": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/verification.json",
+      "sha256": "8132b108797fca4e9922197db838f23047479f1eca63c4b480515c3b3ec0c90b"
+    },
+    "training_inputs": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/training-inputs.json",
+      "sha256": "eb5d4df5907b7c11a89be13989156e5f5cac831d145d7331c56f2436e8b99676"
+    },
+    "batch_estimates": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/batch-estimates.json",
+      "sha256": "27034f7c89cd3cf4ee210f4200293c8755db01b919e87d528b84a658609a349b"
+    },
+    "batch_admission": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/batch-admission.json",
+      "sha256": "21188ae640e8212e283deca4a87fe016c17f006f1654227f8cc8077e254bb54d"
+    },
+    "configuration": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/configuration.json",
+      "sha256": "4d3a70e1bfbed4af09d8fb01443f5e0e060845a4584d49ad7ad30e9715389ef1"
+    },
+    "augmentation": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/pipeline.json",
+      "sha256": "9399e5f29201d7e314c387c6236cdcc9e62894a08bd5765d3688e1fa6c7c74e3"
+    },
+    "readback": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/receipt.json",
+      "sha256": "155d0fc93855c7664c944c4d781b549cfc80bfb13a77fe77fa2e199101a2f0bf"
+    },
+    "native_epoch_log": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/native-training-log.jsonl",
+      "sha256": "a4e707721a370d98bfc78bca5faf75a6fea65dff22558cb9463d96ff5a4ebaa9"
+    },
+    "remote_scalars": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/scalars.json",
+      "sha256": "e4058256bcc1a533c2bd25cb3da7a97e0ded170bf84a6be23e66744e8990d4ab"
+    },
+    "cpu_validation": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/cpu-validation.json",
+      "sha256": "c6229a910c896e2898f3b15427fbf76d435c07ad7de05cc3f0c09e9400c0b1eb"
+    },
+    "independent_acceptance": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/independent-acceptance-review.json",
+      "sha256": "bfaf0bc66e7a428bc35cac21095e112c8a8b6a752d404cffa6fdb15ece11460a"
+    },
+    "cleanup_plan": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/cleanup-plan.json",
+      "sha256": "257cdcd349fc0821efd4a43072c9f0ca469673bfcf46f31fcbe93167e8703e57"
+    },
+    "cleanup_and_protected_inventory": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json_mosaic-690b57305f/readback/20261116T205320Z-1f9589b3/cleanup.json",
+      "sha256": "4c60c6eb2b9a07bb8232df4a478ff44ee00f6b926e0fec3d053455c60a0aeab8"
+    },
+    "fixture_manifest": {
+      "path": "runs/verification-gap-closure/fixtures-v1/prepared/manifest.json",
+      "sha256": "4308e0bf241675bc07d0e0fce9fe75a516fddd322e1d359f09bf6e4f56eb4973"
+    },
+    "asset_bindings": {
+      "path": "runs/verification-gap-closure/assets-v1/consumer-bindings.json",
+      "sha256": "6e1962b7d9ccaf7fe96cbd99d388cae447ccc96789599f6adc1be6314fe18d58"
+    },
+    "service_owner": {
+      "path": "runs/verification-gap-closure/service-owner.json",
+      "sha256": "eb40a1b5e9a6f7e54b359855f1646aac065be8e836827ba6c429be8f6b59d268"
+    },
+    "reused_ticket15_review": {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-l-json-6735466407/readback/20261116T203034Z-72bb8d59/independent-acceptance-review.json",
+      "sha256": "3988e2d2ecb58ca60b82a5cb3939dc80e05eeba2718ee58a4d670e0a08e5e44e"
+    }
+  },
+  "evidence_reuse": "Coordinator executed GPU run and cleanup; separate agent executed CPU readback. Independent audit checked retained observations and reused identical source/fixture/helper inputs from ticket15. Dated-record preparation made no live calls or test executions.",
+  "limits": [
+    "Two-epoch smoke establishes execution and publication, not scientific accuracy or convergence.",
+    "One GPU/backend variant; physical multi-GPU, other backends and export compilation/runtime parity remain separate.",
+    "Memory observations are sampled, not continuous reserve or playback frame-time proof; capacity applies to the admitted allocator budget and tested batches.",
+    "Selected Mosaic snapshot and unchanged adapter execution agree; no separate per-image mosaic trace.",
+    "Process cleanup concerns ticket16 only; ticket17 was running independently and no global compute-empty claim is made.",
+    "Historical WSL hang cause remains unproven.",
+    "Cleanup reports logical bytes; physical reclaim was not separately attributed.",
+    "Coordinator delivery gate remains pending; no complete campaign claim."
+  ]
+}

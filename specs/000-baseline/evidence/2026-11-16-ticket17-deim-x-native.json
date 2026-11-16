@@ -1,0 +1,481 @@
+{
+  "schema_version": 1,
+  "ticket": 17,
+  "selection": "deimv2/x",
+  "variant": "default",
+  "status": "accepted_native_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route remain pending",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f",
+  "source_commit": "657edda357539fb6640533ca3de557c5f91f5970",
+  "environment": "cy-it-ded7c4",
+  "project": "cy-it-ded7c4 ticket17",
+  "task_id": "96137d22aa344cedbefdbf6e08919a4c",
+  "output_model_id": "c0546ba3bd44420789f10b672ea8c501",
+  "boot_id": "5e9f68d1-63db-4188-9995-e686745fda8c",
+  "namespace_uid": "4febab82-ebc6-41cc-b11b-a4364ffccc33",
+  "source_applicability": {
+    "launch_source_map_identical": 459,
+    "readback_source_map_identical": 238,
+    "shared_inputs_identical": true,
+    "scope": "Reused ticket15 source/fixture/helper review. Rehashed X initialization."
+  },
+  "x_family_baseline": {
+    "initial_optimizer_parameters_sha256": "a9dbda79717f5b8e24dbf09a3ef7f75373bffbf3e05bcdde5276e8b743468b83",
+    "eligible_prior_completed_X_readbacks": [],
+    "comparison": "First eligible X-family baseline. No L-family parameter comparison.",
+    "derived_asset": {
+      "canonical_url": "https://huggingface.co/facebook/dinov3-vits16plus-pretrain-lvd1689m/resolve/c93d816fc9e567563bc068f01475bec89cc634a6/model.safetensors#hf-dinov3-to-deim-v1",
+      "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/.cache/clearml-yolo/models/deimv2/x/e088cbd89c1972cf5c778344/hf-dinov3-to-deim-v1.pth",
+      "content_kind": "file",
+      "sha256": "0eef1d947c36b7201439f5506c4b1262e7a1a75ed1de565b4a17418f5080575d",
+      "override": "model.train.backbone_weights",
+      "revision": "1d2ca42171570c713e78fc6a766ec5104b7f4724",
+      "derivation": {
+        "source_url": "https://huggingface.co/facebook/dinov3-vits16plus-pretrain-lvd1689m/resolve/c93d816fc9e567563bc068f01475bec89cc634a6/model.safetensors",
+        "source_revision": "c93d816fc9e567563bc068f01475bec89cc634a6",
+        "source_sha256": "208146e499dace99e4c9376ddb8a26f77d64c31c46c4dc4b86ff8bc63b0235e2",
+        "converter": "hf-dinov3-to-deim-v1",
+        "native_revision": "1d2ca42171570c713e78fc6a766ec5104b7f4724"
+      }
+    }
+  },
+  "checkpoint": {
+    "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/best_stg1.pth",
+    "sha256": "cb5efefc12a26baaa2a564b8233497cd5dc56904ab4b0051ca40dd2e1af2fed7",
+    "thresholds": {
+      "1": 0.032261621206998825,
+      "2": 0.02736498787999153,
+      "3": 0.017293481156229973,
+      "4": 0.019063683226704597
+    }
+  },
+  "fixture": {
+    "canonical_manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+    "seed": 0,
+    "train_images": 160,
+    "val_images": 40,
+    "test_images": 40,
+    "heldout_backgrounds": 34,
+    "pixel_leakage": false
+  },
+  "training": {
+    "status": "passed",
+    "epochs": [
+      0,
+      1
+    ],
+    "optimizer": {
+      "steps": 54,
+      "skipped_steps": 0,
+      "parameter_changed": true,
+      "initial_optimizer_parameters_sha256": "a9dbda79717f5b8e24dbf09a3ef7f75373bffbf3e05bcdde5276e8b743468b83"
+    },
+    "step_derivation": "2 * ceil(160 / 6) = 54, drop_last false",
+    "seed": 0,
+    "precision": "fp32",
+    "native_loss_count": 136,
+    "remote_scalar_loss_count": 398,
+    "native_seconds": 262.8092471279997,
+    "launcher_seconds": 266.1902657139999
+  },
+  "augmentation": {
+    "status": "passed",
+    "mode": "native",
+    "recipe": {
+      "type": "Compose",
+      "ops": [
+        {
+          "type": "Mosaic",
+          "output_size": 320,
+          "rotation_range": 10,
+          "translation_range": [
+            0.1,
+            0.1
+          ],
+          "scaling_range": [
+            0.5,
+            1.5
+          ],
+          "probability": 1.0,
+          "fill_value": 0,
+          "use_cache": true,
+          "max_cached_images": 50,
+          "random_pop": true
+        },
+        {
+          "type": "RandomPhotometricDistort",
+          "p": 0.5
+        },
+        {
+          "type": "RandomZoomOut",
+          "fill": 0
+        },
+        {
+          "type": "RandomIoUCrop",
+          "p": 0.8
+        },
+        {
+          "type": "SanitizeBoundingBoxes",
+          "min_size": 1
+        },
+        {
+          "type": "RandomHorizontalFlip"
+        },
+        {
+          "type": "Resize",
+          "size": [
+            640,
+            640
+          ]
+        },
+        {
+          "type": "SanitizeBoundingBoxes",
+          "min_size": 1
+        },
+        {
+          "type": "ConvertPILImage",
+          "dtype": "float32",
+          "scale": true
+        },
+        {
+          "type": "Normalize",
+          "mean": [
+            0.485,
+            0.456,
+            0.406
+          ],
+          "std": [
+            0.229,
+            0.224,
+            0.225
+          ]
+        },
+        {
+          "type": "ConvertBoxes",
+          "fmt": "cxcywh",
+          "normalize": true
+        }
+      ],
+      "policy": {
+        "name": "stop_epoch",
+        "epoch": [
+          4,
+          29,
+          50
+        ],
+        "ops": [
+          "Mosaic",
+          "RandomPhotometricDistort",
+          "RandomZoomOut",
+          "RandomIoUCrop"
+        ]
+      },
+      "mosaic_prob": 0.5
+    },
+    "collator": {
+      "type": "BatchImageCollateFunction",
+      "base_size": 640,
+      "base_size_repeat": 3,
+      "stop_epoch": 50,
+      "mixup_prob": 0.5,
+      "mixup_epochs": [
+        4,
+        29
+      ],
+      "copyblend_prob": 0.5,
+      "copyblend_epochs": [
+        4,
+        50
+      ],
+      "area_threshold": 100,
+      "num_objects": 3,
+      "with_expand": true,
+      "expand_ratios": [
+        0.1,
+        0.25
+      ],
+      "ema_restart_decay": 0.9999
+    },
+    "scope": "Configured native recipe. No claim every epoch-gated or probabilistic transform fired."
+  },
+  "telemetry": {
+    "status": "passed",
+    "samples": 256,
+    "minimum_free_mib": 10339,
+    "guard_mib": 10240,
+    "maximum_completed_sample_gap_seconds": 1.2462977420000243,
+    "outer_query_timeout": false
+  },
+  "estimate": {
+    "status": "passed",
+    "fresh_forced": true,
+    "chosen_batch": 6,
+    "trials": [
+      {
+        "global_batch": 8,
+        "status": "oom",
+        "trial_id": "0c677056f66d47ff804545de4a58c0a8",
+        "actual_global_batch": null,
+        "peak_memory_bytes": [],
+        "warmup_steps": 0,
+        "measured_steps": 0,
+        "validation_steps": 0,
+        "duration_seconds": 22.84910055400087
+      },
+      {
+        "global_batch": 4,
+        "status": "success",
+        "trial_id": "8ddf9194537b440094130b7455982f21",
+        "actual_global_batch": 4,
+        "peak_memory_bytes": [
+          17678729216
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "duration_seconds": 31.69059432299946
+      },
+      {
+        "global_batch": 6,
+        "status": "success",
+        "trial_id": "4e5c852f42b441cf9c9baa13d3356e7b",
+        "actual_global_batch": 6,
+        "peak_memory_bytes": [
+          23320068096
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "duration_seconds": 32.96670479600016
+      },
+      {
+        "global_batch": 7,
+        "status": "oom",
+        "trial_id": "c4555b072b704cd3bad73c562f6b8e49",
+        "actual_global_batch": null,
+        "peak_memory_bytes": [],
+        "warmup_steps": 0,
+        "measured_steps": 0,
+        "validation_steps": 0,
+        "duration_seconds": 10.419138112999462
+      },
+      {
+        "global_batch": 6,
+        "status": "success",
+        "trial_id": "34ff0f30baab41beacb80f7d97b6d88e",
+        "actual_global_batch": 6,
+        "peak_memory_bytes": [
+          23321116672
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "duration_seconds": 25.55432824899981
+      }
+    ],
+    "failure_class": "Allocator OOM at batches 8 and 7, no query/trial timeout"
+  },
+  "readback": {
+    "status": "passed",
+    "started_utc": "2026-11-16T21:01:48.948844+00:00",
+    "finished_utc": "2026-11-16T21:02:37.734265+00:00",
+    "helper_sha256": "25be67d9975f6c2266bd4681ae92219cca0bdb22c06facca7c344b4c5cb492ab",
+    "artifact_sha256": {
+      "gt_csv": "a840cea5395dda1807b40e566309c342a615249b35d191a9fc2667fb5fd424d3",
+      "metrics_best_confidences_val": "3a13aef92958d8fc7a0a5ae5854120a58ef8e4c2cce3160bc8bf4df08f81a4ed",
+      "metrics_dashboard_dtrk_test": "4bdeea02e8835a021a9d8b146f89c56aa3823f695952d7435b37e00a99e4382e",
+      "metrics_dashboard_dtrk_val": "36a2626274355b163c1361096021b7edfbb16ffa9cdbe83ec566f422b92d9e7b",
+      "metrics_dashboard_full_test": "feaf744a4be8126bda7847a9fca02a726d52d2ed21b2ba4557a4367f3f67cf2a",
+      "metrics_dashboard_full_val": "784b99741d8a61576d83b33a481f881e512175545c4c3f5fc425681868299f5f",
+      "pipeline_outcome": "8feb1049156c3895ddf996acc3f90fd1014af405636d5dd4988de21e54aa0e4c",
+      "predicts_csv": "d9959a3b4b88492a53003638b20f097b50c521e6df5dfdfc47130d55faf0a377"
+    },
+    "forced_downloads": 9,
+    "native_epoch_loss_values": 136,
+    "remote_scalar_loss_values": 398,
+    "loss_field_semantics": "Readback native_loss_values contains native epoch losses. Producer verification.native_loss_values contains remote scalar losses."
+  },
+  "cpu_validation": {
+    "status": "passed",
+    "device": "cpu",
+    "split": "val",
+    "images": 40,
+    "background_images": 15,
+    "prediction_rows": 12000,
+    "counts": {
+      "1": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 8
+      },
+      "2": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 1
+      },
+      "3": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 48
+      },
+      "4": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 7
+      }
+    },
+    "prediction_sha256": "e921e2dfd0616d95819b30f6c0c165e49f5de2d92f7028a98b902fcb00f4e12a",
+    "limitation": "Native CY DEIM prediction plus CY fixed-threshold scoring; not upstream solver validation or accuracy qualification"
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T21:08:33.398789+00:00",
+    "directories_removed": [
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24345320
+      },
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/cache",
+        "files": 9,
+        "logical_bytes": 836219539
+      }
+    ],
+    "removed_logical_bytes": 860564859,
+    "protected_files_verified_before_after": 122,
+    "known_ticket17_pids_absent": [
+      1872492,
+      1872724,
+      1873033,
+      1994432,
+      1994665
+    ],
+    "matching_active_ticket17_processes": [],
+    "other_workload": "Ticket18 CPU readback is separate and untouched; no global process or compute-empty claim.",
+    "acceptance_review_sha256": "73b843f914a42c1ec43174760ae32933a90b1e69504e831620607c36e67370cd",
+    "preserved": "All checkpoints, artifacts, CPU predictions, inputs/logs/receipts, fixtures, shared assets, prior cases and services"
+  },
+  "checks": {
+    "preparation": "passed",
+    "fresh_admission": "passed",
+    "native_training": "passed",
+    "capacity_estimation": "passed",
+    "native_recipe_identity": "passed",
+    "native_epoch_validation": "passed",
+    "source_applicability_reuse": "passed",
+    "X_initialization_identity": "passed",
+    "remote_publication": "passed",
+    "CPU_native_prediction_fixed_threshold_scoring": "passed",
+    "sampled_reserve": "passed",
+    "launcher_worker_cleanup": "passed",
+    "independent_acceptance_review": "passed",
+    "protected_cache_cleanup": "passed"
+  },
+  "evidence_bindings": [
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket17-20261116T205539Z-5bec4388/inputs.json",
+      "sha256": "f5f77986d84c73eec6bbe72bc0b2500aa7d4f336b2777b0860f6b34fb57cbac3"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket17-20261116T205539Z-5bec4388/result.json",
+      "sha256": "03e1ad420c78ed95100cb6a235fa6cd36968f234e757fa52150d5200bbf494dd"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket17-20261116T205539Z-5bec4388/gpu-telemetry.jsonl",
+      "sha256": "e5a5ecb9d3c92d949116e2db788c6f283842a1162209c186a38f9281db6fbaba"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket17-20261116T205006Z-75dd8d59/result.json",
+      "sha256": "954e89d9476b00bffcad09a0191573e614302848c737cdbf0256d030394f8cfd"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket17-admission-20261116.json",
+      "sha256": "46887040f286e74f493c0eba7cc2d1b1a4f4868cc42c5dbc4ba9f0fa037f320a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/summary.json",
+      "sha256": "c491d3e56f69b02d99cf29f1fce6cc6309b9f1d3d012118a7a76cb7c2423fc13"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/verification.json",
+      "sha256": "670b1a993c400eb840b9e7fe0d152df0843d497afd261e644d7d6c304dffa8e2"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/training-inputs.json",
+      "sha256": "a2d3153920116f9db5bc35c99e5e9a2b4be525df4f8a00b5b5595f52ba8ea131"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/batch-estimates.json",
+      "sha256": "f66ea514e21329ae293104c682951b7a6edeaf0d4526d1108ad2de39778f1d1e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/batch-admission.json",
+      "sha256": "8d1833c732a017b9e36a5e6d6d1c6f93e6a59d9b9c0222fafec86f087e9c2edb"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/configuration.json",
+      "sha256": "34a112e8231720835df75d1f53f0e09e8062515530593d34f00f02b953bcc516"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/optimizer.json",
+      "sha256": "a7b93ffd657454d59d074622d9e449c1cce2090cc461f0981136577f2827e251"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/receipt.json",
+      "sha256": "2b2c49c6d411109f433bf9a3f5a3d9d90437d175c784d316f05b6033b8719e89"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/native-args.json",
+      "sha256": "e34c29d341c46ea531058f41d439072614032960f56952ddfd7c6c1466a0f150"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/native-training-log.jsonl",
+      "sha256": "7e26fbd78be5d08d202847ab1ddbe83a0443acac282cf79522ee11e67603e62e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/scalars.json",
+      "sha256": "d9ac78e691c645d1a1d2028580dbac5eabb1bea1d35b3cc6696f3e887d24b562"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/cpu-validation.json",
+      "sha256": "0b0c1bd8719cebdfaf2530e632db977563c65d662419b529712f7057f904eb82"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/independent-acceptance-review.json",
+      "sha256": "73b843f914a42c1ec43174760ae32933a90b1e69504e831620607c36e67370cd"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/cleanup-plan.json",
+      "sha256": "0e68e64a340cc3069742046fe2096de41ab8b52977b5a396352dc6d025f180b5"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-x-default-c2a101d30f/readback/20261116T210148Z-6e27fb3b/cleanup.json",
+      "sha256": "40a4da7422f6a800477c044b3d73847d8ac603162ca88054d4958c7869ae4805"
+    },
+    {
+      "path": "runs/verification-gap-closure/fixtures-v1/prepared/manifest.json",
+      "sha256": "4308e0bf241675bc07d0e0fce9fe75a516fddd322e1d359f09bf6e4f56eb4973"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/consumer-bindings.json",
+      "sha256": "6e1962b7d9ccaf7fe96cbd99d388cae447ccc96789599f6adc1be6314fe18d58"
+    },
+    {
+      "path": "runs/verification-gap-closure/service-owner.json",
+      "sha256": "eb40a1b5e9a6f7e54b359855f1646aac065be8e836827ba6c429be8f6b59d268"
+    }
+  ],
+  "evidence_reuse": "Coordinator executed GPU run and cleanup, separate agent executed CPU readback. Independent audit reused identical source/fixture/helper inputs and rehashed X initialization and case outputs. Dated-record preparation made no live calls or test executions.",
+  "limits": [
+    "First eligible X baseline only, no cross-family parameter comparison.",
+    "Two-epoch smoke does not establish scientific accuracy or convergence.",
+    "One GPU/backend variant, no physical multi-GPU or export/runtime parity claim.",
+    "Sampled memory is not continuous reserve or playback proof. Capacity applies to admitted allocator budget and tested batches.",
+    "Configured native transforms do not establish every optional or epoch-gated transform fired.",
+    "Cleanup concerns ticket17 only, other tickets untouched, no global compute-empty claim.",
+    "Historical WSL hang cause unproven. Earlier campaign failures unchanged.",
+    "Cleanup reports logical bytes, physical reclaim not separately measured.",
+    "Coordinator delivery gate remains pending."
+  ]
+}
