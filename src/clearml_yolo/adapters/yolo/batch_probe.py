@@ -124,7 +124,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     )
     model.load(weights)
     del weights
-    values = values | {"imgsz": request.profile.effective_size[0]}
+    values = values | {"imgsz": request.profile.effective_size[0], "batch": request.global_batch}
     model.args = SimpleNamespace(**values)
     model.names = {index: str(index) for index in range(request.workload.classes)}
     model.nc = request.workload.classes
