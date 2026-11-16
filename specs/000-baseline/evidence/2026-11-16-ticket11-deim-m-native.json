@@ -1,0 +1,579 @@
+{
+  "schema_version": 1,
+  "ticket": 11,
+  "selection": "deimv2/m",
+  "variant": "default",
+  "status": "accepted",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541",
+  "source_commit": "5c0ece16a73ecc9ce279b564b7d69471c69007fa",
+  "launcher_recorded_root_head": "5c0ece16a73ecc9ce279b564b7d69471c69007fa",
+  "source_applicability": {
+    "independent_compared_inputs": 552,
+    "unchanged_launch_python_inputs": 459,
+    "differences": [],
+    "receipt": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/readback/20261116T172855Z-b7392b58/source-applicability.json",
+    "sha256": "83eb2cf059534c822c9abb3c3c3cefecf76c222c05e47e27059a81c489c7f4aa"
+  },
+  "environment": "cy-it-adb183",
+  "task_id": "531b6870764942fd9db4118243e25a32",
+  "output_model_id": "5b7d13cbbd8d4b75ba82ffd6ea8fb13f",
+  "checkpoint": {
+    "checkpoint": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/readback/20261116T172855Z-b7392b58/best_stg1.pth",
+    "sha256": "8a32aaea11a637260bf9b3d634f227edfc89d0d9c571f41d4db914b1febc7ab1",
+    "task_id": "531b6870764942fd9db4118243e25a32",
+    "model_id": "5b7d13cbbd8d4b75ba82ffd6ea8fb13f",
+    "thresholds": {
+      "1": 0.05653344467282295,
+      "2": 0.02413356676697731,
+      "3": 0.08003979921340942,
+      "4": 0.028827596455812454
+    },
+    "manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33"
+  },
+  "native_elapsed_seconds": 175.3881015139923,
+  "launcher_elapsed_seconds": 178.95886985999823,
+  "telemetry": {
+    "samples": 170,
+    "minimum_free_mib": 10374,
+    "maximum_used_mib": 21814,
+    "maximum_utilization_percent": 87,
+    "maximum_sample_gap_seconds": 1.2756872450117953,
+    "configured_minimum_free_bytes": 10737418240,
+    "user_minimum_free_bytes": 8589934592,
+    "errors": 0,
+    "limitation": "Finite sampled NVML observations, not continuous hardware proof"
+  },
+  "estimate": {
+    "status": "validated",
+    "raw_capacity": 8,
+    "chosen_batch": 8,
+    "trials": [
+      {
+        "global_batch": 8,
+        "status": "success",
+        "trial_id": "698fc3f27ada4d1697ec3811eac209b1",
+        "actual_global_batch": 8,
+        "peak_memory_bytes": [
+          18611961856
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "optimizer_paths": [
+          "AdamW"
+        ],
+        "diagnostic": "",
+        "duration_seconds": 32.480959489999805
+      },
+      {
+        "global_batch": 16,
+        "status": "oom",
+        "trial_id": "b82d13ba37d34853b2431d91550c567a",
+        "actual_global_batch": null,
+        "peak_memory_bytes": [],
+        "warmup_steps": 0,
+        "measured_steps": 0,
+        "validation_steps": 0,
+        "optimizer_paths": [],
+        "diagnostic": "OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 31.82 GiB of which 13.19 GiB is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. 16.90 GiB allowed; Of the allocated memory 16.74 GiB is allocated by PyTorch, and 140.85 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "duration_seconds": 9.482274983005482
+      },
+      {
+        "global_batch": 8,
+        "status": "success",
+        "trial_id": "69d645331e5042008d52ec7c3599c23c",
+        "actual_global_batch": 8,
+        "peak_memory_bytes": [
+          18607767552
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "optimizer_paths": [
+          "AdamW"
+        ],
+        "diagnostic": "",
+        "duration_seconds": 32.12596042100631
+      }
+    ],
+    "limitation": "Measured capacity under internal 10GiB reserve; not unrestricted physical GPU capacity"
+  },
+  "epochs": 2,
+  "optimizer": {
+    "steps": 40,
+    "skipped_steps": 0,
+    "parameter_changed": true,
+    "initial_optimizer_parameters_sha256": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b"
+  },
+  "initialization_comparisons": {
+    "deimv2-m-json-39f7a43a40": {
+      "initial_optimizer_parameters_sha256": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b",
+      "summary_sha256": "2b04c2bc452c59c1845e5a11dc8136008ae51fcb53df22b996b6d08dbb1d9412",
+      "optimizer_sha256": "303bc58efd12d68ecf5f63544a2b7314b3579845c6570fe5e662c81c87629efc",
+      "scope": "Completed native M-family initialization identity only; does not accept the other ticket"
+    }
+  },
+  "profile": {
+    "model": {
+      "selection": "deimv2/m",
+      "backend": "deimv2",
+      "preset": "m",
+      "architecture": "deimv2/m"
+    },
+    "nominal_size": [
+      640,
+      640
+    ],
+    "effective_size": [
+      800,
+      800
+    ],
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 5090",
+        "total_memory_bytes": 34162343936,
+        "uuid": "GPU-7459c4c9-b94d-ca31-17b0-fc63140c4dc1"
+      }
+    ],
+    "dependencies": {
+      "clearml-yolo": "0.48.2",
+      "torch": "2.14.1",
+      "torchvision": "0.29.1",
+      "numpy": "2.5.1",
+      "timm": "1.0.30",
+      "faster-coco-eval": "1.8.0",
+      "python": "3.12.13",
+      "nvidia-cufft": "12.0.0.61",
+      "nvidia-nvjitlink": "13.3.33",
+      "nvidia-nvshmem-cu13": "3.4.5",
+      "nvidia-nccl-cu13": "2.30.7",
+      "nvidia-ml-py": "13.610.43",
+      "nvidia-cusolver": "12.0.4.66",
+      "nvidia-cuda-cupti": "13.0.85",
+      "nvidia-cuda-runtime": "13.0.96",
+      "nvidia-cublas": "13.1.1.3",
+      "nvidia-cusparselt-cu13": "0.8.1",
+      "nvidia-cusparse": "12.6.3.3",
+      "triton": "3.8.0",
+      "nvidia-curand": "10.4.0.35",
+      "nvidia-cudnn-cu13": "9.24.0.43",
+      "nvidia-cufile": "1.15.1.6",
+      "nvidia-cuda-nvrtc": "13.0.88",
+      "nvidia-nvtx": "13.0.85",
+      "deim-source": "1d2ca42171570c713e78fc6a766ec5104b7f4724"
+    },
+    "precision": "fp32",
+    "compilation": false,
+    "optimizers": [
+      "AdamW"
+    ],
+    "accumulation": "fixed:1",
+    "ema": true,
+    "augmentation": "89e594d0a55ea5c733543766a2cf885685dbd885bec4338cf0110258d9608930",
+    "implementation_revision": "batch-v1:64107e8ab97ecfc0047ff6ab1e139071f915c1a29cbc70a19e8495dc25855382"
+  },
+  "manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+  "augmentation_sha256": null,
+  "native_augmentation_recipe": {
+    "type": "Compose",
+    "ops": [
+      {
+        "type": "Mosaic",
+        "output_size": 320,
+        "rotation_range": 10,
+        "translation_range": [
+          0.1,
+          0.1
+        ],
+        "scaling_range": [
+          0.5,
+          1.5
+        ],
+        "probability": 1.0,
+        "fill_value": 0,
+        "use_cache": true,
+        "max_cached_images": 50,
+        "random_pop": true
+      },
+      {
+        "type": "RandomPhotometricDistort",
+        "p": 0.5
+      },
+      {
+        "type": "RandomZoomOut",
+        "fill": 0
+      },
+      {
+        "type": "RandomIoUCrop",
+        "p": 0.8
+      },
+      {
+        "type": "SanitizeBoundingBoxes",
+        "min_size": 1
+      },
+      {
+        "type": "RandomHorizontalFlip"
+      },
+      {
+        "type": "Resize",
+        "size": [
+          640,
+          640
+        ]
+      },
+      {
+        "type": "SanitizeBoundingBoxes",
+        "min_size": 1
+      },
+      {
+        "type": "ConvertPILImage",
+        "dtype": "float32",
+        "scale": true
+      },
+      {
+        "type": "Normalize",
+        "mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "std": [
+          0.229,
+          0.224,
+          0.225
+        ]
+      },
+      {
+        "type": "ConvertBoxes",
+        "fmt": "cxcywh",
+        "normalize": true
+      }
+    ],
+    "policy": {
+      "name": "stop_epoch",
+      "epoch": [
+        4,
+        49,
+        90
+      ],
+      "ops": [
+        "Mosaic",
+        "RandomPhotometricDistort",
+        "RandomZoomOut",
+        "RandomIoUCrop"
+      ]
+    },
+    "mosaic_prob": 0.5
+  },
+  "native_collator": {
+    "type": "BatchImageCollateFunction",
+    "base_size": 640,
+    "base_size_repeat": 6,
+    "stop_epoch": 90,
+    "mixup_prob": 0.5,
+    "mixup_epochs": [
+      4,
+      49
+    ],
+    "copyblend_prob": 0.5,
+    "copyblend_epochs": [
+      4,
+      90
+    ],
+    "area_threshold": 100,
+    "num_objects": 3,
+    "with_expand": true,
+    "expand_ratios": [
+      0.1,
+      0.25
+    ],
+    "ema_restart_decay": 0.9999
+  },
+  "native_validation": [
+    {
+      "epoch": 0,
+      "metrics": {
+        "test_coco_eval_bbox": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "epoch": 1,
+      "metrics": {
+        "test_coco_eval_bbox": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  ],
+  "readback": {
+    "status": "passed",
+    "receipt": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/readback/20261116T172855Z-b7392b58/receipt.json",
+    "sha256": "c535ad3c15d9301e0859114c7493db28e49461d4b5adc6cdcd7ffa736982b248",
+    "helper_sha256": "25be67d9975f6c2266bd4681ae92219cca0bdb22c06facca7c344b4c5cb492ab",
+    "populations": {
+      "images": 240,
+      "heldout_images": 80,
+      "heldout_backgrounds": 34,
+      "contexts": [
+        "prediction:db48a2b598396779249c"
+      ],
+      "pixel_leakage": false
+    },
+    "workbook_checks": {
+      "metrics_dashboard_dtrk_test": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 64,
+        "unavailable_values": "preserved"
+      },
+      "metrics_dashboard_dtrk_val": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 64,
+        "unavailable_values": "preserved"
+      },
+      "metrics_dashboard_full_test": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 124,
+        "unavailable_values": "preserved"
+      },
+      "metrics_dashboard_full_val": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 124,
+        "unavailable_values": "preserved"
+      }
+    },
+    "finite_scalar_losses": 186,
+    "finite_native_log_losses": 96,
+    "cpu": {
+      "status": "passed",
+      "device": "cpu",
+      "split": "val",
+      "images": 40,
+      "image_names": [
+        "0c2522533.jpg",
+        "0f4bf08bd.jpg",
+        "102ac71fd.jpg",
+        "1379aba8d.jpg",
+        "1592ad79d.jpg",
+        "20e93e1cb.jpg",
+        "2511b18de.jpg",
+        "2ccef61c3.jpg",
+        "315405789.jpg",
+        "37ab3a83a.jpg",
+        "38a63550b.jpg",
+        "3ee9a7e10.jpg",
+        "3ff8946e0.jpg",
+        "4bb7baa20.jpg",
+        "51fd0e994.jpg",
+        "534991d20.jpg",
+        "54fc1f606.jpg",
+        "5a96ebdcf.jpg",
+        "5e88c8a04.jpg",
+        "60aca03e2.jpg",
+        "63ad80e46.jpg",
+        "6b22a1e37.jpg",
+        "73ebf6bfd.jpg",
+        "7f1c326d4.jpg",
+        "80f7d7679.jpg",
+        "945fbed15.jpg",
+        "98ed0f752.jpg",
+        "9d73bc0ef.jpg",
+        "a272e2e20.jpg",
+        "ac912ddc4.jpg",
+        "b56eaf11d.jpg",
+        "bc7ce8f4d.jpg",
+        "ccd94dc85.jpg",
+        "db4867ee8.jpg",
+        "def2ac19d.jpg",
+        "df5fa0c40.jpg",
+        "ea476b31f.jpg",
+        "ec8c34113.jpg",
+        "ee6241bbf.jpg",
+        "f35093ccb.jpg"
+      ],
+      "prediction_rows": 12000,
+      "background_images": 15,
+      "checkpoint_sha256": "8a32aaea11a637260bf9b3d634f227edfc89d0d9c571f41d4db914b1febc7ab1",
+      "descriptor": {
+        "schema_version": 1,
+        "backend": "deimv2",
+        "preset": "m",
+        "class_names": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "preprocessing": {
+          "resize": "stretch",
+          "size": 640,
+          "mean": [
+            0.485,
+            0.456,
+            0.406
+          ],
+          "std": [
+            0.229,
+            0.224,
+            0.225
+          ],
+          "stride": 32,
+          "color": "RGB"
+        },
+        "dependencies": {
+          "torch": "2.14.1",
+          "torchvision": "0.29.1",
+          "faster-coco-eval": "1.8.0"
+        },
+        "source_revision": "1d2ca42171570c713e78fc6a766ec5104b7f4724",
+        "checkpoint_sha256": "8a32aaea11a637260bf9b3d634f227edfc89d0d9c571f41d4db914b1febc7ab1"
+      },
+      "thresholds": {
+        "1": 0.05653344467282295,
+        "2": 0.02413356676697731,
+        "3": 0.08003979921340942,
+        "4": 0.028827596455812454
+      },
+      "counts": {
+        "1": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 8
+        },
+        "2": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "3": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 48
+        },
+        "4": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 7
+        }
+      },
+      "prediction_sha256": "f25eca77e442a85f1929ff187d18887ff7aac3ffb942dee1e263dff258c1d598",
+      "limitation": "Native CY DEIM prediction plus CY fixed-threshold scoring; not upstream solver validation or accuracy qualification"
+    },
+    "artifact_sha256": {
+      "gt_csv": "a840cea5395dda1807b40e566309c342a615249b35d191a9fc2667fb5fd424d3",
+      "metrics_best_confidences_val": "62dfddf53404aab66d1180512bc7e6c8cd0720337f2e4288bf4d9b42bc1bd3ff",
+      "metrics_dashboard_dtrk_test": "5fb46b175be0335cd0f815f6aa89f790d4aa836cc19fe96e1ddb969104e682ed",
+      "metrics_dashboard_dtrk_val": "5531d379d2f2311a5c8527557cd9032b63fc938be1279ffdb39871f7e1f9ea77",
+      "metrics_dashboard_full_test": "d78b7e6c6ce01295ddd53a16aed43858ad2f41ab88abe7b60ff1e573f2053cd9",
+      "metrics_dashboard_full_val": "bbfacb054fedac470b27fa0b35299e75bf581064fb380f5a01d836ee7d425a63",
+      "pipeline_outcome": "4af8d3b6542bb59a8877c17f57c34589a0206925e6e7843768bfa526522b7d0b",
+      "predicts_csv": "9f30985940c3516da58d991dd4bce37bc64dcbc2c3d071f3c9bbc3284129ff66"
+    }
+  },
+  "checks": {
+    "native_training": "passed",
+    "capacity_estimation": "passed",
+    "native_augmentation_identity": "passed",
+    "remote_publication": "passed",
+    "CPU_native_prediction_fixed_threshold_scoring": "passed",
+    "native_epoch_validation": "passed",
+    "source_applicability": "passed",
+    "sampled_reserve": "passed",
+    "launcher_worker_cleanup": "passed",
+    "cache_cleanup": "passed",
+    "independent_acceptance_review": "passed"
+  },
+  "cleanup_plan": {
+    "status": "planned-pending-root-inspection",
+    "deleted": false,
+    "directories": [
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24345320
+      },
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/readback/20261116T172855Z-b7392b58/cache",
+        "files": 9,
+        "logical_bytes": 310580291
+      }
+    ],
+    "planned_logical_bytes": 334925611,
+    "preserve": "Every checkpoint, native input/log, artifact copy, CPU prediction, receipt, prior case, shared asset and service",
+    "cpu_media_duplicates": "none created"
+  },
+  "protected_file_count": 123,
+  "protected_logical_bytes": 971760893,
+  "handoff": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/handoff.json",
+  "handoff_sha256": "76d0ac54eeb70f04d005da8a592fd908d71d9e5b54abd51783c1a487f44c5657",
+  "audited_utc": "2026-11-16T17:35:45.162287+00:00",
+  "evidence_reuse": "Native and independent fresh-client CPU readback executed by coordinator; this task only rehashed/reconciled retained artifacts",
+  "limits": [
+    "No GPU, inference, service calls or product/helper edits by this evidence task; only exact approved duplicate caches removed",
+    "CPU outcome is native CY DEIM prediction with fixed-threshold scoring, not a separate upstream solver validation loop",
+    "No accuracy, export, physical multi-GPU, unrestricted capacity or complete campaign claim"
+  ],
+  "cleanup": {
+    "status": "passed",
+    "authorization": "Root independently rehashed122 protectedfiles and inspected exact2cachetrees before authorizing deletion; independent acceptance review remains pending",
+    "finished_utc": "2026-11-16T17:43:10.358720+00:00",
+    "removed": [
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24345320
+      },
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-default-7aa523d541/readback/20261116T172855Z-b7392b58/cache",
+        "files": 9,
+        "logical_bytes": 310580291
+      }
+    ],
+    "removed_logical_bytes": 334925611,
+    "protected_files_rehashed": 122,
+    "protected_hashes_unchanged": true,
+    "physical_reclaim": "Not attributed from global filesystem counters during concurrent campaign work",
+    "preserved": "All checkpoints, native inputs/logs, receipts/artifactcopies/CPU predictions, priorcases, sharedassets/services",
+    "processes": "No new native/readback job launched; only bounded offline audit and cleanup"
+  },
+  "independent_review": {
+    "reviewer": "final_recipe_review",
+    "status": "approved",
+    "scope": "Scientific evidence and protected handoff reviewed; root independently rehashed123 final protected files and verified exact cache absence; final gate/coordinator acceptance pending"
+  }
+}

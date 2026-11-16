@@ -1,0 +1,547 @@
+{
+  "schema_version": 1,
+  "ticket": 13,
+  "selection": "deimv2/m",
+  "variant": "json_mosaic",
+  "status": "accepted",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4",
+  "source_commit": "ba56e2f2751954fb9c65799817d22b9e51b36b89",
+  "launcher_recorded_root_head": "ba56e2f2751954fb9c65799817d22b9e51b36b89",
+  "source_applicability": {
+    "independent_compared_inputs": 552,
+    "unchanged_launch_python_inputs": 459,
+    "differences": [],
+    "receipt": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/readback/20261116T174305Z-2d91dc08/source-applicability.json",
+    "sha256": "de07a020f3b8f6cfc23d7c3357e4dbc63b2e872c1ee11eea380bb1d8c0f900ea"
+  },
+  "environment": "cy-it-adb183",
+  "task_id": "fd8141f44ce245599b0152ad2bc15d7d",
+  "output_model_id": "e3843e508dab41d4b1c4e73d27ed236c",
+  "checkpoint": {
+    "checkpoint": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/readback/20261116T174305Z-2d91dc08/best_stg1.pth",
+    "sha256": "6d7c9bcaab952e5be10aeeb7f143ff03de1bfb2a29a2da22fdc26ef8aeb7931e",
+    "task_id": "fd8141f44ce245599b0152ad2bc15d7d",
+    "model_id": "e3843e508dab41d4b1c4e73d27ed236c",
+    "thresholds": {
+      "1": 0.04384184628725052,
+      "2": 0.018543154001235962,
+      "3": 0.06694138050079346,
+      "4": 0.020960776135325432
+    },
+    "manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33"
+  },
+  "native_elapsed_seconds": 208.04191687100683,
+  "launcher_elapsed_seconds": 211.04900583499693,
+  "telemetry": {
+    "samples": 197,
+    "minimum_free_mib": 10390,
+    "maximum_used_mib": 21798,
+    "maximum_utilization_percent": 99,
+    "maximum_sample_gap_seconds": 1.4922965669975383,
+    "configured_minimum_free_bytes": 10737418240,
+    "user_minimum_free_bytes": 8589934592,
+    "errors": 0,
+    "limitation": "Finite sampled NVML observations, not continuous hardware proof"
+  },
+  "estimate": {
+    "status": "validated",
+    "raw_capacity": 16,
+    "chosen_batch": 16,
+    "trials": [
+      {
+        "global_batch": 8,
+        "status": "success",
+        "trial_id": "14eeb9f7072e4e89bdd4c94eca336858",
+        "actual_global_batch": 8,
+        "peak_memory_bytes": [
+          13697286144
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "optimizer_paths": [
+          "AdamW"
+        ],
+        "diagnostic": "",
+        "duration_seconds": 33.741725778003456
+      },
+      {
+        "global_batch": 16,
+        "status": "success",
+        "trial_id": "2f0ec410082b4cb98411e325bed108e2",
+        "actual_global_batch": 16,
+        "peak_memory_bytes": [
+          22300852224
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "optimizer_paths": [
+          "AdamW"
+        ],
+        "diagnostic": "",
+        "duration_seconds": 37.00968388799811
+      },
+      {
+        "global_batch": 24,
+        "status": "oom",
+        "trial_id": "b6d81c67b79b42cba378b83a3daa11f3",
+        "actual_global_batch": null,
+        "peak_memory_bytes": [],
+        "warmup_steps": 0,
+        "measured_steps": 0,
+        "validation_steps": 0,
+        "optimizer_paths": [],
+        "diagnostic": "OutOfMemoryError: CUDA out of memory. Tried to allocate 66.00 MiB. GPU 0 has a total capacity of 31.82 GiB of which 13.21 GiB is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. 16.89 GiB allowed; Of the allocated memory 16.65 GiB is allocated by PyTorch, and 214.01 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+        "duration_seconds": 14.770849767010077
+      },
+      {
+        "global_batch": 16,
+        "status": "success",
+        "trial_id": "e70735b3a36d4de49d7b2a0e3dec4063",
+        "actual_global_batch": 16,
+        "peak_memory_bytes": [
+          22296657920
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "optimizer_paths": [
+          "AdamW"
+        ],
+        "diagnostic": "",
+        "duration_seconds": 36.05725735799933
+      }
+    ],
+    "limitation": "Measured capacity under internal 10GiB reserve; not unrestricted physical GPU capacity"
+  },
+  "epochs": 2,
+  "optimizer": {
+    "steps": 20,
+    "skipped_steps": 0,
+    "parameter_changed": true,
+    "initial_optimizer_parameters_sha256": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b"
+  },
+  "initialization_comparisons": {
+    "deimv2-m-default-7aa523d541": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b",
+    "deimv2-m-json-39f7a43a40": "35ceec789217dba1fecbe4aae9b97331128e73a542fa7cfd5540b6157f24774b"
+  },
+  "profile": {
+    "model": {
+      "selection": "deimv2/m",
+      "backend": "deimv2",
+      "preset": "m",
+      "architecture": "deimv2/m"
+    },
+    "nominal_size": [
+      640,
+      640
+    ],
+    "effective_size": [
+      640,
+      640
+    ],
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 5090",
+        "total_memory_bytes": 34162343936,
+        "uuid": "GPU-7459c4c9-b94d-ca31-17b0-fc63140c4dc1"
+      }
+    ],
+    "dependencies": {
+      "clearml-yolo": "0.48.2",
+      "torch": "2.14.1",
+      "torchvision": "0.29.1",
+      "numpy": "2.5.1",
+      "timm": "1.0.30",
+      "faster-coco-eval": "1.8.0",
+      "albumentations": "2.0.8",
+      "python": "3.12.13",
+      "nvidia-cufft": "12.0.0.61",
+      "nvidia-nvjitlink": "13.3.33",
+      "nvidia-nvshmem-cu13": "3.4.5",
+      "nvidia-nccl-cu13": "2.30.7",
+      "nvidia-ml-py": "13.610.43",
+      "nvidia-cusolver": "12.0.4.66",
+      "nvidia-cuda-cupti": "13.0.85",
+      "nvidia-cuda-runtime": "13.0.96",
+      "nvidia-cublas": "13.1.1.3",
+      "nvidia-cusparselt-cu13": "0.8.1",
+      "nvidia-cusparse": "12.6.3.3",
+      "triton": "3.8.0",
+      "nvidia-curand": "10.4.0.35",
+      "nvidia-cudnn-cu13": "9.24.0.43",
+      "nvidia-cufile": "1.15.1.6",
+      "nvidia-cuda-nvrtc": "13.0.88",
+      "nvidia-nvtx": "13.0.85",
+      "deim-source": "1d2ca42171570c713e78fc6a766ec5104b7f4724"
+    },
+    "precision": "fp32",
+    "compilation": false,
+    "optimizers": [
+      "AdamW"
+    ],
+    "accumulation": "fixed:1",
+    "ema": true,
+    "augmentation": "cbf3c0592e61fefb949f95f79a7a0f76fac342402d8f572edbf75d9bf8c839d5",
+    "implementation_revision": "batch-v1:64107e8ab97ecfc0047ff6ab1e139071f915c1a29cbc70a19e8495dc25855382"
+  },
+  "manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+  "augmentation_sha256": "049739959eebe7b4291c3b22a4d56b9eb3b105e277f0c422a5d956a89ec353ff",
+  "augmentation_pipeline": {
+    "__version__": "2.0.8",
+    "transform": {
+      "__class_fullname__": "Compose",
+      "p": 1.0,
+      "transforms": [
+        {
+          "__class_fullname__": "Mosaic",
+          "p": 1.0,
+          "cell_shape": [
+            640,
+            640
+          ],
+          "center_range": [
+            0.3,
+            0.7
+          ],
+          "fill": 0.0,
+          "fill_mask": 0.0,
+          "fit_mode": "cover",
+          "grid_yx": [
+            2,
+            2
+          ],
+          "interpolation": 1,
+          "mask_interpolation": 0,
+          "metadata_key": "mosaic_metadata",
+          "target_size": [
+            640,
+            640
+          ]
+        },
+        {
+          "__class_fullname__": "HorizontalFlip",
+          "p": 1.0
+        },
+        {
+          "__class_fullname__": "RandomBrightnessContrast",
+          "p": 1.0,
+          "brightness_by_max": true,
+          "brightness_limit": [
+            -0.2,
+            0.2
+          ],
+          "contrast_limit": [
+            -0.2,
+            0.2
+          ],
+          "ensure_safe_range": false
+        }
+      ],
+      "bbox_params": {
+        "format": "pascal_voc",
+        "label_fields": [
+          "class_labels"
+        ],
+        "min_area": 0.0,
+        "min_visibility": 0.0,
+        "min_width": 0.0,
+        "min_height": 0.0,
+        "check_each_transform": true,
+        "clip": false,
+        "max_accept_ratio": null
+      },
+      "keypoint_params": null,
+      "additional_targets": {},
+      "is_check_shapes": true
+    }
+  },
+  "native_validation": [
+    {
+      "epoch": 0,
+      "metrics": {
+        "test_coco_eval_bbox": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "epoch": 1,
+      "metrics": {
+        "test_coco_eval_bbox": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  ],
+  "readback": {
+    "status": "passed",
+    "receipt": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/readback/20261116T174305Z-2d91dc08/receipt.json",
+    "sha256": "9575cb96ee8d715c19f042c78663189e8cc6f266d0b201979741c6be8e57b949",
+    "helper_sha256": "25be67d9975f6c2266bd4681ae92219cca0bdb22c06facca7c344b4c5cb492ab",
+    "populations": {
+      "images": 240,
+      "heldout_images": 80,
+      "heldout_backgrounds": 34,
+      "contexts": [
+        "prediction:2bf37227842b8a716792"
+      ],
+      "pixel_leakage": false
+    },
+    "workbook_checks": {
+      "metrics_dashboard_dtrk_test": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 64,
+        "unavailable_values": "preserved"
+      },
+      "metrics_dashboard_dtrk_val": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 64,
+        "unavailable_values": "preserved"
+      },
+      "metrics_dashboard_full_test": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 124,
+        "unavailable_values": "preserved"
+      },
+      "metrics_dashboard_full_val": {
+        "sheets": [
+          "Sheet1",
+          "Dataset counts"
+        ],
+        "finite_numeric_cells": 124,
+        "unavailable_values": "preserved"
+      }
+    },
+    "finite_scalar_losses": 90,
+    "finite_native_log_losses": 96,
+    "cpu": {
+      "status": "passed",
+      "device": "cpu",
+      "split": "val",
+      "images": 40,
+      "image_names": [
+        "0c2522533.jpg",
+        "0f4bf08bd.jpg",
+        "102ac71fd.jpg",
+        "1379aba8d.jpg",
+        "1592ad79d.jpg",
+        "20e93e1cb.jpg",
+        "2511b18de.jpg",
+        "2ccef61c3.jpg",
+        "315405789.jpg",
+        "37ab3a83a.jpg",
+        "38a63550b.jpg",
+        "3ee9a7e10.jpg",
+        "3ff8946e0.jpg",
+        "4bb7baa20.jpg",
+        "51fd0e994.jpg",
+        "534991d20.jpg",
+        "54fc1f606.jpg",
+        "5a96ebdcf.jpg",
+        "5e88c8a04.jpg",
+        "60aca03e2.jpg",
+        "63ad80e46.jpg",
+        "6b22a1e37.jpg",
+        "73ebf6bfd.jpg",
+        "7f1c326d4.jpg",
+        "80f7d7679.jpg",
+        "945fbed15.jpg",
+        "98ed0f752.jpg",
+        "9d73bc0ef.jpg",
+        "a272e2e20.jpg",
+        "ac912ddc4.jpg",
+        "b56eaf11d.jpg",
+        "bc7ce8f4d.jpg",
+        "ccd94dc85.jpg",
+        "db4867ee8.jpg",
+        "def2ac19d.jpg",
+        "df5fa0c40.jpg",
+        "ea476b31f.jpg",
+        "ec8c34113.jpg",
+        "ee6241bbf.jpg",
+        "f35093ccb.jpg"
+      ],
+      "prediction_rows": 12000,
+      "background_images": 15,
+      "checkpoint_sha256": "6d7c9bcaab952e5be10aeeb7f143ff03de1bfb2a29a2da22fdc26ef8aeb7931e",
+      "descriptor": {
+        "schema_version": 1,
+        "backend": "deimv2",
+        "preset": "m",
+        "class_names": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "preprocessing": {
+          "resize": "stretch",
+          "size": 640,
+          "mean": [
+            0.485,
+            0.456,
+            0.406
+          ],
+          "std": [
+            0.229,
+            0.224,
+            0.225
+          ],
+          "stride": 32,
+          "color": "RGB"
+        },
+        "dependencies": {
+          "torch": "2.14.1",
+          "torchvision": "0.29.1",
+          "faster-coco-eval": "1.8.0"
+        },
+        "source_revision": "1d2ca42171570c713e78fc6a766ec5104b7f4724",
+        "checkpoint_sha256": "6d7c9bcaab952e5be10aeeb7f143ff03de1bfb2a29a2da22fdc26ef8aeb7931e"
+      },
+      "thresholds": {
+        "1": 0.04384184628725052,
+        "2": 0.018543154001235962,
+        "3": 0.06694138050079346,
+        "4": 0.020960776135325432
+      },
+      "counts": {
+        "1": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 8
+        },
+        "2": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 1
+        },
+        "3": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 48
+        },
+        "4": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 7
+        }
+      },
+      "prediction_sha256": "64b299046a6cbe71de5db38a4a4ac7a65862c9c02368cf6d11ecc5645e72e801",
+      "limitation": "Native CY DEIM prediction plus CY fixed-threshold scoring; not upstream solver validation or accuracy qualification"
+    },
+    "artifact_sha256": {
+      "gt_csv": "a840cea5395dda1807b40e566309c342a615249b35d191a9fc2667fb5fd424d3",
+      "metrics_best_confidences_val": "91c1c7cda6f4b1d1e770ae6e7876e897eaa005ae612c8a9fe09529765e1ae211",
+      "metrics_dashboard_dtrk_test": "20967f356092e7655de5d4cf3d5a471d6d4a3e8f12887e0c3f7957cc475a6a08",
+      "metrics_dashboard_dtrk_val": "5d08ea46d3d58fa96e38cb38c5ca55151ea19223fe732b3f93f55f3627923346",
+      "metrics_dashboard_full_test": "b494a4fb7e66afa490a0f858876a1ed8e7ac6d3759ee82726b02943ecb6873e5",
+      "metrics_dashboard_full_val": "0336ef403009ccaa7d5f7e4b4cf68994b4d569993b7554c0e43c0fd0a1b033a6",
+      "pipeline_outcome": "ebd36401804d6ac740cce9a4e979a456e85467ac240d3b11b97fc0b5ebd6208b",
+      "predicts_csv": "ffa814408869178d9547b5892b3082cbfeec11bd371f707c1e7a68dfe6f7335d"
+    }
+  },
+  "checks": {
+    "native_training": "passed",
+    "capacity_estimation": "passed",
+    "JSON_mosaic_augmentation_identity": "passed",
+    "remote_publication": "passed",
+    "CPU_native_prediction_fixed_threshold_scoring": "passed",
+    "native_epoch_validation": "passed",
+    "source_applicability": "passed",
+    "sampled_reserve": "passed",
+    "launcher_worker_cleanup": "passed",
+    "cache_cleanup": "passed",
+    "independent_acceptance_review": "passed"
+  },
+  "cleanup_plan": {
+    "status": "planned-pending-root-inspection",
+    "deleted": false,
+    "directories": [
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24346284
+      },
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/readback/20261116T174305Z-2d91dc08/cache",
+        "files": 9,
+        "logical_bytes": 310604262
+      }
+    ],
+    "planned_logical_bytes": 334950546,
+    "preserve": "Every checkpoint, native input/log, artifact copy, CPU prediction, receipt, prior case, shared asset and service",
+    "cpu_media_duplicates": "none created"
+  },
+  "protected_file_count": 129,
+  "protected_logical_bytes": 971905218,
+  "handoff": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/handoff.json",
+  "handoff_sha256": "f5dbdf7d3cbea02630d9accd96bbd4893b5bdf7bbc862f0f437181221e2f49e4",
+  "audited_utc": "2026-11-16T17:46:47.965690+00:00",
+  "evidence_reuse": "Native and independent fresh-client CPU readback executed by coordinator; this task only rehashed/reconciled retained artifacts",
+  "limits": [
+    "No GPU, inference, service calls or product/helper edits by this evidence task; only exact approved duplicate caches removed",
+    "CPU outcome is native CY DEIM prediction with fixed-threshold scoring, not a separate upstream solver validation loop",
+    "No accuracy, export, physical multi-GPU, unrestricted capacity or complete campaign claim"
+  ],
+  "cleanup": {
+    "status": "passed",
+    "authorization": "Root independently reviewed scientific evidence and rehashed128protectedfiles plus238productsource files; checked exact2cachetrees/counts/bytes/nosymlinks before authorizing deletion",
+    "finished_utc": "2026-11-16T17:49:31.900856+00:00",
+    "removed": [
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24346284
+      },
+      {
+        "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/deimv2-m-json_mosaic-64c66241b4/readback/20261116T174305Z-2d91dc08/cache",
+        "files": 9,
+        "logical_bytes": 310604262
+      }
+    ],
+    "removed_logical_bytes": 334950546,
+    "protected_files_rehashed": 128,
+    "protected_hashes_unchanged": true,
+    "physical_reclaim": "Not attributed from global filesystem counters during concurrent campaign work",
+    "preserved": "All checkpoints, native inputs/logs, receipts/artifactcopies/CPU predictions, priorcases, sharedassets/services",
+    "processes": "No new native/readback job launched; only bounded offline audit and cleanup"
+  },
+  "independent_review": {
+    "reviewer": "root",
+    "status": "approved",
+    "scope": "Independent scientific evidence and128protectedfile review; final coordinator acceptance/native gate pending"
+  }
+}
