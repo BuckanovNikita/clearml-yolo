@@ -1,0 +1,331 @@
+Native targets: ['gpu_states', 'discover_gpus', 'require_idle', 'monitor_devices', 'reserve_cuda_memory']
+Native selection: 41 entries in 11 modules
+⠦ Generating mutants
+    done in 579ms (2 files mutated, 236 ignored, 0 unmodified)
+⠏ Running stats
+    done
+⠴ Running clean tests
+    done
+⠏ Running forced fail test
+    done
+Running mutation testing
+⠸ 233/315  🎉 214 🫥 0  ⏰ 0  🤔 0  🙁 19  🔇 0  🧙 0
+6.83 mutations/second
+
+Mutant results
+--------------
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_1
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_10
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_11
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_12
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_13
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_14
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_15
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_16
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_17
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_18
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_19
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_2
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_20
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_21
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_22
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_23
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_24
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_25
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_26
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_27
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_28
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_29
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_3
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_30
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_31
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_32
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_33
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_34
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_35
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_36
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_37
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_38
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_39
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_4
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_40
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_41
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_42
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_43
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_44
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_45
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_46
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_47
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_48
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_49
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_5
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_50
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_51
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_52
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_53
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_54
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_55
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_56
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_57
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_58
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_59
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_6
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_60
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_61
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_62
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_7
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_8
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_9
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_1
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_10
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_11
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_12
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_13
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_14
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_15
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_16
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_17
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_18
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_19
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_2
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_20
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_21
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_22
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_23
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_24
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_25
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_26
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_27
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_28
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_29
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_3
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_30
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_31
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_32
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_33
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_34
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_35
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_36
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_37
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_38
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_39
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_4
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_40
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_41
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_42
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_43
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_44
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_45
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_46
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_47
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_48
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_49
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_5
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_50
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_51
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_52
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_53
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_54
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_55
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_56
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_57
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_58
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_59
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_6
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_60
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_61
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_62
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_63
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_64
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_65
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_66
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_67
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_68
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_69
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_7
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_70
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_71
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_72
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_73
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_74
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_75
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_8
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_9
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_1
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_10
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_11
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_12
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_13
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_14
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_15
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_16
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_17
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_18
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_19
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_2
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_20
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_21
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_3
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_4
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_5
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_6
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_7
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_8
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_monitor_devices__mutmut_9
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_1
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_10
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_11
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_12
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_13
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_14
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_15
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_16
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_17
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_18
+🙁 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_19
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_2
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_20
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_21
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_22
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_23
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_3
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_4
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_5
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_6
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_7
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_8
+🎉 clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_9
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_1
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_10
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_11
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_12
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_13
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_14
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_15
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_16
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_17
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_18
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_19
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_2
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_20
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_21
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_22
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_23
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_24
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_25
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_26
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_27
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_28
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_29
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_3
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_30
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_31
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_32
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_33
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_34
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_35
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_36
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_37
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_38
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_39
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_4
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_40
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_41
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_42
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_43
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_44
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_45
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_46
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_47
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_48
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_49
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_5
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_50
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_51
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_52
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_6
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_7
+🙁 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_8
+🎉 clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_9
+
+Mutants in changed functions: 233, killed: 214, survived: 19, not reached by tests: 0, not run (budget): 0
+
+# clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_33: survived
+--- src/clearml_yolo/adapters/runtime/gpu_inventory.py
++++ src/clearml_yolo/adapters/runtime/gpu_inventory.py
+@@ -14,7 +14,7 @@
+         check=True,
+         capture_output=True,
+         text=True,
+-        timeout=30,
++        timeout=31,
+     )
+     records = json.loads(result.stdout)
+     states = gpu_states()
+
+# clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_44: survived
+--- src/clearml_yolo/adapters/runtime/gpu_inventory.py
++++ src/clearml_yolo/adapters/runtime/gpu_inventory.py
+@@ -22,7 +22,7 @@
+     for record in records:
+         state = states.get(record["uuid"])
+         if state is None:
+-            raise RuntimeError("Visible CUDA device lacks whole-GPU telemetry (MIG unsupported)")
++            raise RuntimeError("XXVisible CUDA device lacks whole-GPU telemetry (MIG unsupported)XX")
+         devices.append(
+             GPUDevice.model_validate(
+                 record
+
+# clearml_yolo.adapters.runtime.gpu_inventory.x_discover_gpus__mutmut_59: survived
+--- src/clearml_yolo/adapters/runtime/gpu_inventory.py
++++ src/clearml_yolo/adapters/runtime/gpu_inventory.py
+@@ -30,5 +30,5 @@
+             )
+         )
+     if not devices:
+-        raise RuntimeError("No visible CUDA GPUs; batch estimation requires idle GPUs")
++        raise RuntimeError("XXNo visible CUDA GPUs; batch estimation requires idle GPUsXX")
+     return tuple(devices)
+
+# clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_19: survived
+--- src/clearml_yolo/adapters/runtime/gpu_inventory.py
++++ src/clearml_yolo/adapters/runtime/gpu_inventory.py
+@@ -3,7 +3,7 @@
+     processes = _query("--query-compute-apps=gpu_uuid,pid")
+     by_gpu: dict[str, set[int]] = {}
+     for uuid, pid in processes:
+-        by_gpu.setdefault(uuid, set()).add(_telemetry_integer(pid, "pid"))
++        by_gpu.setdefault(uuid, set()).add(_telemetry_integer(pid, "XXpidXX"))
+     states = {}
+     for uuid, total, free, utilization in inventory:
+         total_bytes = _telemetry_integer(total, "memory.total") * 1024**2
+
+# clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_28: survived
+--- src/clearml_yolo/adapters/runtime/gpu_inventory.py
++++ src/clearml_yolo/adapters/runtime/gpu_inventory.py
+@@ -6,7 +6,7 @@
+         by_gpu.setdefault(uuid, set()).add(_telemetry_integer(pid, "pid"))
+     states = {}
+     for uuid, total, free, utilization in inventory:
+-        total_bytes = _telemetry_integer(total, "memory.total") * 1024**2
++        total_bytes = _telemetry_integer(total, "XXmemory.totalXX") * 1024**2
+         free_bytes = _telemetry_integer(free, "memory.free") * 1024**2
+         if total_bytes <= 0 or not 0 <= free_bytes <= total_bytes:
+             raise RuntimeError("GPU telemetry unavailable: inconsistent total/free memory readings")
+... and 14 more:
+    clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_39: survived
+    clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_46: survived
+    clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_52: survived
+    clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_53: survived
+    clearml_yolo.adapters.runtime.gpu_inventory.x_gpu_states__mutmut_69: survived
+    clearml_yolo.adapters.runtime.gpu_inventory.x_require_idle__mutmut_19: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_20: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_21: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_39: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_4: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_40: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_5: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_7: survived
+    clearml_yolo.adapters.runtime.gpu_memory.x_reserve_cuda_memory__mutmut_8: survived
+Machine evidence: /mnt/wsl/data/nkt/clearml-yolo/specs/014-estimated-batch-acceptance/evidence/2026-11-16-memory-basis-mutation-final.json
+Counts: {'killed': 214, 'survived': 19}

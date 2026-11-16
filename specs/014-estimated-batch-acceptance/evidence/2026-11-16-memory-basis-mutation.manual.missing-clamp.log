@@ -1,0 +1,32 @@
+...F...                                                                  [100%]
+=================================== FAILURES ===================================
+______ test_normalized_memory_saturates_at_cuda_capacity_in_caller_order _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d0016ad4b60>
+
+    def test_normalized_memory_saturates_at_cuda_capacity_in_caller_order(monkeypatch: pytest.MonkeyPatch) -> None:
+        mib = 1024**2
+        devices = (
+            _device().model_copy(update={"uuid": "GPU-peer", "total_memory_bytes": 100 * mib}),
+            _device().model_copy(update={"total_memory_bytes": 200 * mib}),
+        )
+    
+        def query(selector: str) -> list[list[str]]:
+            return (
+                []
+                if selector.startswith("--query-compute-apps=")
+                else [["GPU-test", "150", "70", "0"], ["GPU-peer", "200", "150", "0"]]
+            )
+    
+        monkeypatch.setattr(gpu, "_query", query)
+        for unavailable in (gpu.require_idle(devices), gpu.monitor_devices(devices, lambda: ())):
+>           assert unavailable == (0, 130 * mib)
+E           assert (-52428800, 136314880) == (0, 136314880)
+E             
+E             At index 0 diff: -52428800 != 0
+E             Use -v to get more diff
+
+tests/test_gpu_inventory.py:355: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_gpu_inventory.py::test_normalized_memory_saturates_at_cuda_capacity_in_caller_order
+1 failed, 6 passed in 0.40s

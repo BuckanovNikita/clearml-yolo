@@ -1,0 +1,593 @@
+task: [coverage] mkdir -p /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.tmp/coverage
+task: [coverage] env UV_PROJECT_ENVIRONMENT=/mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv TESTMON_DATAFILE=/mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.testmondata COVERAGE_FILE=/mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.tmp/coverage/.coverage RUFF_CACHE_DIR=/mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.ruff_cache MYPY_CACHE_DIR=/mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.mypy_cache uv run --locked pytest --cov --ignore=tests/integration -n 4
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+Using --randomly-seed=50987836
+rootdir: /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo
+configfile: pyproject.toml
+testpaths: tests
+plugins: cov-7.1.0, anyio-4.14.2, xdist-3.8.0, randomly-5.1.0, typeguard-4.6.0, hypothesis-6.169.1, testmon-2.3.0, hydra-core-1.3.4
+created: 4/4 workers
+4 workers [4814 items]
+
+........................................................................ [  1%]
+........................................................................ [  2%]
+........................................................................ [  4%]
+........................................................................ [  5%]
+........................................................................ [  7%]
+........................................................................ [  8%]
+........................................................................ [ 10%]
+........................................................................ [ 11%]
+........................................................................ [ 13%]
+........................................................................ [ 14%]
+........................................................................ [ 16%]
+........................................................................ [ 17%]
+........................................................................ [ 19%]
+........................................................................ [ 20%]
+........................................................................ [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 26%]
+............................................................/mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+../mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+.......... [ 28%]
+........................................................................ [ 29%]
+........................................................................ [ 31%]
+........................................................................ [ 32%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+........................................................................ [ 37%]
+........................................................................ [ 38%]
+........................................................................ [ 40%]
+........................................................................ [ 41%]
+........................................................................ [ 43%]
+........................................................................ [ 44%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 49%]
+........................................................................ [ 50%]
+........................................................................ [ 52%]
+........................................................................ [ 53%]
+........................................................................ [ 55%]
+........................................................................ [ 56%]
+........................................................................ [ 58%]
+........................................................................ [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 62%]
+........................................................................ [ 64%]
+........................................................................ [ 65%]
+........................................................................ [ 67%]
+........................................................................ [ 68%]
+........................................................................ [ 70%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+........................................................................ [ 76%]
+........................................................................ [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 85%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+........................................................................ [ 89%]
+........................................................................ [ 91%]
+........................................................................ [ 92%]
+........................................................................ [ 94%]
+........................................................................ [ 95%]
+............................................s........................... [ 97%]
+........................................................................ [ 98%]
+..............................................................           [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/hydra_zen/structured_configs/_implementations.py:2619: 76 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/hydra_zen/structured_configs/_implementations.py:2619: PydanticDeprecatedSince20: The `__fields__` attribute is deprecated, use the `model_fields` class property instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    _fields = target.__fields__  # type: ignore
+
+tests/test_shared_extraction_compatibility.py::test_real_report_values_styles_and_layout_equal_frozen_workbooks[False]
+tests/test_shared_extraction_compatibility.py::test_real_report_values_styles_and_layout_equal_frozen_workbooks[True]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/report_generator/reports/business/builder.py:66: UserWarning: Unavailable business values in 'f1_score': 1/3 classes; rollout requires all criteria
+    df2_goals = add_goal_columns(df2, biz)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:362: PyparsingDeprecationWarning: 'setDefaultWhitespaceChars' deprecated - use 'set_default_whitespace_chars'
+    ParserElement.setDefaultWhitespaceChars(' \t')
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:368: PyparsingDeprecationWarning: 'replaceWith' deprecated - use 'replace_with'
+    true_expr = Keyword("true", caseless=True).setParseAction(replaceWith(True))
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:368: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    true_expr = Keyword("true", caseless=True).setParseAction(replaceWith(True))
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:369: PyparsingDeprecationWarning: 'replaceWith' deprecated - use 'replace_with'
+    false_expr = Keyword("false", caseless=True).setParseAction(replaceWith(False))
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:369: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    false_expr = Keyword("false", caseless=True).setParseAction(replaceWith(False))
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:370: PyparsingDeprecationWarning: 'replaceWith' deprecated - use 'replace_with'
+    null_expr = Keyword("null", caseless=True).setParseAction(replaceWith(NoneValue()))
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:370: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    null_expr = Keyword("null", caseless=True).setParseAction(replaceWith(NoneValue()))
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:373: PyparsingDeprecationWarning: 'escChar' argument is deprecated, use 'esc_char'
+    key = QuotedString('"', escChar='\\', unquoteResults=False) | \
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:373: PyparsingDeprecationWarning: 'unquoteResults' argument is deprecated, use 'unquote_results'
+    key = QuotedString('"', escChar='\\', unquoteResults=False) | \
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:374: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    Regex(regexp_numbers, re.DOTALL).setParseAction(safe_convert_number) | \
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:382: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    number_expr = Regex(regexp_numbers, re.DOTALL).setParseAction(convert_number)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:386: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    ).setParseAction(convert_period)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:390: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    multiline_string = Regex('""".*?"*"""', re.DOTALL | re.UNICODE).setParseAction(parse_multi_string)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:392: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    quoted_string = Regex(r'"(?:[^"\\\n]|\\.)*"[ \t]*', re.UNICODE).setParseAction(create_quoted_string)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:399: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    re.UNICODE).setParseAction(unescape_string)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:400: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    substitution_expr = Regex(r'[ \t]*\$\{[^\}]+\}[ \t]*').setParseAction(create_substitution)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:413: PyparsingDeprecationWarning: 'setParseAction' deprecated - use 'set_parse_action'
+    ).setParseAction(include_config)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:438: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    config = config_expr.parseString(content, parseAll=True)[0]
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pyparsing/util.py:466: PyparsingDeprecationWarning: 'parseAll' argument is deprecated, use 'parse_all'
+    return fn(self, *args, **kwargs)
+
+tests/test_workflow_quality.py: 12 warnings
+tests/test_clearml_session.py: 2 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/utilities/pyhocon/config_parser.py:364: PyparsingDeprecationWarning: 'setDefaultWhitespaceChars' deprecated - use 'set_default_whitespace_chars'
+    ParserElement.setDefaultWhitespaceChars(default)
+
+tests/test_workflow_quality.py: 24 warnings
+tests/test_clearml_results.py: 4 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/digital_metrics/reporting/dashboard.py:323: UserWarning: Glyph 29483 (\N{CJK UNIFIED IDEOGRAPH-732B}) missing from font(s) DejaVu Sans.
+    figure.savefig(
+
+tests/test_workflow_quality.py: 52 warnings
+tests/test_evaluation_identity.py: 4 warnings
+tests/test_clearml_results.py: 8 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/clearml/binding/matplotlib_bind.py:245: UserWarning: Glyph 29483 (\N{CJK UNIFIED IDEOGRAPH-732B}) missing from font(s) DejaVu Sans.
+    ret = PatchedMatplotlib._patched_original_savefig(self, *args, **kw)
+
+tests/test_detector_augmentation.py::test_native_bridges_accept_empty_crops_and_raw_mosaic_donors[False-rfdetr]
+tests/test_detector_augmentation.py::test_rfdetr_repeated_native_setup_keeps_custom_training_only[Large]
+tests/test_detector_augmentation.py::test_native_bridges_accept_empty_crops_and_raw_mosaic_donors[True-rfdetr]
+tests/test_model_assets_loading.py::test_rf_registry_supplies_full_native_weights_with_checksum[medium]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/test_detector_augmentation.py::test_deim_custom_pipeline_preserves_subpixel_boxes
+tests/test_detector_augmentation.py::test_fasterrcnn_dataloader_workers_are_reproducible
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/albumentations/core/composition.py:331: UserWarning: Got processor for bboxes, but no transform to process it.
+    self._set_keys()
+
+tests/test_detector_augmentation.py::test_rfdetr_repeated_native_setup_keeps_custom_training_only[Medium]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pydantic/main.py:263: PretrainWeightsCompatibilityWarning: RFDETRMediumConfig was instantiated with pretrain_weights=None. The model will be initialised from scratch, which typically produces lower accuracy than fine-tuning from the published checkpoint ('rf-detr-medium.pth').
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_detector_augmentation.py::test_rfdetr_repeated_native_setup_keeps_custom_training_only[Nano]
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-True]
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-False]
+tests/test_rfdetr_probe.py::test_native_datamodule_and_lightning_accumulation_execute_exact_workload
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[False-False]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pydantic/main.py:263: PretrainWeightsCompatibilityWarning: RFDETRNanoConfig was instantiated with pretrain_weights=None. The model will be initialised from scratch, which typically produces lower accuracy than fine-tuning from the published checkpoint ('rf-detr-nano.pth').
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_detector_augmentation.py::test_rfdetr_repeated_native_setup_keeps_custom_training_only[Large]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pydantic/main.py:263: PretrainWeightsCompatibilityWarning: RFDETRLargeConfig was instantiated with pretrain_weights=None. The model will be initialised from scratch, which typically produces lower accuracy than fine-tuning from the published checkpoint ('rf-detr-large-2026.pth').
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_detector_augmentation.py::test_rfdetr_repeated_native_setup_keeps_custom_training_only[Small]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pydantic/main.py:263: PretrainWeightsCompatibilityWarning: RFDETRSmallConfig was instantiated with pretrain_weights=None. The model will be initialised from scratch, which typically produces lower accuracy than fine-tuning from the published checkpoint ('rf-detr-small.pth').
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-True]
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-False]
+tests/test_rfdetr_probe.py::test_native_datamodule_and_lightning_accumulation_execute_exact_workload
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[False-False]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pydantic/main.py:112: PretrainWeightsCompatibilityWarning: RFDETRNanoConfig was instantiated with pretrain_weights=None. The model will be initialised from scratch, which typically produces lower accuracy than fine-tuning from the published checkpoint ('rf-detr-nano.pth').
+    'validate_assignment': lambda model, name, val: model.__pydantic_validator__.validate_assignment(model, name, val),  # pyright: ignore[reportAssignmentType]
+
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-True]
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-False]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pytorch_lightning/utilities/_pytree.py:21: FutureWarning: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+    return [pytree], LeafSpec()
+
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-True]
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-False]
+tests/test_rfdetr_probe.py::test_native_datamodule_and_lightning_accumulation_execute_exact_workload
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[False-False]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:434: The 'train_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=31` in the `DataLoader` to improve performance.
+
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[True-False]
+tests/test_rfdetr_probe.py::test_native_datamodule_and_lightning_accumulation_execute_exact_workload
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[False-False]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:434: The 'val_dataloader' does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` to `num_workers=31` in the `DataLoader` to improve performance.
+
+tests/test_rfdetr_probe.py::test_native_datamodule_and_lightning_accumulation_execute_exact_workload
+tests/test_rfdetr_probe.py::test_fit_counts_real_amp_updates_before_stopping_and_validating[False-False]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/pytorch_lightning/utilities/_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+
+tests/test_execution_lifecycle.py::test_channel_is_not_available_to_forked_workers@serial
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/tests/test_execution_lifecycle.py:171: DeprecationWarning: This process (pid=3690434) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[None]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[None]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[None]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[None]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/tests/test_evaluation_identity.py:60: UserWarning: Glyph 29483 (\N{CJK UNIFIED IDEOGRAPH-732B}) missing from font(s) DejaVu Sans.
+    figure.canvas.draw()
+
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+tests/test_evaluation_identity.py::test_real_exports_and_payload_retain_identity[0123456789abcdef0123456789abcdef]
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/tests/test_evaluation_identity.py:63: UserWarning: Glyph 29483 (\N{CJK UNIFIED IDEOGRAPH-732B}) missing from font(s) DejaVu Sans.
+    original(figure, *args, **kwargs)
+
+tests/test_clearml_results.py: 12 warnings
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/digital_metrics/reporting/dashboard.py:238: UserWarning: Glyph 29483 (\N{CJK UNIFIED IDEOGRAPH-732B}) missing from font(s) DejaVu Sans.
+    plt.tight_layout()
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/eta/constants.py:50: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    AUTHOR = _META["author"]
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/eta/constants.py:52: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    URL = _META["home-page"]
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/fiftyone/server/scalars.py:19: DeprecationWarning: Passing a class to strawberry.scalar() is deprecated. Use StrawberryConfig.scalar_map instead for better type checking support. See: https://strawberry.rocks/docs/types/scalars
+    BSON = gql.scalar(
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/fiftyone/server/scalars.py:25: DeprecationWarning: Passing a class to strawberry.scalar() is deprecated. Use StrawberryConfig.scalar_map instead for better type checking support. See: https://strawberry.rocks/docs/types/scalars
+    BSONArray = gql.scalar(
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/fiftyone/server/scalars.py:31: DeprecationWarning: Passing a class to strawberry.scalar() is deprecated. Use StrawberryConfig.scalar_map instead for better type checking support. See: https://strawberry.rocks/docs/types/scalars
+    JSON = gql.scalar(
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/fiftyone/server/scalars.py:37: DeprecationWarning: Passing a class to strawberry.scalar() is deprecated. Use StrawberryConfig.scalar_map instead for better type checking support. See: https://strawberry.rocks/docs/types/scalars
+    JSONArray = gql.scalar(
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/fiftyone/server/scalars.py:43: DeprecationWarning: Passing a class to strawberry.scalar() is deprecated. Use StrawberryConfig.scalar_map instead for better type checking support. See: https://strawberry.rocks/docs/types/scalars
+    DateTime = gql.scalar(
+
+tests/test_fiftyone_evaluation_results.py::test_wrong_class_pair_claims_gt_and_retains_source_fn
+tests/test_fiftyone_evaluation_results.py::test_old_payload_has_no_invented_ap
+tests/test_fiftyone_evaluation_results.py::test_f1_matches_source_epsilon
+tests/test_fiftyone_evaluation_results.py::test_serialization_retains_report_ids_and_ap
+  /mnt/wsl/data/nkt/.codex/worktrees/6140/clearml-yolo/.venv/lib/python3.12/site-packages/fiftyone/server/scalars.py:50: DeprecationWarning: Passing a class to strawberry.scalar() is deprecated. Use StrawberryConfig.scalar_map instead for better type checking support. See: https://strawberry.rocks/docs/types/scalars
+    Date = gql.scalar(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.12.13-final-0 _______________
+
+Name                                                             Stmts   Miss Branch BrPart   Cover   Missing
+-------------------------------------------------------------------------------------------------------------
+src/clearml_yolo/__init__.py                                         0      0      0      0 100.00%
+src/clearml_yolo/adapters/__init__.py                                0      0      0      0 100.00%
+src/clearml_yolo/adapters/assets/__init__.py                         0      0      0      0 100.00%
+src/clearml_yolo/adapters/assets/archive.py                         91     15     42     11  78.95%   18-23, 38, 41->47, 43, 48, 50, 61, 72, 75, 81, 91-92, 104
+src/clearml_yolo/adapters/assets/bundles.py                        161     12     44      8  89.27%   51, 55, 64-65, 129, 144, 147, 201-202, 216-217, 219
+src/clearml_yolo/adapters/assets/execution.py                       69      8     46      3  85.22%   30-32, 79-82, 92
+src/clearml_yolo/adapters/assets/http.py                            53     12     20      4  69.86%   40-48, 54, 56, 82
+src/clearml_yolo/adapters/assets/hub.py                            408     36    126     27  87.08%   165, 172, 179-180, 182, 194, 197-201, 206, 209-214, 222, 225, 309, 321, 328->340, 350, 353, 357, 360, 373->exit, 375, 378, 387->390, 408-409, 466, 567, 571->575, 603, 606, 611, 618
+src/clearml_yolo/adapters/assets/preparation.py                    153      7     34      3  94.65%   102-104, 108-109, 142->exit, 151, 155
+src/clearml_yolo/adapters/assets/resolver.py                       135      6     40      3  94.86%   62, 75, 119-120, 175, 207
+src/clearml_yolo/adapters/assets/sources.py                         27      4      4      0  87.10%   44-48
+src/clearml_yolo/adapters/assets/storage.py                         26      1      6      2  90.62%   13, 31->33
+src/clearml_yolo/adapters/assets/validation.py                      38      3     20      2  91.38%   30-31, 41
+src/clearml_yolo/adapters/augmentation/__init__.py                   0      0      0      0 100.00%
+src/clearml_yolo/adapters/augmentation/configuration.py             22      2      6      2  85.71%   13, 19
+src/clearml_yolo/adapters/augmentation/pipeline.py                  98      6     34      6  90.91%   41, 43, 45, 47, 54, 141
+src/clearml_yolo/adapters/augmentation/probe.py                     38      3      6      3  86.36%   24, 62, 65
+src/clearml_yolo/adapters/augmentation/serialization.py            155     15     66     10  88.69%   63, 104, 106, 115, 123, 139-140, 151, 153, 177, 187, 191, 203, 225-226
+src/clearml_yolo/adapters/augmentation/torch_data.py                29      1      8      1  94.59%   18
+src/clearml_yolo/adapters/clearml/__init__.py                        0      0      0      0 100.00%
+src/clearml_yolo/adapters/clearml/cache.py                         287      3    172      4  98.47%   173-174, 184, 214->216, 295->294, 325->324
+src/clearml_yolo/adapters/clearml/console.py                        80     10     20      5  85.00%   71-72, 78, 85, 104, 107, 115-117, 122
+src/clearml_yolo/adapters/clearml/console_worker.py                132     49     44      6  60.80%   66->74, 101, 105, 114, 134, 142-144, 147-148, 160, 170-177, 187-233, 237, 246
+src/clearml_yolo/adapters/clearml/datasets.py                       26      1     10      1  94.44%   39
+src/clearml_yolo/adapters/clearml/deadline.py                       35      2      8      2  90.70%   42, 49
+src/clearml_yolo/adapters/clearml/detectors.py                      78      4     20      4  91.84%   51, 97, 103, 148
+src/clearml_yolo/adapters/clearml/links.py                          17      0      2      0 100.00%
+src/clearml_yolo/adapters/clearml/models.py                        269     13    118     15  92.76%   46, 194, 248, 254, 273, 283, 314, 333, 335, 355, 358, 367, 392, 409->411, 412->414
+src/clearml_yolo/adapters/clearml/naming.py                         87      4     22      4  92.66%   182, 188, 210, 213
+src/clearml_yolo/adapters/clearml/native.py                        260     19     98     22  87.99%   58, 89->87, 102->99, 105, 112, 134, 142-145, 155, 186->190, 190->192, 195->197, 220, 224, 247, 288, 298, 301, 322, 339, 444, 446, 448
+src/clearml_yolo/adapters/clearml/parameters.py                      6      0      0      0 100.00%
+src/clearml_yolo/adapters/clearml/population.py                     33      2     12      2  91.11%   15, 32
+src/clearml_yolo/adapters/clearml/report.py                        193      1     74      2  98.88%   189, 388->394
+src/clearml_yolo/adapters/clearml/results.py                       273     12    106     13  93.40%   55, 58, 89, 146->exit, 195, 197, 203, 274, 280, 324, 326, 368, 378
+src/clearml_yolo/adapters/clearml/script.py                         50      2     18      1  95.59%   78-81
+src/clearml_yolo/adapters/clearml/session.py                       960     62    388     45  92.06%   97, 105, 139, 171, 287, 295-296, 347->exit, 387->393, 399, 416-417, 426, 436, 461-462, 486, 526, 574, 579, 584-590, 763, 790->793, 806-807, 829->831, 873, 893-894, 915, 937, 954, 975, 979, 981, 988, 991, 993, 1043, 1050, 1053, 1067, 1157, 1184, 1201, 1230, 1233, 1381, 1390, 1394, 1396, 1410, 1417, 1419-1426, 1488-1496, 1518, 1528
+src/clearml_yolo/adapters/deim/__init__.py                           0      0      0      0 100.00%
+src/clearml_yolo/adapters/deim/assets.py                            25      0      2      0 100.00%
+src/clearml_yolo/adapters/deim/backend.py                          298     55     84     18  78.80%   49, 55-57, 61-63, 65, 101-103, 125, 133, 137->134, 144->140, 147-149, 164, 188-190, 225, 229, 233, 237, 240-241, 244, 247, 260-285, 343-345, 377, 384-386, 390, 409-413, 496, 500-508
+src/clearml_yolo/adapters/deim/hf_weights.py                       127      3     30      3  96.18%   106, 128, 196
+src/clearml_yolo/adapters/deim/probe.py                            167     54     40      5  65.70%   37-40, 120->123, 166, 196->198, 204->206, 207, 222, 225, 261-282, 293-346
+src/clearml_yolo/adapters/deim/source.py                           122     25     40      9  74.07%   78, 81, 115->exit, 121-123, 130, 133-136, 158-162, 171-179, 193, 198, 208, 209->212
+src/clearml_yolo/adapters/deim/transforms.py                        41      3      8      3  87.76%   33, 37, 70
+src/clearml_yolo/adapters/evaluation/__init__.py                     0      0      0      0 100.00%
+src/clearml_yolo/adapters/evaluation/comparison.py                  20      0      2      0 100.00%
+src/clearml_yolo/adapters/evaluation/pr_curves.py                    7      0      0      0 100.00%
+src/clearml_yolo/adapters/evaluation/scoring.py                    267     11     60      7  94.50%   103, 118, 192, 195-196, 317-318, 334-335, 339, 477
+src/clearml_yolo/adapters/export/__init__.py                         2      0      0      0 100.00%
+src/clearml_yolo/adapters/export/attention_precision.py             70      2     34      2  96.15%   23, 72
+src/clearml_yolo/adapters/export/build.py                           73     43     24      3  38.14%   24-45, 57, 73, 76-100
+src/clearml_yolo/adapters/export/metadata.py                        13      0      0      0 100.00%
+src/clearml_yolo/adapters/export/onnx.py                            47     30     12      0  28.81%   39-93
+src/clearml_yolo/adapters/export/positions.py                       77     49     18      0  29.47%   50-51, 54-61, 65-96, 103-104, 107-117
+src/clearml_yolo/adapters/export/precision.py                      138      3     46      4  96.20%   49, 68, 146->148, 177
+src/clearml_yolo/adapters/export/preprocessing.py                   82     11     38     11  81.67%   17, 46, 50, 60, 79, 81, 85, 89, 113, 115, 129
+src/clearml_yolo/adapters/export/quality.py                         89      6     30      6  89.92%   38, 56, 65, 81, 125, 132
+src/clearml_yolo/adapters/export/runtime.py                        189     72     86     28  58.55%   23-51, 56, 61-65, 69-71, 87, 101, 105, 107, 111, 115, 121, 126, 135, 140, 142, 147, 151, 155, 157, 159, 161, 163->162, 165, 170, 181, 194, 203, 207, 209-214, 227, 233-243
+src/clearml_yolo/adapters/export/swin.py                            61     34     16      0  42.86%   40-41, 44-81, 85-90, 95-105
+src/clearml_yolo/adapters/export/tensors.py                        132     90     12      0  31.94%   35-62, 105-113, 117-183, 186-230
+src/clearml_yolo/adapters/export/verification.py                   151     66     32      6  54.10%   43, 46, 49, 68-72, 88, 109-181, 212-225, 243, 245->247, 315->317
+src/clearml_yolo/adapters/fasterrcnn/__init__.py                     0      0      0      0 100.00%
+src/clearml_yolo/adapters/fasterrcnn/assets.py                       2      0      0      0 100.00%
+src/clearml_yolo/adapters/fasterrcnn/backend.py                     27      6      6      3  72.73%   23, 35, 49, 58-61
+src/clearml_yolo/adapters/fasterrcnn/configuration.py                2      0      0      0 100.00%
+src/clearml_yolo/adapters/fasterrcnn/data.py                         2      0      0      0 100.00%
+src/clearml_yolo/adapters/fasterrcnn/evaluation.py                   2      2      0      0   0.00%   3-5
+src/clearml_yolo/adapters/fasterrcnn/inference.py                   10      0      0      0 100.00%
+src/clearml_yolo/adapters/fasterrcnn/model.py                       26      2      8      2  88.24%   30, 38
+src/clearml_yolo/adapters/fasterrcnn/training.py                     9      0      0      0 100.00%
+src/clearml_yolo/adapters/fasterrcnn/transform.py                    2      0      0      0 100.00%
+src/clearml_yolo/adapters/fcos/__init__.py                           0      0      0      0 100.00%
+src/clearml_yolo/adapters/fcos/backend.py                           27      6      6      3  72.73%   29, 52, 54, 63-66
+src/clearml_yolo/adapters/fcos/model.py                             21      3      8      3  79.31%   24, 26, 32
+src/clearml_yolo/adapters/fiftyone/__init__.py                       0      0      0      0 100.00%
+src/clearml_yolo/adapters/fiftyone/bounded.py                      312     72     92     11  76.49%   65, 71-73, 91, 108-110, 114-121, 126-193, 197-224, 228-235, 295, 307, 310, 330->329, 341-342, 411, 418, 434, 494, 506
+src/clearml_yolo/adapters/fiftyone/evaluation.py                   251    104     72      7  54.49%   102-103, 167-168, 217-227, 232-245, 249-252, 258-260, 322-327, 337, 342-346, 380, 399-409, 414-415, 456-464, 475-495, 509-548
+src/clearml_yolo/adapters/fiftyone/noop.py                           6      1      0      0  83.33%   13
+src/clearml_yolo/adapters/fiftyone/panel.py                        261    261     88      0   0.00%   7-448
+src/clearml_yolo/adapters/fiftyone/plugin/__init__.py                5      5      0      0   0.00%   3-14
+src/clearml_yolo/adapters/fiftyone/protocol.py                      16      0      0      0 100.00%
+src/clearml_yolo/adapters/fiftyone/publisher.py                    220    112     66      5  39.51%   38-40, 65, 74-81, 85-89, 99-139, 146-155, 167-178, 189-232, 236-241, 246-250, 260-276, 288, 295-297, 384, 386
+src/clearml_yolo/adapters/fiftyone/worker.py                        41     41     12      0   0.00%   3-63
+src/clearml_yolo/adapters/integrations/__init__.py                   0      0      0      0 100.00%
+src/clearml_yolo/adapters/integrations/batch_lookup.py              35      0      8      0 100.00%
+src/clearml_yolo/adapters/integrations/batch_probe.py              121      4     32      3  95.42%   103, 131, 182, 248
+src/clearml_yolo/adapters/integrations/batch_profiles.py            95      7     38      3  89.47%   50-55, 57, 68
+src/clearml_yolo/adapters/integrations/batch_resolution.py          50      0     12      0 100.00%
+src/clearml_yolo/adapters/integrations/detectors.py                258     23    104     17  87.29%   96, 110, 115, 120, 122, 139-142, 166, 175, 214, 282-285, 307, 318, 319->323, 342, 404, 406, 426, 440-442
+src/clearml_yolo/adapters/integrations/distributed_training.py      78     16     24      2  76.47%   28, 33-35, 63, 128-144
+src/clearml_yolo/adapters/integrations/export_operations.py         74     33     30      7  48.08%   28, 32, 35, 39, 43-52, 61-98, 123->125, 135->137
+src/clearml_yolo/adapters/integrations/native_ddp.py               328     39    140     29  83.76%   62, 86, 89-99, 114->113, 123, 142, 150->172, 171, 208, 280-281, 296, 304, 310, 315, 322, 324, 330, 332, 336, 339, 345, 347, 382, 403, 406, 413, 415, 418, 420, 441
+src/clearml_yolo/adapters/integrations/native_runtime.py           232     10     42      5  94.53%   77, 87, 92, 102->104, 240->246, 245, 249, 264, 316-320
+src/clearml_yolo/adapters/integrations/native_trainer.py            80      7     20      3  90.00%   26, 82-88, 133
+src/clearml_yolo/adapters/integrations/probe_worker.py              50     12     16      2  69.70%   23-30, 68-71, 75
+src/clearml_yolo/adapters/integrations/training.py                  72      7     14      4  84.88%   40, 62, 95, 102, 118-120
+src/clearml_yolo/adapters/integrations/training_worker.py           57     57     20      0   0.00%   3-85
+src/clearml_yolo/adapters/observability/__init__.py                  0      0      0      0 100.00%
+src/clearml_yolo/adapters/observability/capture.py                 145     12     38      8  87.98%   58->exit, 71, 90, 134->126, 169->178, 172-174, 176, 188-189, 208-210, 217
+src/clearml_yolo/adapters/observability/diagnostics.py              31      0      4      0 100.00%
+src/clearml_yolo/adapters/observability/mirror_worker.py            39     39      8      0   0.00%   3-48
+src/clearml_yolo/adapters/observability/progress.py                 85     12     30      5  83.48%   38, 46-47, 49, 54, 85-91
+src/clearml_yolo/adapters/observability/tracing.py                 236     13     66      7  92.72%   71->67, 120-122, 163->165, 231-232, 234->exit, 244-245, 255->258, 290, 300->exit, 317-319, 344-345
+src/clearml_yolo/adapters/reporting/__init__.py                      0      0      0      0 100.00%
+src/clearml_yolo/adapters/reporting/comparison_workbook.py          20      0      2      0 100.00%
+src/clearml_yolo/adapters/reporting/count_issues.py                 99      2     32      3  96.18%   35->33, 62, 108
+src/clearml_yolo/adapters/reporting/evaluation.py                   60      1     20      1  97.50%   78
+src/clearml_yolo/adapters/reporting/evaluation_workbook.py          52      1     10      1  96.77%   52
+src/clearml_yolo/adapters/reporting/metrics_reader.py               10      0      0      0 100.00%
+src/clearml_yolo/adapters/reporting/population_counts.py            36      1     18      1  96.30%   45
+src/clearml_yolo/adapters/reporting/report_layout.py                 5      5      0      0   0.00%   3-16
+src/clearml_yolo/adapters/reporting/reports.py                      35      0      8      0 100.00%
+src/clearml_yolo/adapters/reporting/workbook_identity.py           161     14     54     12  86.98%   51, 60, 100, 107, 112, 122, 124, 126-127, 133, 152-153, 195, 253
+src/clearml_yolo/adapters/rfdetr/__init__.py                         0      0      0      0 100.00%
+src/clearml_yolo/adapters/rfdetr/assets.py                          10      1      2      1  83.33%   15
+src/clearml_yolo/adapters/rfdetr/backend.py                        219     33     74     16  81.91%   43-51, 56-58, 66, 138, 163, 170, 205, 207, 215, 240, 267, 296-299, 308, 312-326, 339, 381, 385
+src/clearml_yolo/adapters/rfdetr/probe.py                          202     38     62     13  79.17%   73, 128, 135, 175, 181->180, 199, 204, 215, 257, 259, 273, 279, 305, 309-335
+src/clearml_yolo/adapters/rfdetr/transforms.py                      38      4     10      4  83.33%   41, 57, 61, 66
+src/clearml_yolo/adapters/runtime/__init__.py                        0      0      0      0 100.00%
+src/clearml_yolo/adapters/runtime/bootstrap.py                      65      4     14      5  88.61%   64->66, 79-80, 88->91, 97, 98->exit, 103
+src/clearml_yolo/adapters/runtime/distributed.py                    37     15     18      2  58.18%   16, 22, 37-52
+src/clearml_yolo/adapters/runtime/execution_lifecycle.py            50      6     14      4  84.38%   27-28, 35, 37-38, 41
+src/clearml_yolo/adapters/runtime/git_workspace.py                  17      0      4      0 100.00%
+src/clearml_yolo/adapters/runtime/gpu_inventory.py                 109      1     40      1  98.66%   58
+src/clearml_yolo/adapters/runtime/gpu_memory.py                     33      0      8      0 100.00%
+src/clearml_yolo/adapters/runtime/process_tree.py                  520     61    190     27  85.92%   69, 87-88, 93, 120-121, 168-170, 206-207, 245-246, 268-269, 286-287, 290->294, 315, 321, 331, 348-349, 352->356, 379, 396-397, 402, 411, 423-424, 438, 442, 488, 496-497, 518-519, 524-525, 534-543, 552, 554, 587, 593->595, 607-609, 661, 692->695, 715-716, 720, 727-730, 745->748, 752
+src/clearml_yolo/adapters/runtime/worker_pool.py                   136     19     32      3  85.71%   55-56, 58->62, 60-61, 64-65, 124-129, 161-162, 166-167, 179, 185-186, 190->192
+src/clearml_yolo/adapters/runtime/workers.py                        87     14     26      2  84.07%   65-66, 70-71, 75-76, 80-81, 83, 103, 130-133
+src/clearml_yolo/adapters/storage/__init__.py                        0      0      0      0 100.00%
+src/clearml_yolo/adapters/storage/batch_estimates.py                45      1      2      1  95.74%   39
+src/clearml_yolo/adapters/storage/batch_sizes.py                   179      7     62      9  93.36%   98, 168, 219->214, 227, 234, 245, 290, 292, 301->293
+src/clearml_yolo/adapters/storage/checkpoint.py                     88     12     34      9  81.15%   20, 33, 36, 38-39, 56->exit, 66, 88, 91-94, 97, 107->109
+src/clearml_yolo/adapters/storage/dataset.py                        88      1     28      1  98.28%   68
+src/clearml_yolo/adapters/storage/dataset_cache.py                 241     32     78     23  82.76%   63, 116, 121, 131, 135, 138, 155, 159, 162-170, 175, 183-193, 196, 216, 265, 269, 282, 283->exit, 292, 299, 302, 305, 308, 311-312, 339, 366, 369
+src/clearml_yolo/adapters/storage/dataset_export.py                153      7     46      8  92.46%   52, 56, 58, 60, 105->76, 206, 208, 266
+src/clearml_yolo/adapters/storage/dataset_records.py               191      4     74      5  96.60%   142, 147, 240, 252, 323->317
+src/clearml_yolo/adapters/storage/dedup.py                         180     10     62      5  92.98%   98-101, 157, 165, 172, 177-178, 222
+src/clearml_yolo/adapters/storage/file_io.py                        57      2      6      2  93.65%   130, 132
+src/clearml_yolo/adapters/storage/filesystem.py                     41      0     12      0 100.00%
+src/clearml_yolo/adapters/storage/identity.py                       26      1      6      1  93.75%   23
+src/clearml_yolo/adapters/storage/native_archive.py                 27      0     10      0 100.00%
+src/clearml_yolo/adapters/storage/population.py                     13      0      6      0 100.00%
+src/clearml_yolo/adapters/storage/publication_data.py              106     10     38     10  86.11%   54, 57, 88, 95, 102, 106, 119, 122, 131, 137
+src/clearml_yolo/adapters/storage/run_identity.py                   48      1      8      1  96.43%   22
+src/clearml_yolo/adapters/torchvision/__init__.py                    0      0      0      0 100.00%
+src/clearml_yolo/adapters/torchvision/assets.py                     52      5     18      5  85.71%   42, 54, 68->79, 71-72, 82
+src/clearml_yolo/adapters/torchvision/backbone.py                   57      2     18      2  94.67%   49, 111
+src/clearml_yolo/adapters/torchvision/checkpoint.py                 13      2      6      2  78.95%   13, 20
+src/clearml_yolo/adapters/torchvision/configuration.py              10      0      2      0 100.00%
+src/clearml_yolo/adapters/torchvision/data.py                      107     10     24     10  84.73%   77, 81, 84, 86, 99, 124, 139, 167, 175, 185
+src/clearml_yolo/adapters/torchvision/distributed.py                63     12     24      6  74.71%   19-21, 23, 49-51, 60-63, 73-74, 82
+src/clearml_yolo/adapters/torchvision/evaluation.py                 66     13     18      4  77.38%   47, 65, 97, 112-124
+src/clearml_yolo/adapters/torchvision/inference.py                  37      2     10      2  91.49%   31, 59
+src/clearml_yolo/adapters/torchvision/probe.py                     131     14     32     12  84.05%   107, 124->exit, 129->exit, 138, 176, 179, 180->182, 188, 190, 195, 197, 207, 216-220
+src/clearml_yolo/adapters/torchvision/training.py                  126      5     32      9  91.14%   93, 137, 198, 237->239, 241->246, 247->239, 249->239, 252, 254
+src/clearml_yolo/adapters/torchvision/transform.py                  49      0      8      0 100.00%
+src/clearml_yolo/adapters/yolo/__init__.py                           0      0      0      0 100.00%
+src/clearml_yolo/adapters/yolo/assets.py                            52      1     10      1  96.77%   86
+src/clearml_yolo/adapters/yolo/augmentation.py                      45      2      4      2  91.84%   23, 92
+src/clearml_yolo/adapters/yolo/batch_probe.py                      166      5     42      5  95.19%   56, 138, 158, 232, 257
+src/clearml_yolo/adapters/yolo/config.py                           213      5    100      4  97.12%   270, 292, 339, 463-464
+src/clearml_yolo/adapters/yolo/ground_truth.py                     145     11     62      8  90.82%   47, 52, 67, 89-90, 112-113, 168, 234, 237, 238->245, 240
+src/clearml_yolo/adapters/yolo/inference.py                        112      3     32      2  96.53%   157-158, 179
+src/clearml_yolo/adapters/yolo/reinfer.py                          134     13     24      5  88.61%   61-66, 115, 129, 147->exit, 174-181, 183-188, 191-192
+src/clearml_yolo/application/__init__.py                             0      0      0      0 100.00%
+src/clearml_yolo/application/batch_ports.py                          4      0      0      0 100.00%
+src/clearml_yolo/application/contracts.py                          200      2     34      2  98.29%   453, 457
+src/clearml_yolo/application/evaluation.py                          17      0      0      0 100.00%
+src/clearml_yolo/application/ground_truth.py                        27      2     16      3  88.37%   24, 26, 46->60
+src/clearml_yolo/application/ports.py                               51      0      0      0 100.00%
+src/clearml_yolo/application/training_workers.py                    80      1      6      1  97.67%   119
+src/clearml_yolo/application/use_cases/__init__.py                   0      0      0      0 100.00%
+src/clearml_yolo/application/use_cases/batch_estimate.py            48      1     12      1  96.67%   66
+src/clearml_yolo/application/use_cases/compare.py                  241      7     56     10  94.28%   88, 121, 123, 178->184, 199, 209, 489->492, 500->exit, 528, 552
+src/clearml_yolo/application/use_cases/export.py                    41      4     16      4  85.96%   33, 60, 68, 71
+src/clearml_yolo/application/use_cases/ground_truth.py              10      0      0      0 100.00%
+src/clearml_yolo/application/use_cases/metrics.py                   88      3     18      3  94.34%   74, 91, 122
+src/clearml_yolo/application/use_cases/pipeline.py                 255     16     82      7  91.99%   55, 62-65, 82-83, 99-100, 154, 192->194, 243-252, 351, 489, 604->609
+src/clearml_yolo/application/use_cases/predict.py                  100      9     22      8  86.07%   26, 30, 33, 36, 62, 77-78, 102, 160
+src/clearml_yolo/application/use_cases/publication.py               49      1      6      1  96.36%   63
+src/clearml_yolo/application/use_cases/report.py                    61      3     20      3  92.59%   87, 97, 139
+src/clearml_yolo/application/use_cases/train.py                     52      2     12      2  93.75%   43, 47
+src/clearml_yolo/application/use_cases/val.py                       18      0      0      0 100.00%
+src/clearml_yolo/core/__init__.py                                    0      0      0      0 100.00%
+src/clearml_yolo/core/artifact_names.py                             17      0      0      0 100.00%
+src/clearml_yolo/core/assets.py                                     70      1      2      1  97.22%   54
+src/clearml_yolo/core/batch_estimation.py                          387      9    148     12  96.07%   148, 151, 153, 415->419, 424, 433, 457, 474->480, 522->521, 618, 623, 644
+src/clearml_yolo/core/batch_sizes.py                                67      2     12      2  94.94%   103, 106
+src/clearml_yolo/core/comparison/__init__.py                         0      0      0      0 100.00%
+src/clearml_yolo/core/comparison/assemble.py                       120      0     34      0 100.00%
+src/clearml_yolo/core/comparison/significance.py                    95      3     30      1  95.20%   179-181
+src/clearml_yolo/core/datasets.py                                   51      0     12      0 100.00%
+src/clearml_yolo/core/evaluation/__init__.py                         0      0      0      0 100.00%
+src/clearml_yolo/core/evaluation/models.py                         111      0      0      0 100.00%
+src/clearml_yolo/core/evaluation/payload.py                         47      0      0      0 100.00%
+src/clearml_yolo/core/evaluation/policy.py                          42      0     22      0 100.00%
+src/clearml_yolo/core/evaluation/result_rows.py                    132      3     56      3  96.81%   94, 97, 101
+src/clearml_yolo/core/evaluation/schema.py                          44      6     12      6  78.57%   33, 35, 37, 69, 71, 73
+src/clearml_yolo/core/export.py                                     69      3     20      3  93.26%   85, 87, 92
+src/clearml_yolo/core/export_quality.py                             82      0     24      0 100.00%
+src/clearml_yolo/core/export_requests.py                            57      2     22      2  94.94%   33, 41
+src/clearml_yolo/core/identity.py                                   45      0     10      0 100.00%
+src/clearml_yolo/core/models.py                                    125      6     24      6  91.95%   507, 529, 535, 544, 637, 643
+src/clearml_yolo/core/pipeline_outcome.py                           30      0      8      0 100.00%
+src/clearml_yolo/core/presentation.py                               98      2     26      1  97.58%   47-48
+src/clearml_yolo/core/publication.py                                33      0      0      0 100.00%
+src/clearml_yolo/core/redaction.py                                 138      7     56      7  92.78%   55, 71, 81, 226, 228, 236, 241
+src/clearml_yolo/core/report_counts.py                              18      0      4      0 100.00%
+src/clearml_yolo/core/transforms.py                                 35      0      6      0 100.00%
+src/clearml_yolo/core/validation/__init__.py                         2      0      0      0 100.00%
+src/clearml_yolo/core/validation/schemas.py                        133      4     32      2  96.36%   76, 79-80, 136
+src/clearml_yolo/core/weight_bundles.py                             93      7     24      7  88.03%   62, 94, 101, 107, 110, 114, 119
+src/clearml_yolo/entrypoints/__init__.py                             0      0      0      0 100.00%
+src/clearml_yolo/entrypoints/batch_estimate.py                     276     12     90      6  95.08%   92-94, 98-100, 112, 193->182, 207, 226, 259-261, 317, 455
+src/clearml_yolo/entrypoints/batch_estimate_worker.py               38      8      4      1  78.57%   35-37, 64-68, 72
+src/clearml_yolo/entrypoints/compare.py                              8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/composition.py                        160      8      6      1  92.17%   67-69, 93-95, 250-252
+src/clearml_yolo/entrypoints/config_tree.py                         26      1      2      1  92.86%   65
+src/clearml_yolo/entrypoints/dedup.py                               28      4      8      3  80.56%   31, 34-35, 44->exit, 49
+src/clearml_yolo/entrypoints/download_weights.py                    26      1     10      1  94.44%   50
+src/clearml_yolo/entrypoints/export.py                               8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/ground_truth.py                         8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/hydra/__init__.py                       0      0      0      0 100.00%
+src/clearml_yolo/entrypoints/hydra/common.py                       208     10     70     10  92.09%   69->exit, 112, 163, 178, 184, 232, 273, 283->287, 290, 324-326
+src/clearml_yolo/entrypoints/hydra/config_resolution.py            164      5     64      4  96.05%   48->55, 171, 178, 203, 229-230
+src/clearml_yolo/entrypoints/hydra/config_tree.py                  109      2     56      2  97.58%   128, 169
+src/clearml_yolo/entrypoints/hydra/configs.py                       60      3     16      2  93.42%   44, 53, 62
+src/clearml_yolo/entrypoints/hydra/declarations.py                 148      0      0      0 100.00%
+src/clearml_yolo/entrypoints/hydra/defaults/__init__.py              0      0      0      0 100.00%
+src/clearml_yolo/entrypoints/hydra/sweeps.py                        46     35     16      0  17.74%   15-18, 23-58, 63-66, 76-114
+src/clearml_yolo/entrypoints/hydra/transforms.py                    53      2     20      2  94.52%   81, 90
+src/clearml_yolo/entrypoints/hydra/validation.py                   240    102    134     10  54.01%   51, 117->exit, 140, 157, 161, 170, 173, 193, 200, 203, 205-214, 218-236, 241, 245-265, 270-306, 311-334
+src/clearml_yolo/entrypoints/metrics.py                              8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/options.py                             27      0      4      0 100.00%
+src/clearml_yolo/entrypoints/pipeline.py                             8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/predict.py                              8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/report.py                               8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/train.py                                8      8      2      0   0.00%   3-17
+src/clearml_yolo/entrypoints/val.py                                  8      8      2      0   0.00%   3-17
+-------------------------------------------------------------------------------------------------------------
+TOTAL                                                            20021   2562   6210    836  84.81%
+Required test coverage of 84.12% reached. Total coverage: 84.81%
+========== 4813 passed, 1 skipped, 536 warnings in 339.74s (0:05:39) ===========

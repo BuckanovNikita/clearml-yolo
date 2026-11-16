@@ -1,0 +1,88 @@
+{
+  "method": "GPUState.used_for",
+  "kind": "manual fault injection, excluded from native mutation counts",
+  "base": "137079d099490e2153405f042befe8325e9a38bc",
+  "source_sha256": {
+    "src/clearml_yolo/adapters/runtime/gpu_inventory.py": "30e963c49197e2cb471c72368558776f7f540a2faa195e812233f1fca472fb4f",
+    "src/clearml_yolo/adapters/runtime/gpu_memory.py": "e07d74d592396ecb57788be4210944e338d3f2178175e08f2b02bb90cf9f1a73",
+    "tests/test_gpu_inventory.py": "5b66105c3695016e3158513e2da03fff4403aaf0175da6a448cc07c044128ac5",
+    "tests/test_gpu_memory.py": "f7d9b080b045cdd2f4b0c4032a5baa49c582f99db3b0a02e55442a392a8ab71a",
+    "tests/test_training_workers.py": "a4a69b37288f0e33a9053f3d5abb34b74f58afab7512d9fa820fc4b6b03cb124",
+    "tests/severstal_batch.py": "1c1b43b779a6c32ec9485f7e490ca95d28c608df1e9cc4401b71e4c6865f1cb3"
+  },
+  "cases": [
+    {
+      "name": "original-mixed-basis",
+      "replacement": "return self.used",
+      "argv": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "-n",
+        "0",
+        "--no-cov",
+        "tests/test_gpu_inventory.py::test_reserve_accepts_recorded_nvml_free_despite_lower_cuda_total",
+        "tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory",
+        "tests/test_gpu_inventory.py::test_normalized_memory_saturates_at_cuda_capacity_in_caller_order"
+      ],
+      "returncode": 1,
+      "expected_returncode": 1,
+      "log": "/mnt/wsl/data/nkt/clearml-yolo/specs/014-estimated-batch-acceptance/evidence/2026-11-16-memory-basis-mutation.manual.original-mixed-basis.log",
+      "log_sha256": "699fdc6914791271f049081d7a86b63c91c2d214e1b0beab2bc0cedf14295da3",
+      "tail": "E               RuntimeError: GPU 0 free memory fell below the required reserve of 10737418240 bytes\n\nsrc/clearml_yolo/adapters/runtime/gpu_inventory.py:191: RuntimeError\n=========================== short test summary info ============================\nFAILED tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory[32607-32579.75-10240-22367-22339.75-True]\nFAILED tests/test_gpu_inventory.py::test_normalized_memory_saturates_at_cuda_capacity_in_caller_order\nFAILED tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory[32579-32607-10239-22340-22368-False]\nFAILED tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory[32607-32579.75-10261-22346-22318.75-True]\nFAILED tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory[32579-32607-10261-22318-22346-True]\nFAILED tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory[32607-32579.75-10239-22368-22340.75-False]\nFAILED tests/test_gpu_inventory.py::test_reserve_accepts_recorded_nvml_free_despite_lower_cuda_total\n7 failed in 0.46s"
+    },
+    {
+      "name": "missing-clamp",
+      "replacement": "return total_memory_bytes - self.free_bytes",
+      "argv": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "-n",
+        "0",
+        "--no-cov",
+        "tests/test_gpu_inventory.py::test_reserve_accepts_recorded_nvml_free_despite_lower_cuda_total",
+        "tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory",
+        "tests/test_gpu_inventory.py::test_normalized_memory_saturates_at_cuda_capacity_in_caller_order"
+      ],
+      "returncode": 1,
+      "expected_returncode": 1,
+      "log": "/mnt/wsl/data/nkt/clearml-yolo/specs/014-estimated-batch-acceptance/evidence/2026-11-16-memory-basis-mutation.manual.missing-clamp.log",
+      "log_sha256": "1b609bfaf7c3ae2c744e2dad7a009dd146283870caeebde06610ed4e7a65eee1",
+      "tail": "        monkeypatch.setattr(gpu, \"_query\", query)\n        for unavailable in (gpu.require_idle(devices), gpu.monitor_devices(devices, lambda: ())):\n>           assert unavailable == (0, 130 * mib)\nE           assert (-52428800, 136314880) == (0, 136314880)\nE             \nE             At index 0 diff: -52428800 != 0\nE             Use -v to get more diff\n\ntests/test_gpu_inventory.py:355: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_gpu_inventory.py::test_normalized_memory_saturates_at_cuda_capacity_in_caller_order\n1 failed, 6 passed in 0.40s"
+    },
+    {
+      "name": "restored-clean",
+      "replacement": "return max(total_memory_bytes - self.free_bytes, 0)",
+      "argv": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "-n",
+        "0",
+        "--no-cov",
+        "tests/test_gpu_inventory.py::test_reserve_accepts_recorded_nvml_free_despite_lower_cuda_total",
+        "tests/test_gpu_inventory.py::test_discovery_admission_and_monitoring_use_coherent_free_memory",
+        "tests/test_gpu_inventory.py::test_normalized_memory_saturates_at_cuda_capacity_in_caller_order"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "log": "/mnt/wsl/data/nkt/clearml-yolo/specs/014-estimated-batch-acceptance/evidence/2026-11-16-memory-basis-mutation.manual.restored-clean.log",
+      "log_sha256": "9c2bc789bf2cba75cc5ed822cd3fccab9cf3d7a226611daf566ceea5ed0c55b1",
+      "tail": ".......                                                                  [100%]\n7 passed in 0.39s"
+    }
+  ],
+  "private_source_restored": true,
+  "status": "passed_two_expected_red_faults_and_restored_clean_baseline",
+  "cleanup": {
+    "private_index_export_removed": true,
+    "root_hashes_unchanged": true,
+    "new_environment_created": false
+  }
+}

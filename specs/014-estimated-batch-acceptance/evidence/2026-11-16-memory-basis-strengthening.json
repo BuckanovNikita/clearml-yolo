@@ -1,0 +1,52 @@
+{
+  "status": "strengthened-tests-verified-review-pending-full-gate",
+  "files": {
+    "tests/test_gpu_inventory.py": {
+      "before_strengthening_sha256": "5b66105c3695016e3158513e2da03fff4403aaf0175da6a448cc07c044128ac5",
+      "preformat_sha256": "e6892c1e43d6790c079e0aac4999fc53e823629ab343ef7d10aa553cf5098b59",
+      "final_sha256": "de16a2b005623ef51b9b225a986f294abec73e9451365ee5ad7d23ce8e64a109"
+    },
+    "tests/test_gpu_memory.py": {
+      "before_strengthening_sha256": "f7d9b080b045cdd2f4b0c4032a5baa49c582f99db3b0a02e55442a392a8ab71a",
+      "preformat_sha256": "ce90407354d90bf987fc7a3e233cc159bdd76d333a3106b5870823ee005160b5",
+      "final_sha256": "631b9e961411a1d68b526f8ed20cc2cf8b02f6a290bb9d63728adbd94c55fe0e"
+    }
+  },
+  "product_sha256": {
+    "src/clearml_yolo/adapters/runtime/gpu_inventory.py": "30e963c49197e2cb471c72368558776f7f540a2faa195e812233f1fca472fb4f",
+    "src/clearml_yolo/adapters/runtime/gpu_memory.py": "e07d74d592396ecb57788be4210944e338d3f2178175e08f2b02bb90cf9f1a73"
+  },
+  "product_unchanged": true,
+  "checks": {
+    "focused": "260 passed in8.38s",
+    "mypy": "Success:no issues found in2 source files",
+    "ruff": "check and format-check passed",
+    "targeted_manual_faults": "9 killed; every selected test failed under its associated fault",
+    "full_offline_coverage": "coordinator running after integration"
+  },
+  "manual_mutation_receipt_sha256": "506ff531bced7be7ece7e625b39236bf2efe77d153ff0d291814410342ab52f9",
+  "logs": {
+    "mutant-metadata-name.log": "53e82f697aa177275a1a319ddab0fada47bfded267cee2691dc838a74369b983",
+    "focused.log": "5f2cbe7e9950b734e7f4ed5bc196a017a87f6f6a8782d3588e89d9193c1fe54e",
+    "mutant-allocator-cap.log": "13a2971ab925e90f80a4dae85b31ccd323018db310602d4d039eda3a727b2fb2",
+    "mutant-idle-slow.log": "6ba761c7ee97ee6e422c66cafa55a2045815bef02a78e15bd6d5a2fbf146c697",
+    "initial-focused.log": "e58fc0ef18cbeb7eaa709ca6e1757b6ebba76192d65529660d6cca56c673e1f9",
+    "mutant-metadata-text.log": "ef7f5f1e41c1990030300039d908116a070c1a4d4ebcdcf649061b172f315ec9",
+    "mutant-metadata-check.log": "94c727e802765f890714817f8334317342ac9f71c4e4c6ca82acdc2780c20778",
+    "mutant-metadata-argv.log": "812613234d137b37ec61669d7ba71cbf1f342cbe3d667aa50ae03b9324255e21",
+    "mutant-metadata-timeout.log": "ae1ba988f483e9a9b2d14e6fff245c43a0de344714ba9d755cb40b35f0c20d9f",
+    "mutant-idle-none.log": "295f97bc83098152db6868dc177fdb7efe676526d65e3c1112d20a5aa721a6ce",
+    "mypy.log": "f9b031e5c45aa702cd4fef028d465551cb20a2c4698e0913c7b00766b20ac4d8",
+    "manual-run.log": "506ff531bced7be7ece7e625b39236bf2efe77d153ff0d291814410342ab52f9",
+    "mutant-metadata-capture.log": "8f0f49dc9bd68079f3472f2646f2d7a78cf8ea88bfb3855549489c026634ce72"
+  },
+  "preformat": "Actual copies captured before Ruff --fix/format; not reconstructed",
+  "automatic_changes": "Ruff fixed outer quote style and split one composite assertion, then formatted both files",
+  "review": "count_review inspected both final tests without blockers; full gate pending",
+  "cleanup": "All focused/mypy/manual child sessions exited. No GPU, SDK cache, service changes, staging or commits. Only small test snapshots, diffs, fault sources and logs retained. Pytest temporary fixtures left to standard pytest lifecycle; no shared cache deletion.",
+  "limits": [
+    "Real CPU child uses fake torch/NVML boundary; does not establish liveGPU execution",
+    "Timeout test verifies finite\u226460s policy and accelerates child timeout to0.5s; 30\u219231s remains bounded margin, not equivalent latency",
+    "Nine targeted manual faults supplement, not replace, prior233-mutant native advisory report"
+  ]
+}
