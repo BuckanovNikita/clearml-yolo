@@ -1,0 +1,155 @@
+{
+  "date": "2026-11-16",
+  "scope": "ticket88 independent ClearML readback",
+  "source_commit": "60b5c63aebd70fbe6329f6e0534bd1cccfc6832b",
+  "fresh_audit": {
+    "status": "passed",
+    "started_utc": "2026-11-16T14:40:51.797674+00:00",
+    "source_commit": "60b5c63aebd70fbe6329f6e0534bd1cccfc6832b",
+    "environment": "cy-it-adb183",
+    "task_id": "d6158c43c4fa4b88b9cca75a7d6fd55b",
+    "output_model_ids": [
+      "ff7aee50c13e4488bf47fbfeb1c8d401"
+    ],
+    "task_status": "completed",
+    "artifact_names": [
+      "gt_csv",
+      "metrics_best_confidences_val",
+      "metrics_dashboard_dtrk_test",
+      "metrics_dashboard_dtrk_val",
+      "metrics_dashboard_full_test",
+      "metrics_dashboard_full_val",
+      "pipeline_outcome",
+      "predicts_csv"
+    ],
+    "configuration_names": [
+      "dataset",
+      "run",
+      "run_overrides"
+    ],
+    "plot_inventory": [
+      {
+        "metric": "BoxF1_curve",
+        "variant": "plot image",
+        "iteration": 0
+      },
+      {
+        "metric": "BoxP_curve",
+        "variant": "plot image",
+        "iteration": 0
+      },
+      {
+        "metric": "BoxR_curve",
+        "variant": "plot image",
+        "iteration": 0
+      },
+      {
+        "metric": "Confusion matrix",
+        "variant": "train \u00b7 test",
+        "iteration": 0
+      },
+      {
+        "metric": "Confusion matrix",
+        "variant": "train \u00b7 val",
+        "iteration": 0
+      },
+      {
+        "metric": "Precision-recall",
+        "variant": "train \u00b7 test",
+        "iteration": 0
+      },
+      {
+        "metric": "confusion_matrix",
+        "variant": "plot image",
+        "iteration": 0
+      },
+      {
+        "metric": "confusion_matrix_normalized",
+        "variant": "plot image",
+        "iteration": 0
+      },
+      {
+        "metric": "labels",
+        "variant": "plot image",
+        "iteration": 0
+      },
+      {
+        "metric": "metrics",
+        "variant": "test",
+        "iteration": 0
+      },
+      {
+        "metric": "metrics",
+        "variant": "val",
+        "iteration": 0
+      },
+      {
+        "metric": "predict",
+        "variant": "resolution",
+        "iteration": 0
+      },
+      {
+        "metric": "results",
+        "variant": "plot image",
+        "iteration": 0
+      }
+    ],
+    "retained_files_checked": 30,
+    "reused_readback": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/ultralytics-default-2e66fec4f0/readback/20261116T142920Z-f1e26b43",
+    "checkpoint_sha256": "49cd94e5b561cc67ac7d9a0c4738cd794c5324fa4f9b134ab4d14d5d58c1d171",
+    "fresh_downloads_this_audit": false,
+    "native_validation_this_audit": false,
+    "finished_utc": "2026-11-16T14:40:53.104485+00:00",
+    "script_sha256": "32d0b0a59a77ccee1e3c9d41ff2c9a4dfd1f41a5f061e7359935fa340f0ae8e0"
+  },
+  "reused_receipt": {
+    "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/ultralytics-default-2e66fec4f0/readback/20261116T142920Z-f1e26b43/receipt.json",
+    "sha256": "4a2da70e8e12e87ba85b76e4b57718c91bf6bbcb5eaa638deef655de94114214",
+    "status": "passed"
+  },
+  "contract": "docs/experiment-records.md#publication-inventory",
+  "inventory_audit": {
+    "run_overrides_subset_of_canonical": true,
+    "current_model_plot_slots_present": true,
+    "native_validation_pr_plot_absent": true,
+    "dataset_vocabulary_splits_and_prepared_root_match": true
+  },
+  "retained": {
+    "runs/verification-gap-closure/ticket88-readback/audit.py": {
+      "sha256": "32d0b0a59a77ccee1e3c9d41ff2c9a4dfd1f41a5f061e7359935fa340f0ae8e0",
+      "size": 3958
+    },
+    "runs/verification-gap-closure/ticket88-readback/configuration-objects.json": {
+      "sha256": "a75ac0fe007b951afadc8121f068e2a7c2d225ab3802c40dba2477d9aa55e07c",
+      "size": 9548
+    },
+    "runs/verification-gap-closure/ticket88-readback/plots.json": {
+      "sha256": "26ce5a5973b71eab5864a0ead92b00fab423347d298efd65b7539f4de0178482",
+      "size": 609351
+    },
+    "runs/verification-gap-closure/ticket88-readback/receipt.json": {
+      "sha256": "77dfba8874ec114e2f4d378492d1b0b9eaa89d7eca3d8ffe8242da9627b162ce",
+      "size": 2449
+    },
+    "runs/verification-gap-closure/ticket88-readback/retained-files.json": {
+      "sha256": "a0c21df310f19951ce46a9ba6676aba62dac3bc689c8124f31ca9381e3285ee3",
+      "size": 5340
+    },
+    "runs/verification-gap-closure/ticket88-readback/scalars.json": {
+      "sha256": "8c47849c5281ecae4e2d6fce692cd128a14a58a2fdd2362d5c6d5c5de5e594d0",
+      "size": 6570
+    }
+  },
+  "cleanup": {
+    "live_process_exited": true,
+    "cache_created": false,
+    "service_mutations": false,
+    "gpu_or_training": false,
+    "shared_environment_owner": "coordinator; ticket93"
+  },
+  "limitations": [
+    "Native checkpoint CPU validation and forced downloads reused from accepted20261116T142920Z readback",
+    "Plot payload availability is not rendering verification",
+    "No new GPU, training, service creation or service deletion"
+  ]
+}
