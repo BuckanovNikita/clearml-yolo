@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "ticket": 26,
+  "selection": "rfdetr/medium",
+  "variant": "default",
+  "status": "accepted_native_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route pending",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd",
+  "source_commit": "c0b6065572ac6e1b92147acd58f667a72bc5eac6",
+  "environment": "cy-it-ded7c4",
+  "project": "cy-it-ded7c4 ticket26",
+  "task_id": "9596d8947c3842ee9f2be52ae5187645",
+  "output_model_id": "84b3325053a04180a35bb521ca225f29",
+  "checkpoint_sha256": "7509415bb3bbc38aa6f81594e9445ef7a39dc16b66b08f71cd3d22a794545a64",
+  "source_applicability": {
+    "launch_source_map_identical": 459,
+    "readback_source_map_identical": 238,
+    "shared_inputs_identical": true,
+    "scope": "Independent preparation and actual-input reviews reused; 238 current product sources and the corrected readback helper rehashed at acceptance."
+  },
+  "Medium_baseline": {
+    "initial_optimizer_parameters_sha256": "e282f644c541e9ebb098790eac437d2a50de446590250afb7434efd01a801544",
+    "initialization_comparisons": 0,
+    "scope": "First accepted Medium initializer. No Small initializer or capacity reuse; later Medium variants must compare against this eligible baseline.",
+    "initial_asset_sha256": "749ff6071828aaffac63e204c4f4135ed3d6cdae4d702e086c360edc3b5768c8",
+    "initial_asset_md5": "7223f764a87b863f02eb8d52bf0ce2ee",
+    "initial_asset_url": "https://storage.googleapis.com/rfdetr/medium_coco/checkpoint_best_regular.pth",
+    "native_revision": "1.11.2"
+  },
+  "fixture": {
+    "canonical_manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+    "train_images": 160,
+    "val_images": 40,
+    "test_images": 40,
+    "seed": 0,
+    "heldout_images": 80,
+    "heldout_backgrounds": 34,
+    "pixel_leakage": false
+  },
+  "training": {
+    "status": "passed",
+    "epochs": [0, 1],
+    "batch": 8,
+    "optimizer_steps": 40,
+    "skipped_steps": 0,
+    "parameter_changed": true,
+    "step_derivation": "2 epochs * (160 / 8) = 40 updates; native metrics steps 19 and 39",
+    "seed": 0,
+    "precision": "fp32",
+    "precision_evidence": "Native amp_dtype is null from CY amp=false; unchanged reviewed adapter/Lightning resolution.",
+    "ema": true,
+    "accumulation": 1,
+    "native_loss_count": 46,
+    "remote_scalar_loss_count": 54,
+    "native_seconds": 193.42178778700145,
+    "launcher_seconds": 196.61944188900088
+  },
+  "augmentation": {
+    "mode": "native",
+    "snapshot_sha256": null,
+    "multi_scale": "per-batch",
+    "expanded_scales": true,
+    "scale_jitter": true,
+    "scope": "Native defaults; no custom JSON or per-image transform trace"
+  },
+  "estimator": {
+    "chosen_batch": 8,
+    "status": "validated",
+    "fresh_forced": true,
+    "nominal_size": [576, 576],
+    "effective_size": [736, 736],
+    "successful_trial_steps": {"warmup": 5, "measured": 10, "validation": 1},
+    "trials": [
+      {"batch": 8, "status": "success", "peak_memory_bytes": [17898930176]},
+      {"batch": 16, "status": "oom", "peak_memory_bytes": []},
+      {"batch": 8, "status": "success", "peak_memory_bytes": [17908367360]}
+    ],
+    "scope": "Confirmed backend-valid batch 8 after 16 OOM under the exact native profile and current memory; no silent training fallback or universal device-capacity claim"
+  },
+  "reserve": {
+    "sample_count": 183,
+    "minimum_free_MiB": 10656,
+    "required_free_MiB": 10240,
+    "maximum_observed_gap_seconds": 1.236706593001145,
+    "query_timeout_seconds": 5,
+    "scenario_timeout_seconds": 1800,
+    "owner_timeout_seconds": 2040,
+    "errors": [],
+    "scope": "Sampled evidence only; not continuous reserve or playback-quality proof"
+  },
+  "publication": {
+    "status": "passed",
+    "fresh_downloaded_artifacts": 8,
+    "fresh_downloaded_checkpoint": true,
+    "downloaded_hashes_rechecked": true,
+    "native_checkpoint_hash_matches": true,
+    "native_checkpoint_reloaded": true,
+    "configuration_population_epoch_workbook_checks": "passed"
+  },
+  "cpu_validation": {
+    "status": "passed",
+    "helper_sha256": "10505a719da3729707dbf96c1b0efaa6b948f254c5d01567575711731d579752",
+    "preset": "medium",
+    "size": 576,
+    "images": 40,
+    "background_images": 15,
+    "raw_rows": 11192,
+    "evaluation_rows": 11192,
+    "excluded_rows": 0,
+    "raw_and_evaluation_sha256": "748dd901d660bd8a97c9098aee021c7dfd75891cd865f88cbb74edc79bd4d452",
+    "counts": {"tp": 15, "fp": 255, "fn": 49},
+    "scope": "Native CY detector prediction and fixed-threshold scoring; not upstream solver validation or accuracy qualification"
+  },
+  "execution_sessions": {
+    "GPU": {"session": 51104, "exit_code": 0},
+    "CPU_local": {"session": 87045, "exit_code": 0},
+    "CPU_remote": {"session": 72571, "exit_code": 0},
+    "cleanup": {"session": 63161, "exit_code": 0}
+  },
+  "ownership": {
+    "native_cleanup_complete": true,
+    "native_worker_cleanup_complete": true,
+    "known_pids_absent": [3937532, 3937845, 3937972, 4050196, 4050527],
+    "CPU_parent_birth": 1084276,
+    "CPU_child_birth": 1085010,
+    "CPU_parent_and_child_CUDA_hidden_observed": true
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T22:34:36.809363+00:00",
+    "directories_removed": [
+      {"relative_to_case": "dataset-cache", "files": 249, "logical_bytes": 24346525},
+      {"relative_to_case": "readback/20261116T223111Z-2f934080/cache", "files": 9, "logical_bytes": 150160391}
+    ],
+    "removed_logical_bytes": 174506916,
+    "protected_files_verified_before_after": 119,
+    "exact_case_process_scan": "empty",
+    "cache_open_handle_scan": "empty",
+    "excluded_unrelated_user_systemd_pids": [340, 344],
+    "scope": "Exact case only; shared resources and other workloads retained; no global compute-empty claim",
+    "physical_reclaim": "Logical bytes only; physical reclaim not separately measured"
+  },
+  "checks": {
+    "CPU_preparation": "passed",
+    "actual_input_review": "passed",
+    "native_GPU": "passed",
+    "remote_publication": "passed",
+    "CPU_checkpoint_prediction_and_scoring": "passed",
+    "independent_acceptance": "passed",
+    "exact_owned_cache_cleanup": "passed",
+    "documentation_delivery": "pending_coordinator_native_route"
+  },
+  "evidence": [
+    {"path": ".tmp/verification-gap-closure/backend-preparation/ticket26-20261116T221955Z-e4f0386e/independent-preparation-review.json", "sha256": "f3dcdb08473bf3cf058ce9050a1440747100b5dc3e0db9a99ebd03d799670e6b"},
+    {"path": ".tmp/verification-gap-closure/backend-preparation/ticket26-20261116T222659Z-7e47aaf6/actual-preparation-review.json", "sha256": "76e21e6080be0aa1b2856bac7e0f91e305d99eb7b730cf01e2c315f42667d983"},
+    {"path": ".tmp/verification-gap-closure/backend-preparation/ticket26-20261116T222659Z-7e47aaf6/result.json", "sha256": "3b0dc5484d3b0531bfaa5d965911fad989e128461476a903a106ecc8957d637a"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/summary.json", "sha256": "de157cd650d21b02b440eba300bb3fb15c3c37fb22555227f886f6f8f4e33076"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/receipt.json", "sha256": "2ef01864e72e2eff083e1a5f363f913ab0db920a45f85ea75ff34d383640ce46"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/executor-receipt.json", "sha256": "400d1f3d0b8bf49942ad861e13bf129d9bf2fe0bff243b9ae506903afc7602af"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/independent-acceptance-review.json", "sha256": "93901cf12aec1f3e9bdd1280ab36446aa7d6ead771a1787c8349b10a0c6d5114"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/cpu-validation.json", "sha256": "e0192977bb003997d69cb6987a28a700b7a9399170b0541dc691cdc6ab71af48"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/cpu-geometry.json", "sha256": "844ae5fa5aad4266eb1a3c293eab4ff3260ebc20b5ba44b76948d090e88b7959"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/cleanup-plan.json", "sha256": "81c64854a665a26ba91aec080950acded5486721f63b7505f4b7ae8e914753e2"},
+    {"path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-medium-default-374477a5cd/readback/20261116T223111Z-2f934080/cleanup.json", "sha256": "2e2d148af494fddfd3fc7026875ff15b0d9ef6f6ea51a74a7d2c07454dac5dae"}
+  ],
+  "limitations": [
+    "No accuracy or convergence qualification",
+    "No CPU/GPU or export/runtime numerical parity",
+    "No upstream solver validation or physical multi-GPU claim",
+    "Sampled reserve does not prove continuous reserve or playback quality",
+    "Historical WSL hang causality remains unproven",
+    "Logical cleanup bytes; physical reclaim not separately measured"
+  ]
+}
