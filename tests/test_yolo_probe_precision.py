@@ -1,10 +1,13 @@
 """Explicit YOLO measurement recipes retain native precision and reject unsupported work."""
 
 import json
+import os
+import random
+from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Self, override
+from typing import Any, Self, cast, override
 
 import pytest
 
@@ -20,6 +23,34 @@ from clearml_yolo.core.batch_estimation import (
     TrainingProfile,
     select_models,
 )
+
+
+@pytest.fixture(autouse=True)
+def restore_native_randomness() -> Iterator[None]:
+    import numpy as np
+    import torch
+
+    python_state, torch_state = random.getstate(), torch.get_rng_state()
+    numpy_state = np.random.get_state()  # noqa: NPY002 - native init_seeds changes the legacy global RNG
+    deterministic = torch.are_deterministic_algorithms_enabled()
+    warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
+    cudnn = torch.backends.cudnn.deterministic
+    fill = cast(Any, torch.utils.deterministic).fill_uninitialized_memory
+    environment = {key: os.environ.get(key) for key in ("CUBLAS_WORKSPACE_CONFIG", "PYTHONHASHSEED")}
+    try:
+        yield
+    finally:
+        random.setstate(python_state)
+        np.random.set_state(numpy_state)  # noqa: NPY002 - restore the native global RNG
+        torch.set_rng_state(torch_state)
+        torch.use_deterministic_algorithms(deterministic, warn_only=warn_only)
+        torch.backends.cudnn.deterministic = cudnn
+        cast(Any, torch.utils.deterministic).fill_uninitialized_memory = fill
+        for key, value in environment.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def _request(root: Path, amp: bool | str) -> BatchProbeRequest:

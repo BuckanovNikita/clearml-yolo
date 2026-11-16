@@ -106,13 +106,15 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     from ultralytics.models import YOLO
     from ultralytics.models.yolo.detect import DetectionTrainer
     from ultralytics.nn.tasks import DetectionModel
-    from ultralytics.utils.torch_utils import ModelEMA, attempt_compile
+    from ultralytics.utils.torch_utils import ModelEMA, attempt_compile, init_seeds
 
     rank = int(os.environ["LOCAL_RANK"])
     world_size = request.profile.world_size
     batch = request.global_batch // world_size
     device = torch.device("cuda", rank)
-    torch.manual_seed(int((request.yolo or {}).get("seed", 0)))
+    # Private single-rank probes use RANK=0; native single-device training uses -1.
+    native_rank = int(os.environ["RANK"]) if world_size > 1 else -1
+    init_seeds(int(values["seed"]) + 1 + native_rank, deterministic=values["deterministic"])  # type: ignore[no-untyped-call]
     torch.cuda.reset_peak_memory_stats(device)
     memory = GPUMemory(rank)
     weights: Any = YOLO(request.profile.model.architecture).model
