@@ -53,13 +53,23 @@ Invocation shape:
 # Private GIT_INDEX_FILE: git read-tree HEAD; git add -- src tests
 mutation.export_staged_tree(export)
 targets = [
-    target for target in mutation.collect_targets(export, "fbcfa25", (source,))
+    target
+    for target in mutation.collect_targets(export, "fbcfa25", (source,))
     if target.qualname == "reserve_cuda_memory"
 ]
-mutation.mutate(export, targets, mutation.Options(
-    files=(source,), base="fbcfa25", keep=False, strict=False,
-    max_children=1, max_functions=0, budget_seconds=300,
-))
+mutation.mutate(
+    export,
+    targets,
+    mutation.Options(
+        files=(source,),
+        base="fbcfa25",
+        keep=False,
+        strict=False,
+        max_children=1,
+        max_functions=0,
+        budget_seconds=300,
+    ),
+)
 ```
 
 Native selection retained 10 selectors across five files: the selected memory-guard/
