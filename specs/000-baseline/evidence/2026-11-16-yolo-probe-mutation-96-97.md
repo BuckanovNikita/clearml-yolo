@@ -34,14 +34,20 @@ Invocation shape (private paths omitted):
 # GIT_INDEX_FILE points to a unique temporary index.
 # git read-tree HEAD; git add -- src tests
 mutation.export_staged_tree(export)
-targets = [
-    target for target in mutation.collect_targets(export, "4b73f62", (source,))
-    if target.qualname == "probe"
-]
-mutation.mutate(export, targets, mutation.Options(
-    files=(source,), base="4b73f62", keep=False, strict=False,
-    max_children=1, max_functions=0, budget_seconds=300,
-))
+targets = [target for target in mutation.collect_targets(export, "4b73f62", (source,)) if target.qualname == "probe"]
+mutation.mutate(
+    export,
+    targets,
+    mutation.Options(
+        files=(source,),
+        base="4b73f62",
+        keep=False,
+        strict=False,
+        max_children=1,
+        max_functions=0,
+        budget_seconds=300,
+    ),
+)
 ```
 
 Native selection contained **16 selectors across four files**: selected existing
