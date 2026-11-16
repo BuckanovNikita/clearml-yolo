@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "ticket": 92,
+  "scenario": "native_cancellation",
+  "status": "accepted_native_cancellation_and_protected_cleanup",
+  "delivery_gate": "Coordinator review, commit and native documentation verification pending",
+  "overall_ticket92_status": "open",
+  "remaining_ticket92": [
+    "native worker interruption",
+    "native guardian recovery"
+  ],
+  "case": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38",
+  "documentation_source_commit": "9676174e5263c75fdcdaf3d06fee3b5b919bc986",
+  "review_source_commit": "9676174e5263c75fdcdaf3d06fee3b5b919bc986",
+  "queue_revision": "d3627a0da85968429ddeaff4920c05825e6e05e2",
+  "package_identity": "70cb1afb0777588e7f399ad40ea21ccdac47c3f2aaf4566d558111baebe12fce",
+  "job_id": "5fb6ddab-f696-4e3c-98dc-694958f60bfb",
+  "task_id": "b5c7991cd75c4efe964d1042800bab82",
+  "current_boot": "5e9f68d1-63db-4188-9995-e686745fda8c",
+  "environment": "cy-it-ded7c4",
+  "launch": {
+    "tool_session": 87299,
+    "exit_code": 0,
+    "meaning": "Detached launcher completed; actual controller lifecycle result independently accepted separately",
+    "controller_pid": 3539590,
+    "controller_start_ticks": 952686,
+    "controller_absent_after_execution": true
+  },
+  "preparation": {
+    "controller_sha256": "1d0338bff5d2e31d84a9db2e96d399502f92f05e2e008248b76ee1512c325cf8",
+    "manifest_sha256": "c0aa67259f800bf3c49cdc8fac47babc9bed3dd4a8631b50e4e08c8a8d1f3c7a",
+    "independent_review_sha256": "fa9306fad86f44a6c51c91096345dcab4ee3e6b1901d6bb19e3293e5c826f126",
+    "CPU_composition_session": 53733,
+    "CPU_composition_exit_code": 0,
+    "archive_files_rehashed": 32,
+    "reuse": "Paired runtime and immutable v4 source/profile/fixture/OpenCV identities reused; new private controller and input bindings independently reviewed. Current source successors change dated evidence only. Prepared child instrumentation unchanged; no reused capacity. Regenerated composition differs only in sourceHEAD and generated Hydra/log paths."
+  },
+  "capacity": {
+    "force": true,
+    "status": "ceiling_limited",
+    "batch": 72,
+    "successful_trials": [
+      8,
+      16,
+      48,
+      56,
+      64,
+      72,
+      72
+    ],
+    "confirmation_trial_ids": [
+      "9da53f7ef6b041ea82fc0a1b60c08eee",
+      "c60929ed69d34ff888c3e83060581c47"
+    ],
+    "meaning": "Fresh ceiling72 and separate confirmation; no maximum-capacity claim"
+  },
+  "fault": {
+    "trigger_updates": 1,
+    "expected_complete_updates": 6,
+    "final_updates": 3,
+    "native_cancel_commands": 2,
+    "native_cancel_exit_codes": [
+      0,
+      0
+    ],
+    "reply_states": [
+      "cancelling",
+      "cancelling"
+    ],
+    "final_state": "cancelled",
+    "native_cleanup_complete": true,
+    "expected_transition_observed": true,
+    "scientific_outcome": "intentionally_interrupted_not_successful_training",
+    "completed_recipe_valid": false,
+    "parameters_changed": true,
+    "retained_finalization_error": "Native optimizer updates differ from the direct recipe",
+    "retained_queue_error": "Native process exited with status1"
+  },
+  "recipe": {
+    "batch": 72,
+    "epochs_configured": 2,
+    "seed": 0,
+    "precision": "FP32",
+    "resolution": 640,
+    "augmentation": "native",
+    "fixture_populations": {
+      "train": 160,
+      "val": 40,
+      "test": 40
+    }
+  },
+  "sampled_reserve": {
+    "admission-telemetry.jsonl": {
+      "samples": 505,
+      "minimum_free_bytes": 8723103744,
+      "minimum_free_MiB": 8319.0,
+      "maximum_UTC_gap_seconds": 0.5717287063598633
+    },
+    "external-memory.jsonl": {
+      "samples": 88,
+      "minimum_free_bytes": 9243197440,
+      "minimum_free_MiB": 8815.0,
+      "maximum_UTC_gap_seconds": 0.42055177688598633
+    },
+    "child-memory.jsonl": {
+      "samples": 63,
+      "minimum_free_bytes": 9329180672,
+      "minimum_free_MiB": 8897.0,
+      "maximum_UTC_gap_seconds": 0.6406028270721436
+    }
+  },
+  "timing": {
+    "fault_before_to_released_terminal_seconds": 10.569243907928467,
+    "fault_before_to_controller_result_seconds": 11.545560836791992,
+    "meaning": "Observed cleanup roughly10.57s; does not exercise the full90s forced grace. Original150s cooperative budget and other bounds unchanged."
+  },
+  "ownership": {
+    "observed_job_birth_identities": 63,
+    "owned_helper_identities": 3,
+    "controller_identities": 1,
+    "all_67_absent": true,
+    "stable_claim_owner_marker_generation": true,
+    "cancelling_samples_with_allocation": 20,
+    "cancelling_samples_after_release": 1,
+    "terminal_claim_absent": true,
+    "terminal_allocation_empty": true,
+    "active_coordination_claim_absent": true,
+    "sentinel": {
+      "pid": 3613253,
+      "born": 974390,
+      "uid": 1001,
+      "parent_pid": 3539590,
+      "session": 3613253,
+      "sequence_before_fault": 188,
+      "sequence_after_cleanup": 296,
+      "same_identity_and_advancing_heartbeat": true,
+      "after_heartbeat_later_than_fault_after": true,
+      "owned_shutdown_exit": 0
+    },
+    "process_identity_union_independently_recomputed": true
+  },
+  "guards": {
+    "minimum_free_bytes": 8589934592,
+    "query_seconds": 15,
+    "discovery_seconds": 30,
+    "CLI_seconds": 30,
+    "scenario_seconds": 1800,
+    "cooperative_native_cleanup_seconds": 150,
+    "native_owner_grace_seconds": 90,
+    "helper_TERM_wait_seconds": 10,
+    "helper_KILL_wait_seconds": 5,
+    "lifecycle_before_admission_seconds": 4200,
+    "lifecycle_before_submit_seconds": 2400,
+    "cleanup_margin_seconds": 600,
+    "note": "150s is a cooperative native cleanup budget, not total controller wall time; native transaction bounds and helper closure are separately retained."
+  },
+  "independent_acceptance": {
+    "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/independent-acceptance-review.json",
+    "sha256": "99ca623764d0a1470343d9d8639067b32d2a6e60ccca4dedd15a6c97b6505844",
+    "status": "passed_native_cancellation_case",
+    "result_sha256": "2ba9056946d1c4b8219a5b906e8eab19fb4b6d66d64cf6122ebb72b642298a88"
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T22:18:09.728199+00:00",
+    "removed_logical_bytes": 24463617,
+    "removed_files": 489,
+    "removed_directories": [
+      "dataset-cache"
+    ],
+    "protected_files_rehashed_before_after": 142,
+    "independent_current_protected_rehash": 142,
+    "exact_case_process_and_cache_handles": "empty",
+    "cache_absence_verified": true,
+    "unrelated_processes_excluded": [
+      340,
+      344
+    ],
+    "scope": "Only cancellation dataset cache; all evidence/history/coordination/assets/fixtures/runtime retained. Other ticket GPU work did not require a global empty-compute check.",
+    "physical_reclaim": "Not measured; logical bytes only"
+  },
+  "checks": [
+    {
+      "name": "CPU preparation and independent code review",
+      "status": "passed"
+    },
+    {
+      "name": "Fresh ceiling72 search and confirmation",
+      "status": "passed"
+    },
+    {
+      "name": "Active native repeated cancellation",
+      "status": "passed"
+    },
+    {
+      "name": "Native cleanup and same-UID sentinel survival",
+      "status": "passed"
+    },
+    {
+      "name": "Independent acceptance and protected cache cleanup",
+      "status": "passed"
+    },
+    {
+      "name": "Completed scientific publication for interrupted case",
+      "status": "not_applicable"
+    },
+    {
+      "name": "Worker interruption and guardian recovery",
+      "status": "deferred",
+      "scope": "Blocks overall92 closure, not cancellation acceptance"
+    }
+  ],
+  "bindings": [
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/lifecycle-result.json",
+      "sha256": "2ba9056946d1c4b8219a5b906e8eab19fb4b6d66d64cf6122ebb72b642298a88"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/fault-before.json",
+      "sha256": "61ffb35275327d364f811e9de83855b4665d55302aaa6179aa188cc2c398a58e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/fault-action.json",
+      "sha256": "e9128d7c69d70bd5f18e91a21a776796ee42770e2c1ce4fb235b9c0c8a037b37"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/fault-after.json",
+      "sha256": "d8221dd9a6bc718f8696dcc2d03f94a02aab7e847c4b35d2f54f50bd53796e1d"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/controller-started.json",
+      "sha256": "8e3b78f229d22895be3ecf0af67d4d64d5ba071ad9bbdba710acc3d38fad0704"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/child-started.json",
+      "sha256": "39c2e74216c7691e111135af97b4ed23ca8c680661b2f01934ea3a7408d533a5"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/child-guards.json",
+      "sha256": "6ba60406327649eb16b26713b4246c60b8207bca120c1149529d496e72b2889f"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/independent-process-cleanup.json",
+      "sha256": "fea3de1d1d580eb830dd40fc334276f4e55beec1861bcc6aadd6cf1353974ca7"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/controller-owned-cleanup.json",
+      "sha256": "c300c8129dbe1daffdaf399b8448376dc1cbbcbcde4e85a1c8e0bddc1b624042"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/sentinel-before.json",
+      "sha256": "5d3459f8a477eefcfe1057b67733dcee3ab2217d439c59f63c07f4d53cc06c44"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/sentinel-after.json",
+      "sha256": "f6ffd0f65198e183346c8cb7e8db3a057561786cb67ada0d618605283f9d19cf"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/sentinel-process.json",
+      "sha256": "62c4f94d2a2a5b5ad57b8a44ecb6b10cf4433341ea2ff08de75d64cdfb09dace"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/sentinel-heartbeat.json",
+      "sha256": "086f56045ae79060e4723dd66be8d1322c54e78a8d9538b866a5f66704bcc473"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/monitor-receipt.json",
+      "sha256": "537ff1dc967b37370351b3b9b94d31c6a854c814492f5eace8603ec36bfbce69"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/monitor-stop.json",
+      "sha256": "463e57ac6bddb4e913d92854181ad84e6c9171fa9af0cf16269e5cc74bc8e4ec"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/optimizer.json",
+      "sha256": "d3c33b0932590859db0803a3e19dd2b18986157655fbc5e8fafd997196fabf74"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/child-finish-failure.json",
+      "sha256": "f6c75d99987d31576bcd9ca94486bab1cf85b3f9b9577f59af5fe2a719ccbffa"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/queue-observations.jsonl",
+      "sha256": "010562e7724f79005e6a57fed039630dcd6bb58a0f7d1ac59441894ae0d55182"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/observer-claims.jsonl",
+      "sha256": "9b27f7a312bf13f53d5c2e973638d7ca52481eadb36bc6980212599345dd0ebc"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/admission-process-outcome.json",
+      "sha256": "abc4b3334457393c195d36cd1f61ad6ece6344eb57f65467e4f6da8e026efa51"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/admission/receipt.json",
+      "sha256": "007d4cd834868fdbe19b201fafed7000f2cb433cfd668e9ca70b2307fac376b3"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/admission/request.json",
+      "sha256": "cda66547cdb81daf8fc9486200d4f87e4c412f4a5656385f2a46645860814531"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/admission/batch-estimates.json",
+      "sha256": "f9660aa1c0a40c66cfdeeee7bae326e59ce768f428110ad82413995aed34d44e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/admission-telemetry.jsonl",
+      "sha256": "fc42628b0a9ba8f2e7a6c1847388997fcd5df6e72dc3c69217d20fcdd4968471"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/external-memory.jsonl",
+      "sha256": "6320e17c2d70b20e153848d80ce67a3f92f6f24f31662d2ba49672a675e586d0"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/child-memory.jsonl",
+      "sha256": "95810279073776e4ea9b2c9086de02780f733e4051cac8c31ba995b765704ec5"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/controller-command-68.json",
+      "sha256": "c7e8ab36cb5cbd7a1ca922aab8cbfc458758e7c920d935cc774af84c5ea2e52a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/controller-command-71.json",
+      "sha256": "f5a59577dcf84532905624881c9d562145bd8ff4e21604f422feb3c2be6a0d94"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/lifecycle-before-admission.json",
+      "sha256": "cbf3567f1c8b727ad4415ba3923f15f7eb67d98b6057c635d52488be80b29480"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/lifecycle-before-submit.json",
+      "sha256": "d81a1372877bc06b18c943491686f82a236e4d9bfc5f2f2a033691df7684e698"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/preparation-manifest.json",
+      "sha256": "c0aa67259f800bf3c49cdc8fac47babc9bed3dd4a8631b50e4e08c8a8d1f3c7a"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/independent-review.json",
+      "sha256": "fa9306fad86f44a6c51c91096345dcab4ee3e6b1901d6bb19e3293e5c826f126"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/inputs.json",
+      "sha256": "a62752c663be02a9b0a82a9c69b54a07e3791252f6c61da2c102d9739a723444"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/cancel-request.json",
+      "sha256": "7baad219dca686296430f8df691a590583b4ed2d32559dccc7a974f1558cd8fc"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/run_cancel_case.py",
+      "sha256": "1d0338bff5d2e31d84a9db2e96d399502f92f05e2e008248b76ee1512c325cf8"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/fresh-admission.json",
+      "sha256": "dbcb619137f726fff2cb6e2825d286bd38fca1ce363caf7947e1ef566505022e"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-v1-20261116/controller-launch.json",
+      "sha256": "3502067fb98c6a8955c53e43f99958ff7685262b1f87f9236e4e3a878500a96f"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-cancel-prelaunch-20261116T220903Z/preserved-inventory.json",
+      "sha256": "b08a84dee571e51d26c84ab7a79add2ac8056a44b340602b6dcafb99983443fb"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/independent-acceptance-review.json",
+      "sha256": "99ca623764d0a1470343d9d8639067b32d2a6e60ccca4dedd15a6c97b6505844"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/independent-acceptance-review.md",
+      "sha256": "59c5ed36be0114634385b2890361d820e53496d1ca450d980072e109ba915f03"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/cleanup-plan.json",
+      "sha256": "e6911e846535ba37de9e684a5563ce174e9f00378a3b73a09d647dbf4461fa45"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/ticket92-cancel-v1-87c6fa7b38/cleanup.json",
+      "sha256": "90058da5789bc227ff8b045220cf41dbb14b5e6b82410b7bf148458f4bb4be2b"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/queue-cancel-cleanup-before.json",
+      "sha256": "bb145000123be6129512ed17016388bc05d742909df4f43240ed61e5bcbc6285"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-lifecycle-plan-20261116/plan.md",
+      "sha256": "f624f2bbd37a0686bd202078d63982d66dccf2fd6fb4995dfade6a4429f1bea3"
+    }
+  ],
+  "limits": [
+    "No completed two-epoch training/publication claim for interrupted case",
+    "Observed cleanup does not exercise full90s forced grace",
+    "Same-UID sentinel is not multiuser isolation",
+    "Sampled reserve is not continuous telemetry",
+    "No multiGPU, NFS/outage, inaccessible-ownership recovery or historical WSL root-cause claim",
+    "Documentation work made no live calls, signals, workload execution or deletion"
+  ]
+}

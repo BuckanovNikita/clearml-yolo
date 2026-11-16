@@ -1,0 +1,351 @@
+{
+  "schema_version": 1,
+  "ticket": 24,
+  "selection": "rfdetr/small",
+  "variant": "json",
+  "status": "accepted_native_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route pending",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e",
+  "source_commit": "9676174e5263c75fdcdaf3d06fee3b5b919bc986",
+  "environment": "cy-it-ded7c4",
+  "project": "cy-it-ded7c4 ticket24",
+  "task_id": "c798ca70c16f42d1a2a0da24ba5d12aa",
+  "output_model_id": "37f31a091b70429ab22db3de447b47b9",
+  "checkpoint_sha256": "41d0ace91fe458e755f5c5be58926a89639a62e5b336efaa786660fd2a574156",
+  "source_applicability": {
+    "launch_source_map_identical": 459,
+    "readback_source_map_identical": 238,
+    "shared_inputs_identical": true,
+    "scope": "Reused ticket15 source/fixture review. RF-specific helper, native configuration/CSV and registered initialization independently inspected."
+  },
+  "Small_baseline": {
+    "initial_optimizer_parameters_sha256": "e03485114a0694793e49ad549ddbd29c653e8965ae7dba4cb930057b520f5481",
+    "eligible_prior_completed_small_readbacks": [
+      "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-default-e15f4a0be5/readback/20261116T215313Z-2a90214d/receipt.json"
+    ],
+    "comparison": "Exact initialization matches accepted ticket23 Small baseline. No Nano or DEIM-family comparison.",
+    "initial_asset": {
+      "canonical_url": "https://storage.googleapis.com/rfdetr/small_coco/checkpoint_best_regular.pth",
+      "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/cache/rfdetr/rf-detr-small.pth",
+      "content_kind": "file",
+      "sha256": "d81979a9213a2109345158ce9232668df4c1ae52e9b8db3f2ec0a8cbad959b33",
+      "override": "model.train.weights",
+      "revision": "1.11.2",
+      "derivation": null
+    }
+  },
+  "fixture": {
+    "canonical_manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+    "train_images": 160,
+    "val_images": 40,
+    "test_images": 40,
+    "seed": 0,
+    "images": 240,
+    "heldout_images": 80,
+    "heldout_backgrounds": 34,
+    "contexts": [
+      "prediction:2d6936d512dfbc4c4a94"
+    ],
+    "pixel_leakage": false
+  },
+  "training": {
+    "status": "passed",
+    "epochs": [
+      0,
+      1
+    ],
+    "optimizer": {
+      "steps": 20,
+      "skipped_steps": 0,
+      "parameter_changed": true,
+      "initial_optimizer_parameters_sha256": "e03485114a0694793e49ad549ddbd29c653e8965ae7dba4cb930057b520f5481"
+    },
+    "step_derivation": "2 epochs * (160 / 16) = 20 updates, native metrics steps 9 and 19",
+    "seed": 0,
+    "precision": "fp32",
+    "precision_evidence": "Native amp_dtype is null. CY maps amp=false to null and RF trainer resolves null to 32-true. Saved model.amp=true is not the Lightning execution precision.",
+    "native_loss_count": 40,
+    "remote_scalar_loss_count": 48,
+    "native_seconds": 194.17801638399942,
+    "launcher_seconds": 197.7731178740014
+  },
+  "augmentation": {
+    "status": "passed",
+    "mode": "albumentations",
+    "snapshot_sha256": "bfdd9c00d36be4d222068553563e91dcde506316a6b78751cfe45e769f975e09",
+    "aug_config": {},
+    "augmentation_backend": "torchvision",
+    "scale_jitter": false,
+    "multi_scale": "off",
+    "expanded_scales": true,
+    "scope": "JSON recipe and unchanged adapter agree. Overlapping RF native augmentation disabled. No per-image trace"
+  },
+  "estimator": {
+    "chosen_batch": 16,
+    "fresh_forced": true,
+    "trials": [
+      {
+        "batch": 8,
+        "status": "success",
+        "peak_memory_bytes": [
+          13535805440
+        ]
+      },
+      {
+        "batch": 16,
+        "status": "success",
+        "peak_memory_bytes": [
+          20901003264
+        ]
+      },
+      {
+        "batch": 24,
+        "status": "oom",
+        "peak_memory_bytes": []
+      },
+      {
+        "batch": 16,
+        "status": "success",
+        "peak_memory_bytes": [
+          20895760384
+        ]
+      }
+    ],
+    "nominal_size": [
+      512,
+      512
+    ],
+    "effective_size": [
+      512,
+      512
+    ],
+    "scope": "Fixed custom-augmentation probe shape under admitted allocator budget, not unrestricted device capacity"
+  },
+  "telemetry": {
+    "status": "passed",
+    "samples": 189,
+    "minimum_free_mib": 10414,
+    "guard_mib": 10240,
+    "maximum_completed_sample_gap_seconds": 1.1685890940007084,
+    "outer_query_timeout": false
+  },
+  "publication": {
+    "status": "passed",
+    "task_id": "c798ca70c16f42d1a2a0da24ba5d12aa",
+    "model_id": "37f31a091b70429ab22db3de447b47b9",
+    "checkpoint_sha256": "41d0ace91fe458e755f5c5be58926a89639a62e5b336efaa786660fd2a574156",
+    "checkpoint_name": "checkpoint_best_total.pth",
+    "eight_artifacts_and_checkpoint_rehashed": true,
+    "force_download_helper_reviewed": true
+  },
+  "cpu_validation": {
+    "status": "passed",
+    "images": 40,
+    "background_images": 15,
+    "prediction_rows": 11453,
+    "counts": {
+      "1": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 8
+      },
+      "2": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 1
+      },
+      "3": {
+        "tp": 11,
+        "fp": 97,
+        "fn": 37
+      },
+      "4": {
+        "tp": 1,
+        "fp": 32,
+        "fn": 6
+      }
+    },
+    "prediction_sha256": "279bee0ddbe692052f9f8141aa42961fe4ee2ea4150a81eee2e3078abd368836",
+    "geometry": {
+      "filtering": "Existing product geometry filter via reviewed helper103",
+      "geometry": {
+        "raw_rows": 11453,
+        "evaluation_rows": 11453,
+        "excluded_rows": 0,
+        "reason_counts": {
+          "reversed_corners": 0,
+          "zero_area": 0
+        },
+        "exclusions": [],
+        "raw_prediction_sha256": "279bee0ddbe692052f9f8141aa42961fe4ee2ea4150a81eee2e3078abd368836",
+        "evaluation_prediction_sha256": "279bee0ddbe692052f9f8141aa42961fe4ee2ea4150a81eee2e3078abd368836"
+      },
+      "raw_and_evaluation_bytes_identical": true
+    },
+    "totals": {
+      "tp": 12,
+      "fp": 129,
+      "fn": 52
+    }
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T22:20:53.358842+00:00",
+    "directories_removed": [
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24345561
+      },
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/cache",
+        "files": 9,
+        "logical_bytes": 144226041
+      }
+    ],
+    "removed_logical_bytes": 168571602,
+    "protected_files_verified_before_after": 123,
+    "known_pids_absent": [
+      3642345,
+      3646878,
+      3648935,
+      3732250,
+      3736614
+    ],
+    "exact_case_process_scan": "empty",
+    "cache_open_handle_scan": "empty",
+    "acceptance_review_sha256": "99a810bd48f46f238c7a452a5ee363c7d660088bee1bdbe310089d40f16f51c0",
+    "scope": "Exact case only; other ticket workloads may run; no global compute-empty claim",
+    "physical_reclaim": "Logical bytes only; physical reclaim not separately measured",
+    "excluded_unrelated_user_systemd_pids": [
+      340,
+      344
+    ]
+  },
+  "checks": {
+    "preparation": "passed",
+    "actual_input_review": "passed",
+    "native_execution": "passed",
+    "capacity": "passed",
+    "publication_readback": "passed",
+    "CPU_scoring": "passed",
+    "independent_acceptance": "passed",
+    "protected_cleanup": "passed"
+  },
+  "bindings": [
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T215359Z-a69f04ad/inputs.json",
+      "sha256": "192778aa58b3d371fbec966fbc10df791aa4c878b0121a038b3df0c257e26302"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T215359Z-a69f04ad/independent-preparation-review.json",
+      "sha256": "3985aab67a3d6e6e1b50faca85711977edb8f4b3251fbefa409936f426b756e7"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T215359Z-a69f04ad/fresh-admission.json",
+      "sha256": "7b3a2c7f3ab39c2ea9be49ae6cfae9b97aa01aa78e7a169bb6bcb994209fe7b8"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T221345Z-35f433f1/inputs.json",
+      "sha256": "48b4d0d4b242d1fca8b1ac77aeece5a8f4148a6e012ad2568bfdf56e0f61bb6e"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T221345Z-35f433f1/result.json",
+      "sha256": "22cf5a370f70356b5f6ceefae89d51c7d288e9ce267e0dc64295d28583d97870"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T221345Z-35f433f1/actual-preparation-review.json",
+      "sha256": "1d60961be0bdc13d0cc53d264135ab370e00a27f8eb00b16e23f43f36f7e1ecd"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket24-20261116T221345Z-35f433f1/gpu-telemetry.jsonl",
+      "sha256": "2093067acc1d8452082951fbf41b1c5361f6fdfc0a9e07d990825e486af92b93"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/summary.json",
+      "sha256": "da4dd89d4b6c0b40ebcd4d5bf5a831c7d97a17faf2827e88cb2e0a88a601dab4"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/verification.json",
+      "sha256": "fc4f019bd65cb718f4f5d9c99b1e736e4353ee5bee0a91e6e1733db7ffa6d808"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/training-inputs.json",
+      "sha256": "cdfc616cee756d12738c46604025dc8e9fe3c9f3b63dd167b4684b84107390fb"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/batch-estimates.json",
+      "sha256": "568f3cae977e13b86d90c8f7fbd76c9fa23c18b4cd1a41d9832c12ce5f71eb25"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/batch-admission.json",
+      "sha256": "06564c9075684aa5086d9eb0e2eca058efc6a141f4af1a3c7268789049b75806"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/configuration.json",
+      "sha256": "014a7776611182c258869670cc52158677b10282c4ad531729620eef6c4f19e8"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/optimizer.json",
+      "sha256": "127039c8b91f2823fe9b961cd69e49eb9a83ef6916b5bab481fe8351686c8003"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/pipeline.json",
+      "sha256": "b0d0b2f134143ff8775916d397c87f9511c94096318556f6e3e6e943423b3674"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/receipt.json",
+      "sha256": "30c60e2e0cd9247c21b77c086ac2ff5f35f6266239c820086b06b47d9170c8fe"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/executor-receipt.json",
+      "sha256": "ebf85bddfdc11efebbbb94e2883256524567b1fede0e1155e9701dc544f7b4b1"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/independent-acceptance-review.json",
+      "sha256": "99a810bd48f46f238c7a452a5ee363c7d660088bee1bdbe310089d40f16f51c0"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/cleanup-plan.json",
+      "sha256": "ff17491fcfce4941dfa7246af969251cc45e621284dcf4724c2148ef5b2a9441"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/cleanup.json",
+      "sha256": "fb50cae35e88eade5890760b6b15f29c80a9bce30bc50cff47bcda61e8e53f12"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/cpu-validation.json",
+      "sha256": "5fff6d158c587e79de67fde505b139bbf7ba6500524808a952fc20d3a363a06e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/cpu-geometry.json",
+      "sha256": "1c75f4ee025332a67ba1de0da67c895eb29207f118792529f3a49f480797964e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/native-args.json",
+      "sha256": "28f61f32cc8c19a5c67286a5ef4eee45cdc433a45d09b2e00c243a07da915296"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-small-json-fccd3dfa7e/readback/20261116T221759Z-1c0ad2a1/native-metrics.csv",
+      "sha256": "6496952e9b9742b58a2e50269d6078cdf6e2d74cfbb7133744973b3a07fe5f6f"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/independent-review.json",
+      "sha256": "a7ae9af016ea09f16b1a4d71fd88858b07f9465e140418ad8cf26fec042b96e4"
+    },
+    {
+      "path": "runs/verification-gap-closure/fixtures-v1/prepared/manifest.json",
+      "sha256": "4308e0bf241675bc07d0e0fce9fe75a516fddd322e1d359f09bf6e4f56eb4973"
+    }
+  ],
+  "limitations": [
+    "Two-epoch smoke, not scientific accuracy or convergence",
+    "Sampled memory only, no continuous reserve or playback proof",
+    "One GPU/backend variant, no numerical parity, export or physical multi-GPU claim",
+    "Historical WSL hang cause unproven",
+    "No per-image transform trace",
+    "Raw and evaluation predictions retained; logical cleanup bytes only",
+    "No new live calls or checks during dated-record preparation",
+    "Delivery gate pending"
+  ]
+}
