@@ -26,6 +26,8 @@ class GPUDevice(BaseModel):
 
 @dataclass(frozen=True)
 class GPUState:
+    """Unavailable device bytes include driver reservations as well as allocations."""
+
     used: int
     utilization: int
     pids: frozenset[int]
@@ -70,19 +72,23 @@ def _telemetry_integer(value: str, field: str) -> int:
 
 
 def gpu_states() -> dict[str, GPUState]:
-    inventory = _query("--query-gpu=uuid,memory.used,utilization.gpu")
+    inventory = _query("--query-gpu=uuid,memory.total,memory.free,utilization.gpu")
     processes = _query("--query-compute-apps=gpu_uuid,pid")
     by_gpu: dict[str, set[int]] = {}
     for uuid, pid in processes:
         by_gpu.setdefault(uuid, set()).add(_telemetry_integer(pid, "pid"))
-    return {
-        uuid: GPUState(
-            _telemetry_integer(used, "memory.used") * 1024**2,
+    states = {}
+    for uuid, total, free, utilization in inventory:
+        total_bytes = _telemetry_integer(total, "memory.total") * 1024**2
+        free_bytes = _telemetry_integer(free, "memory.free") * 1024**2
+        if total_bytes <= 0 or not 0 <= free_bytes <= total_bytes:
+            raise RuntimeError("GPU telemetry unavailable: inconsistent total/free memory readings")
+        states[uuid] = GPUState(
+            total_bytes - free_bytes,
             _telemetry_integer(utilization, "utilization.gpu"),
             frozenset(by_gpu.get(uuid, ())),
         )
-        for uuid, used, utilization in inventory
-    }
+    return states
 
 
 def discover_gpus() -> tuple[GPUDevice, ...]:

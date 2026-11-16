@@ -54,3 +54,47 @@ The source is compared with `fbcfa25` in the managed worktree; root HEAD remains
 Remote references were not fetched. The coordinator owns commits and live execution.
 No GPU/model/service process was started for these tests; all focused check
 processes exited. No user data, upstream source or shared staging was changed.
+
+## Third live attempt and driver-reserved memory
+
+**Failed**, not accepted: `ultralytics-default-c6d06d61f1`, launch
+`20261116T075610Z`, exited after 215.45 seconds with owned cleanup confirmed.
+It recorded successful trials at batches 8,16,56,64 and72, and allocator OOMs
+at 128,96,80, before fresh batch 72 confirmation was contaminated by PID 940980.
+That PID could not be attributed after exit; no assertion is made that it belonged
+to this task or another user. No acceptance training began.
+
+Separately, the launch telemetry recorded 8 of 207 samples below 8192 MiB reported
+free memory, with a minimum 7922 MiB. This independently invalidates the run.
+The attempted coordinator SIGINT arrived after pytest had already exited and
+signalled no process. A subsequent compute-process query returned no rows.
+
+A native memory query showed 32607 MiB total, 3563 MiB used, 420 MiB reserved
+and 28625 MiB free. `total-used` omits reserved memory. The first correction's
+whole-device reading therefore remained optimistic. The pending ticket98 fix
+is extended to query total/free explicitly and record unavailable bytes as
+`total-free`, including driver reservations. UUID identity and process ownership
+remain unchanged; admission, capacity accounting and reserve monitoring now share
+that conservative occupancy. Inconsistent or nonnumeric readings fail closed.
+
+A new product regression drives `gpu_states` through `monitor_devices` and
+`require_memory_reserve` with 24 GiB total, 10 GiB used and 5 GiB free. Before
+correction it failed because the 8 GiB guard did not raise; after correction it
+raises and reports 19 GiB unavailable. Four range-error cases and malformed
+free-memory propagation also exercise product behavior. The focused inventory,
+probe and estimation slice passed 221 tests in 3.87s. Strict mypy, Ruff check and
+format check passed for the three affected files. One initial run exposed an
+old three-column mocked telemetry row; updating it to the actual requested
+four-column protocol restored the expected actionable error assertion.
+
+The earlier final automatic gate failed on a Python example's formatting in
+the 96/97 mutation report. Mechanical commit `c161f3f` corrected that example;
+the canonical gate then passed. Explicit native `task test` passed 25 affected
+tests in 3.46s on the pre-extension inputs. The new inventory extension still
+requires scoped mutation disposition, independent review, affected verification
+and a new reserve-preserving live attempt. Neither historical pass covers its
+new behavior automatically.
+
+- `src/clearml_yolo/adapters/runtime/gpu_inventory.py`: `b97a7b58b2fd2951a3a77b4a142d8e8554fafa8581b1486c4c07dab8f3900384`
+- `tests/test_gpu_inventory.py`: `b50e8691a12089b93d27718fbdd149901c7c8c9ca36ee7807d24481ee7877e80`
+- `tests/test_batch_probe.py`: `cc27bd3392bc83989e061dd58d5259141350dcdab76cbc5717825ec9309fedfe`

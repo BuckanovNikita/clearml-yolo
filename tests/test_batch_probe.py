@@ -328,7 +328,7 @@ def test_malformed_telemetry_aborts_search_without_becoming_capacity_evidence(
     _install_workers(monkeypatch, tmp_path, workers)
     queries = iter(
         [
-            [["GPU-a", "[Generic operating system error]", "75"]],
+            [["GPU-a", "100", "[Generic operating system error]", "75"]],
             [["GPU-a", "101"]],
         ]
     )
@@ -340,7 +340,7 @@ def test_malformed_telemetry_aborts_search_without_becoming_capacity_evidence(
     result = adapter.NativeBatchProbe().run(profile, SyntheticWorkload(), settings, state.next_batch)
     assert result.status == "contaminated"
     assert "GPU telemetry unavailable" in result.diagnostic
-    assert "memory.used" in result.diagnostic
+    assert "memory.free" in result.diagnostic
     assert result.peak_memory_bytes == ()
     assert state.observe(result).status == "failed"
     assert len(workers.requests) == 1

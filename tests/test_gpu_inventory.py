@@ -21,6 +21,31 @@ def _device() -> gpu.GPUDevice:
     )
 
 
+def test_driver_reserved_memory_is_unavailable_to_reserve_monitor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Real NVML reports total = used + reserved + free, not just used + free.
+    values = {
+        "uuid": "GPU-test",
+        "memory.total": "24576",
+        "memory.used": "10240",
+        "memory.free": "5120",
+        "utilization.gpu": "0",
+    }
+
+    def query(selector: str) -> list[list[str]]:
+        if selector.startswith("--query-compute-apps="):
+            return []
+        return [[values[field] for field in selector.partition("=")[2].split(",")]]
+
+    monkeypatch.setattr(gpu, "_query", query)
+    device = _device().model_copy(update={"total_memory_bytes": 24 * 1024**3})
+    unavailable = gpu.monitor_devices((device,), lambda: ())
+    with pytest.raises(RuntimeError, match="reserve"):
+        gpu.require_memory_reserve((device,), unavailable, 8 * 1024**3)
+    assert unavailable == (19 * 1024**3,)
+
+
 @pytest.mark.parametrize("pids", [frozenset({10}), frozenset({10, 11})])
 def test_measurements_accept_owned_ranks_and_compiler_children(
     monkeypatch: pytest.MonkeyPatch, pids: frozenset[int]
@@ -115,20 +140,28 @@ def test_telemetry_cannot_reuse_a_previously_owned_pid_after_its_identity_change
         gpu.monitor_devices((_device(),), tree.live_pids)
 
 
-@pytest.mark.parametrize("field", ["memory.used", "utilization.gpu", "pid"])
+@pytest.mark.parametrize("field", ["memory.total", "memory.free", "utilization.gpu", "pid"])
 def test_malformed_numeric_telemetry_is_an_actionable_unavailable_failure(
     monkeypatch: pytest.MonkeyPatch, field: str
 ) -> None:
-    values = {"memory.used": "50", "utilization.gpu": "75", "pid": "42"}
+    values = {"memory.total": "100", "memory.free": "50", "utilization.gpu": "75", "pid": "42"}
     values[field] = "[Generic operating system error]"
     queries = iter(
         [
-            [["GPU-test", values["memory.used"], values["utilization.gpu"]]],
+            [["GPU-test", values["memory.total"], values["memory.free"], values["utilization.gpu"]]],
             [["GPU-test", values["pid"]]],
         ]
     )
     monkeypatch.setattr(gpu, "_query", lambda _: next(queries))
     with pytest.raises(RuntimeError, match=f"GPU telemetry unavailable.*{field}"):
+        gpu.gpu_states()
+
+
+@pytest.mark.parametrize(("total", "free"), [("0", "0"), ("-1", "0"), ("100", "-1"), ("100", "101")])
+def test_inconsistent_memory_telemetry_is_unavailable(monkeypatch: pytest.MonkeyPatch, total: str, free: str) -> None:
+    queries = iter([[["GPU-test", total, free, "0"]], []])
+    monkeypatch.setattr(gpu, "_query", lambda _: next(queries))
+    with pytest.raises(RuntimeError, match="inconsistent total/free"):
         gpu.gpu_states()
 
 
