@@ -1,0 +1,1067 @@
+{
+  "status": "failed_comparison_analyzed_no_new_GPU_work",
+  "utc": "2026-11-16T19:00:30.617975+00:00",
+  "inputs": {
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/0.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/0.stdout": {
+      "sha256": "3636c6e624e31bc0c8cf5627988a7448dba850f9f2f686e69db8303d2ddf3044",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/1.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/1.stdout": {
+      "sha256": "c06bd2bdcadf956964ce54ff1eacecc2550eafaa53dda404928202dfbfcbf7f1",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/10.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/10.stdout": {
+      "sha256": "b55a7ce374609d996d366a2948c6ec97d0ac35574fb9edd6047e485a5891eb3c",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/11.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/11.stdout": {
+      "sha256": "3f5b3ed2ae296966f291f6ebbf93fe103cc57dd4c7dc9a3a41f88d34becfb908",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/12.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/12.stdout": {
+      "sha256": "0694ca1c047e6e271182565822aa30b29ae51f27ed80681aab0b604053e2fb8f",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/13.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/13.stdout": {
+      "sha256": "29f0244c647042edd58dbb0fa98b2750ed26894d40ffb0267ae6e7f7c6d60af6",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/14.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/14.stdout": {
+      "sha256": "c91d668d7d392e492bbf2a557c1bc0bf9cb8e46c6575dbeea516bfab79018cb3",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/15.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/15.stdout": {
+      "sha256": "96df268b2debb41ffecc8f5aaeb05fa628e4db27798e78dc1be1c9488c07f5ab",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/16.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/16.stdout": {
+      "sha256": "29d064ee0873bc1e8fc29f321cda5a1a713a56d73f7d936ec717fbeaa0b383fe",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/17.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/17.stdout": {
+      "sha256": "9137693d954705e8eb6bd3a5abd5947884509fd012d539640e452dc3e30e9201",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/18.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/18.stdout": {
+      "sha256": "5b1371627f4eb63af9d8535d886765e38d14b373aff132a6c3f3ba69a71c85e8",
+      "bytes": 65
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/19.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/19.stdout": {
+      "sha256": "03426e6200883c69c15c64fb5f497309755f2ff6abc6df6b69125dea8564f4d9",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/2.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/2.stdout": {
+      "sha256": "025f7546b4936ec43bb96e872208d5270966807aa29e643496a1fe92da0a1b45",
+      "bytes": 65
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/20.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/20.stdout": {
+      "sha256": "dc7d18b6433c38b8256f3abb219de5fe88d9911e062520208c45f05647e2aa21",
+      "bytes": 67
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/21.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/21.stdout": {
+      "sha256": "d039f86f5d3c18ab576e50b17e50b89c7643906e0407578c1d8ed972fa064978",
+      "bytes": 67
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/22.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/22.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/3.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/3.stdout": {
+      "sha256": "8ffcbcfc8d66c2f7760fce5ca990750d39523aa77e12e646051abe20c45266cf",
+      "bytes": 65
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/4.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/4.stdout": {
+      "sha256": "5d0b5fef016741a9898d1d6389f6147d26c6894c826a218a0d415af0acb8b595",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/5.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/5.stdout": {
+      "sha256": "8039e8a0c31e6c1f6fc78ae6d44a9a1dac64980ab963d7aed11bf7843179a140",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/6.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/6.stdout": {
+      "sha256": "3eb0d1c9e0f7c0927b2c24f58a78ed1f5d0ff0b216aa1b48e64f8d9258717365",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/7.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/7.stdout": {
+      "sha256": "f5aaed88ccacfd03ca819e8dc145ed585ed64db370dcec48581d4f5a89988633",
+      "bytes": 65
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/8.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/8.stdout": {
+      "sha256": "d0cc136536b9311a405ece5a4d56afc2dc00d205d68a34f805fef89204af6144",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/9.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/9.stdout": {
+      "sha256": "16662926fb81b049ceebbc06e700ad08a3cca699b33d1424f87e3f31f1519b99",
+      "bytes": 66
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/receipt.json": {
+      "sha256": "97c2c03a2996b9bb0ff2460c53099a9635060a40b4a819f8894e36c3ea033bdb",
+      "bytes": 31382
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host/supervisor.json": {
+      "sha256": "7a617e61e82bbbafac383dc6c568cd3c681cf3fcdeaf893442f6d5f99e101456",
+      "bytes": 197
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/host-samples.json": {
+      "sha256": "0cab40adc5386e05f094dd96ef87e5be415dc33635b2f7bd241a764791c5478c",
+      "bytes": 29746
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/linux-processes.json": {
+      "sha256": "49f2a7a8bba24420dce339356f8088bf785b50f19e8a9609352fe9dd669093fa",
+      "bytes": 2798
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/manifest.json": {
+      "sha256": "cff524288145a82a7778010fad809bd56541f882d878c8e314b0eabe0b22d10c",
+      "bytes": 68970
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/native-diagnostic.log": {
+      "sha256": "882f9bd19c9c2b7cf4781c3141271ebddc7119ed1360c6376aee1daa0ae4cf49",
+      "bytes": 179
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/result.json": {
+      "sha256": "ddad40810e08f9fbe65d624265d0228d30cf1cc4572af9948178ae118e03fa12",
+      "bytes": 2220
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/root-post-cleanup.json": {
+      "sha256": "8f4f0c21a0a2d1ff68f80b71e7713b17a46740ee7d8e096fb6e4698f9ef3fdd3",
+      "bytes": 614
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/root-windows-postcheck.json": {
+      "sha256": "04564f301775cda1e7b6c3469485b34f6a546d6273fca93291ed5099b77b7e96",
+      "bytes": 4049
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/windows-cancellation.log": {
+      "sha256": "ec24f6c94c29e55b706a173800d2cb0c187767ed1e6dc086a4ca2615af387aeb",
+      "bytes": 411
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/windows-observer.log": {
+      "sha256": "7d96a10d1acf76c3d0b9c7c84088a9e6d7dd049b27d8bf8aee0f35eb3882b439",
+      "bytes": 20535
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/.tmp/batch-estimate/a0c2417bf0b14c46925fcac12d8d53b9/AdamW/rank-0.json": {
+      "sha256": "6ad71357e3f9fbc09e3c20b30e60a5b1b25944618e8aa7b383dcec32165096c1",
+      "bytes": 242
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/.tmp/batch-estimate/a0c2417bf0b14c46925fcac12d8d53b9/AdamW/rank-0.log": {
+      "sha256": "3deec49c7bbcbfa0e50852f2584e94b519a410309284f5723b20843763b178ec",
+      "bytes": 1839
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/.tmp/batch-estimate/a0c2417bf0b14c46925fcac12d8d53b9/AdamW/request.json": {
+      "sha256": "0ecb6dd106b0f5f1b6612f4f170dbfaf5929a3e5ae9f14c49a9703d3d8335ca1",
+      "bytes": 3652
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/diagnostic.json": {
+      "sha256": "708f2219cf6a61a4507f88d2eb05bd47f184743aaf84677f8464dd96c524484f",
+      "bytes": 1777
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/events-2313595.jsonl": {
+      "sha256": "b80e95ad3b8d69eb0ac70d320819af6a7a97c5b25f211f964ab83484f7edc2e4",
+      "bytes": 363
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/events-2313631.jsonl": {
+      "sha256": "5eaa1614b55bc07fa0fce955d6c0e6e6287453b87dc37903575aa442f2fe4dda",
+      "bytes": 590
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/events-2313677.jsonl": {
+      "sha256": "628ef76cac96d8ce07a2790fd2ce12eec829b59d82af6a28219d891c67f6e520",
+      "bytes": 801
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/gpu-telemetry.jsonl": {
+      "sha256": "5cbbe92c13e6f08210a0309e197e049360f89c029c9d7c18bcbd9a84c52abe8f",
+      "bytes": 2677
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/historical-request.json": {
+      "sha256": "8c759a1872cc6b2d50cab6eabbdb7a0962c71cfbf3deb2fb8dacf441cbddf553",
+      "bytes": 3653
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/kernel-window.jsonl": {
+      "sha256": "259cea4ae8320731d9d96fc9520cced27845d6c4ff2e1965196aa3e1d0c95796",
+      "bytes": 399013
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/native.log": {
+      "sha256": "945f11abc9b2568f6af00d461ccdcac4d6858a897bdaf46909bbfec6e7f5255a",
+      "bytes": 5223
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/observed-processes.json": {
+      "sha256": "821919d16dbe68b3e44c436aa15f8cba3ead32d0f64705462c68a7259b68aea0",
+      "bytes": 133803
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/preparation-manifest.json": {
+      "sha256": "902e52904bf6eeedb35196dde220a6c8102790317deafa36892272de29cccf35",
+      "bytes": 81635
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/process-observations.jsonl": {
+      "sha256": "5d01fa1e9f047a05bfd6c641688c170104e3e3a5b62fd7829593299f0a4e6323",
+      "bytes": 622974
+    },
+    "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/pytest.log": {
+      "sha256": "55b9e73be27aa6d40233a7bd66cca662f67c5c9c5c1c0cd1195129480e219cc3",
+      "bytes": 3898
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-185354-analysis.json": {
+      "sha256": "8dafb42e76551e30a2611b10c0efc3bd575982cb9a79a5d225526214e5ffb311",
+      "bytes": 48327
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-185354-analysis.md": {
+      "sha256": "3ac49174ecc884fa7866ab459707582778979c345cb624037d22d882bbbc31e4",
+      "bytes": 5369
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-existing-channels.py": {
+      "sha256": "c88f9fdecad2fd53a2e7f10d9a8b4c6bac727b90e0e80a1b5282d47faadf71c8",
+      "bytes": 10115
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-existing-channels.json": {
+      "sha256": "18b370c29b034bba1e0ebe4c007655b0374164fc3a7eebcdfb47838602a3835a",
+      "bytes": 12730
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-existing-channels-completion.json": {
+      "sha256": "3c5e8bc37b334fc6ab3d6f92f871ffdcf4746b9d71f528ce4423fdb9cf0776a2",
+      "bytes": 1782
+    },
+    ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-combined-root-review.json": {
+      "sha256": "7d34ecffbfb19775407d1f8e549303e862a6e0c0a1af04f7a9e7af23a6b77fd9",
+      "bytes": 1374
+    }
+  },
+  "executed_source_binding": {
+    "manifest_sha256": "cff524288145a82a7778010fad809bd56541f882d878c8e314b0eabe0b22d10c",
+    "source_files_rehashed": 375,
+    "changed": []
+  },
+  "combined_result": {
+    "status": "failed",
+    "started": {
+      "utc": "2026-11-16T18:53:54.355646+00:00",
+      "monotonic": 77953.5364563,
+      "boottime": 77953.53645811
+    },
+    "pid": 2313495,
+    "nonce": "8ce78d32599a42928ace425bc4d37de0",
+    "manifest_sha256": "cff524288145a82a7778010fad809bd56541f882d878c8e314b0eabe0b22d10c",
+    "source_head_at_prepare": "a8fc8b6f16accde0d07fb594800e602f5df8db84",
+    "cleanup_complete": false,
+    "scope": "one original batch8; host observation additional, all3 original Linux guards unchanged",
+    "UTC_calibration": {
+      "linux_before_launch": {
+        "utc": "2026-11-16T18:53:54.357024+00:00",
+        "monotonic": 77953.53783174,
+        "boottime": 77953.5378323
+      },
+      "linux_after_identity_read": {
+        "utc": "2026-11-16T18:53:54.863826+00:00",
+        "monotonic": 77954.044640126,
+        "boottime": 77954.044641526
+      },
+      "windows_identity_timestamp": "2026-11-16T18:53:54.7858484Z",
+      "windows_minus_linux_offset_seconds_bounds": [
+        -0.07797813415527344,
+        0.42882394790649414
+      ],
+      "limit": "Startup observation bracket, not exact clock equality; require overlap robust to this uncertainty. Stopwatch/boottime remain separate duration domains."
+    },
+    "host_ready": {
+      "utc": "2026-11-16T18:53:55.666673+00:00",
+      "monotonic": 77954.847474383,
+      "boottime": 77954.847474453
+    },
+    "native_started": {
+      "utc": "2026-11-16T18:53:55.667667+00:00",
+      "monotonic": 77954.848478496,
+      "boottime": 77954.848479906
+    },
+    "diagnostic": "RuntimeError: Host sample completion timestamp stale/future/invalid; cancel diagnostic",
+    "native_SIGTERM_sent": {
+      "utc": "2026-11-16T18:54:29.221130+00:00",
+      "monotonic": 77988.401931341,
+      "boottime": 77988.401931461
+    },
+    "finished": {
+      "utc": "2026-11-16T18:54:31.614526+00:00",
+      "monotonic": 77990.795334898,
+      "boottime": 77990.795335348
+    },
+    "cleanup_errors": [
+      "Windows: RuntimeError: Exact Windows cancellation failed"
+    ],
+    "signals_received": [],
+    "host_valid_samples": 22,
+    "windows_cleanup_state": "unresolved",
+    "windows_cleanup_limit": "Failure of auxiliary Windows cancellation or inspection leaves Windows cleanup unresolved; Linux interop termination is not Windows cleanup proof."
+  },
+  "host_result": {
+    "status": "failed",
+    "mode": "observe",
+    "nonce": "8ce78d32599a42928ace425bc4d37de0",
+    "supervisor_pid": 325332,
+    "supervisor_creation_filetime": 134393288343744014,
+    "started_utc": "2026-11-16T18:53:55.0969406Z",
+    "deadline_seconds": 5,
+    "cleanup_complete": true,
+    "error": "System.Management.Automation.RuntimeException: Host observation failed; stop without retry",
+    "finished_utc": "2026-11-16T18:54:29.8086121Z",
+    "elapsed_seconds": 34.7123638
+  },
+  "host_last_success": {
+    "case": 21,
+    "app": "C:\\WINDOWS\\system32\\nvidia-smi.exe",
+    "arguments": "--query-gpu=uuid,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits",
+    "started_utc": "2026-11-16T18:54:22.2814580Z",
+    "start_elapsed_seconds": 27.185102099999998,
+    "stdout": "\\\\wsl.localhost\\Ubuntu-26.04\\mnt\\wsl\\data\\nkt\\clearml-yolo\\.tmp\\verification-gap-closure\\ticket101-telemetry-diagnosis\\windows-comparison-20261116T185354Z-524e785d\\host\\21.stdout",
+    "stderr": "\\\\wsl.localhost\\Ubuntu-26.04\\mnt\\wsl\\data\\nkt\\clearml-yolo\\.tmp\\verification-gap-closure\\ticket101-telemetry-diagnosis\\windows-comparison-20261116T185354Z-524e785d\\host\\21.stderr",
+    "cleanup_complete": true,
+    "pid": 324688,
+    "creation_filetime": 134393288622868468,
+    "status": "completed",
+    "timer_error": 0,
+    "exit_code": 0,
+    "finished_utc": "2026-11-16T18:54:22.6152972Z",
+    "end_elapsed_seconds": 27.519345599999998
+  },
+  "host_failed_query": {
+    "case": 22,
+    "app": "C:\\WINDOWS\\system32\\nvidia-smi.exe",
+    "arguments": "--query-gpu=uuid,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits",
+    "started_utc": "2026-11-16T18:54:23.6314840Z",
+    "start_elapsed_seconds": 28.534713699999998,
+    "stdout": "\\\\wsl.localhost\\Ubuntu-26.04\\mnt\\wsl\\data\\nkt\\clearml-yolo\\.tmp\\verification-gap-closure\\ticket101-telemetry-diagnosis\\windows-comparison-20261116T185354Z-524e785d\\host\\22.stdout",
+    "stderr": "\\\\wsl.localhost\\Ubuntu-26.04\\mnt\\wsl\\data\\nkt\\clearml-yolo\\.tmp\\verification-gap-closure\\ticket101-telemetry-diagnosis\\windows-comparison-20261116T185354Z-524e785d\\host\\22.stderr",
+    "cleanup_complete": true,
+    "pid": 321588,
+    "creation_filetime": 134393288636374913,
+    "wrapper_action": "Windows timer TerminateProcess(owned handle,124)",
+    "action_utc": "2026-11-16T18:54:28.6566970Z",
+    "status": "timeout_terminated",
+    "timer_error": 0,
+    "exit_code": 124,
+    "finished_utc": "2026-11-16T18:54:29.7734234Z",
+    "end_elapsed_seconds": 34.6767081
+  },
+  "host_failed_payload": {
+    "stdout_bytes": 0,
+    "stderr_bytes": 0
+  },
+  "ordering": {
+    "calibration_windows_minus_linux_seconds": [
+      -0.07797813415527344,
+      0.42882394790649414
+    ],
+    "host_query_creation_windows_utc": "2026-11-16T18:54:23.637491+00:00",
+    "host_query_creation_linux_bounds": [
+      "2026-11-16T18:54:23.208667+00:00",
+      "2026-11-16T18:54:23.715469+00:00"
+    ],
+    "host_timer_linux_bounds": [
+      "2026-11-16T18:54:28.227873+00:00",
+      "2026-11-16T18:54:28.734675+00:00"
+    ],
+    "host_query_finished_linux_bounds": [
+      "2026-11-16T18:54:29.344599+00:00",
+      "2026-11-16T18:54:29.851401+00:00"
+    ],
+    "host_supervisor_finished_linux_bounds": [
+      "2026-11-16T18:54:29.379788+00:00",
+      "2026-11-16T18:54:29.886590+00:00"
+    ],
+    "host_timer_action_seconds_after_process_creation": 5.019205808639526,
+    "host_entry_Stopwatch_seconds": 6.1419944000000015,
+    "host_entry_finish_seconds_after_timer_action": 1.1167259216308594,
+    "native_SIGTERM_linux_utc": "2026-11-16T18:54:29.221130+00:00",
+    "minimum_timer_precedes_SIGTERM_seconds": 0.48645472526550293,
+    "guaranteed_host_process_pre_timer_lifetime_linux_utc": [
+      "2026-11-16T18:54:23.715469+00:00",
+      "2026-11-16T18:54:28.227873+00:00"
+    ],
+    "last_success_oldest_age_at_SIGTERM_seconds": 7.034656763076782,
+    "staleness_threshold_linux_utc": "2026-11-16T18:54:29.186473+00:00",
+    "threshold_to_SIGTERM_seconds": 0.03465676307678223,
+    "interpretation": "The5s Windows timer action precedes native cancellation for every offset in the retained calibration interval. Host executable timeout is established; not solely delayed publication of a successful record. Entry duration includes process/output/UNC/supervision, not internal NVML time."
+  },
+  "Linux_queries": [
+    {
+      "pid": 2314563,
+      "ppid": 2313677,
+      "command": [
+        "/usr/lib/wsl/lib/nvidia-smi",
+        "--query-gpu=uuid,memory.total,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      "command_sha256": "de6ed9701697d32073a5a94626b9b8b0fb85a0798e5562db3e4c772ca22a0988",
+      "start_boot_seconds": 77982.83,
+      "start_utc_estimate": "2026-11-16T18:54:23.649198+00:00",
+      "first_seen": {
+        "utc": "2026-11-16T18:54:23.726822+00:00",
+        "monotonic": 77982.907623526,
+        "boottime": 77982.907623566
+      },
+      "last_alive": {
+        "utc": "2026-11-16T18:54:29.740677+00:00",
+        "monotonic": 77988.921478487,
+        "boottime": 77988.921478547
+      },
+      "first_absent": {
+        "utc": "2026-11-16T18:54:29.843966+00:00",
+        "monotonic": 77989.024767416,
+        "boottime": 77989.024767516
+      },
+      "maximum_corrected_D_snapshot_process_age_seconds": 5.262143486994319,
+      "snapshots": [
+        {
+          "event": "first_seen",
+          "utc": "2026-11-16T18:54:23.726905+00:00",
+          "monotonic": 77982.907706696,
+          "boottime": 77982.907706746,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 0.8968250751495361,
+          "corrected_process_age_seconds": 0.0777067460003309,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:24.761817+00:00",
+          "monotonic": 77983.942618335,
+          "boottime": 77983.942618385,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 1.9317395687103271,
+          "corrected_process_age_seconds": 1.112618384999223,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:25.794710+00:00",
+          "monotonic": 77984.975511223,
+          "boottime": 77984.975511293,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 2.9646308422088623,
+          "corrected_process_age_seconds": 2.1455112929979805,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:26.833220+00:00",
+          "monotonic": 77986.014025327,
+          "boottime": 77986.014026247,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.003093004226685,
+          "corrected_process_age_seconds": 3.184026246992289,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:27.870177+00:00",
+          "monotonic": 77987.050978202,
+          "boottime": 77987.050978262,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 5.040095806121826,
+          "corrected_process_age_seconds": 4.220978262004792,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:28.911337+00:00",
+          "monotonic": 77988.092142927,
+          "boottime": 77988.092143487,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 6.081191301345825,
+          "corrected_process_age_seconds": 5.262143486994319,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        }
+      ]
+    },
+    {
+      "pid": 2314565,
+      "ppid": 2313631,
+      "command": [
+        "/usr/lib/wsl/lib/nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid",
+        "--format=csv,noheader,nounits"
+      ],
+      "command_sha256": "fbb8040812c462715b0cb688f5a33d6ac0e59130f46afb9712725f0b5890c7eb",
+      "start_boot_seconds": 77983.15,
+      "start_utc_estimate": "2026-11-16T18:54:23.969199+00:00",
+      "first_seen": {
+        "utc": "2026-11-16T18:54:24.037339+00:00",
+        "monotonic": 77983.218140684,
+        "boottime": 77983.218140754
+      },
+      "last_alive": {
+        "utc": "2026-11-16T18:54:29.740598+00:00",
+        "monotonic": 77988.921399197,
+        "boottime": 77988.921399267
+      },
+      "first_absent": {
+        "utc": "2026-11-16T18:54:29.844000+00:00",
+        "monotonic": 77989.024800966,
+        "boottime": 77989.024801016
+      },
+      "maximum_corrected_D_snapshot_process_age_seconds": 5.253531581998686,
+      "snapshots": [
+        {
+          "event": "first_seen",
+          "utc": "2026-11-16T18:54:24.037428+00:00",
+          "monotonic": 77983.218229065,
+          "boottime": 77983.218229135,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 0.8873429298400879,
+          "corrected_process_age_seconds": 0.06822913500946015,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:25.071577+00:00",
+          "monotonic": 77984.252378457,
+          "boottime": 77984.252378537,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 1.921518087387085,
+          "corrected_process_age_seconds": 1.1023785370052792,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:26.107299+00:00",
+          "monotonic": 77985.288104782,
+          "boottime": 77985.288105172,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 2.957162380218506,
+          "corrected_process_age_seconds": 2.138105172009091,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:27.145350+00:00",
+          "monotonic": 77986.326151653,
+          "boottime": 77986.326151723,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 3.995293378829956,
+          "corrected_process_age_seconds": 3.1761517230042955,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:28.183906+00:00",
+          "monotonic": 77987.364706854,
+          "boottime": 77987.364706934,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 5.0338404178619385,
+          "corrected_process_age_seconds": 4.2147069339989685,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:29.222729+00:00",
+          "monotonic": 77988.403531492,
+          "boottime": 77988.403531582,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 6.0726494789123535,
+          "corrected_process_age_seconds": 5.253531581998686,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        }
+      ]
+    },
+    {
+      "pid": 2314588,
+      "ppid": 2313595,
+      "command": [
+        "nvidia-smi",
+        "--query-gpu=uuid,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      "command_sha256": "6996651c5e3df2d2f1889d42ed6b4c73b209a9c242906f2ca9be1bd6e4e77c9f",
+      "start_boot_seconds": 77984.18,
+      "start_utc_estimate": "2026-11-16T18:54:24.999195+00:00",
+      "first_seen": {
+        "utc": "2026-11-16T18:54:25.071151+00:00",
+        "monotonic": 77984.251955093,
+        "boottime": 77984.251955353
+      },
+      "last_alive": {
+        "utc": "2026-11-16T18:54:29.637517+00:00",
+        "monotonic": 77988.818318171,
+        "boottime": 77988.818318211
+      },
+      "first_absent": {
+        "utc": "2026-11-16T18:54:29.740750+00:00",
+        "monotonic": 77988.921551228,
+        "boottime": 77988.921551308
+      },
+      "maximum_corrected_D_snapshot_process_age_seconds": 4.118794578011148,
+      "snapshots": [
+        {
+          "event": "first_seen",
+          "utc": "2026-11-16T18:54:25.071330+00:00",
+          "monotonic": 77984.252134955,
+          "boottime": 77984.252135205,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 0.8911640644073486,
+          "corrected_process_age_seconds": 0.07213520500226878,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:26.107005+00:00",
+          "monotonic": 77985.28780728,
+          "boottime": 77985.28780736,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 1.9269161224365234,
+          "corrected_process_age_seconds": 1.1078073600074276,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:27.145143+00:00",
+          "monotonic": 77986.325944702,
+          "boottime": 77986.325944772,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 2.9650535583496094,
+          "corrected_process_age_seconds": 2.145944772011717,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "slow_query",
+          "utc": "2026-11-16T18:54:28.183568+00:00",
+          "monotonic": 77987.364372412,
+          "boottime": 77987.364372682,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.003440618515015,
+          "corrected_process_age_seconds": 3.184372682007961,
+          "inside_guaranteed_host_pre_timer_lifetime": true
+        },
+        {
+          "event": "deadline_adjacent",
+          "utc": "2026-11-16T18:54:28.703861+00:00",
+          "monotonic": 77987.884662985,
+          "boottime": 77987.884663115,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.523771286010742,
+          "corrected_process_age_seconds": 3.704663115000585,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        },
+        {
+          "event": "deadline_adjacent",
+          "utc": "2026-11-16T18:54:28.807309+00:00",
+          "monotonic": 77987.988114084,
+          "boottime": 77987.988114464,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.627159118652344,
+          "corrected_process_age_seconds": 3.8081144640018465,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        },
+        {
+          "event": "deadline_adjacent",
+          "utc": "2026-11-16T18:54:28.910948+00:00",
+          "monotonic": 77988.091750014,
+          "boottime": 77988.091750114,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.730859994888306,
+          "corrected_process_age_seconds": 3.9117501140135573,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        },
+        {
+          "event": "deadline_adjacent",
+          "utc": "2026-11-16T18:54:29.014550+00:00",
+          "monotonic": 77988.195351793,
+          "boottime": 77988.195351903,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.834468603134155,
+          "corrected_process_age_seconds": 4.015351903013652,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        },
+        {
+          "event": "deadline_adjacent",
+          "utc": "2026-11-16T18:54:29.117990+00:00",
+          "monotonic": 77988.298794288,
+          "boottime": 77988.298794578,
+          "status": "disk-sleep",
+          "wchan": "dxgvmb_send_sync_msg",
+          "raw_epoch_age_seconds": 4.937853813171387,
+          "corrected_process_age_seconds": 4.118794578011148,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        },
+        {
+          "event": "deadline_adjacent",
+          "utc": "2026-11-16T18:54:29.222387+00:00",
+          "monotonic": 77988.403189549,
+          "boottime": 77988.403189739,
+          "status": "running",
+          "wchan": "0",
+          "raw_epoch_age_seconds": 5.042275667190552,
+          "corrected_process_age_seconds": 4.2231897390011,
+          "inside_guaranteed_host_pre_timer_lifetime": false
+        }
+      ]
+    }
+  ],
+  "native": {
+    "receipt": {
+      "status": "failed",
+      "started": {
+        "utc": "2026-11-16T18:53:55.885396+00:00",
+        "monotonic": 77955.066207685,
+        "boottime": 77955.066208855
+      },
+      "pid": 2313595,
+      "birth_epoch": 1794855234.84,
+      "output": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d",
+      "manifest_sha256": "902e52904bf6eeedb35196dde220a6c8102790317deafa36892272de29cccf35",
+      "source_head_at_prepare": "a71737e0dc0b756a8e0428318f31713ca740091f",
+      "command": [
+        "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python",
+        "-B",
+        "/mnt/wsl/data/nkt/clearml-yolo/.tmp/verification-gap-closure/ticket101-telemetry-diagnosis/single_batch8.py",
+        "--stage",
+        "middle",
+        "--output",
+        "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d"
+      ],
+      "cleanup_complete": true,
+      "limits": "Sampled first/last alive and deadline-adjacent bounds only; no guaranteed internal prekill/signal capture; no internal CUDA phase instrumentation.",
+      "selected_gpu": {
+        "index": 0,
+        "uuid": "GPU-7459c4c9-b94d-ca31-17b0-fc63140c4dc1",
+        "name": "NVIDIA GeForce RTX 5090",
+        "total_memory_bytes": 34162343936,
+        "used_memory_bytes": 5492178944,
+        "utilization": 16
+      },
+      "elapsed_seconds": 33.585383926998475,
+      "diagnostic": "Interrupted: Signal 15",
+      "observer_joined": true,
+      "observer_errors": [],
+      "observed_survivors": [],
+      "signals_received": [
+        15
+      ],
+      "finished": {
+        "utc": "2026-11-16T18:54:31.512262+00:00",
+        "monotonic": 77990.693074397,
+        "boottime": 77990.693075197
+      },
+      "kernel_capture": {
+        "returncode": 0,
+        "stderr": "",
+        "sha256": "259cea4ae8320731d9d96fc9520cced27845d6c4ff2e1965196aa3e1d0c95796"
+      }
+    },
+    "rank_result": {
+      "token": "a0c2417bf0b14c46925fcac12d8d53b9",
+      "rank": 0,
+      "status": "success",
+      "actual_global_batch": 8,
+      "peak_memory_bytes": 10894704640,
+      "non_allocator_memory_bytes": 1896611840,
+      "warmup_steps": 5,
+      "measured_steps": 10,
+      "validation_steps": 1,
+      "diagnostic": ""
+    },
+    "rank_file_mtime_utc": "2026-11-16T18:54:29.201452+00:00",
+    "rank_first_observed": {
+      "utc": "2026-11-16T18:54:29.223084+00:00",
+      "monotonic": 77988.403886435,
+      "boottime": 77988.403886565,
+      "event": "file_observed",
+      "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T185355Z-0dd1164d/.tmp/batch-estimate/a0c2417bf0b14c46925fcac12d8d53b9/AdamW/rank-0.json",
+      "size": 242,
+      "mtime_ns": 1794855269201452380,
+      "limitation": "Publication/log growth observation, not an internal CUDA phase boundary"
+    },
+    "rank_mtime_before_SIGTERM_seconds": 0.019677400588989258,
+    "rank_first_observed_after_SIGTERM_seconds": 0.0019540786743164062,
+    "limit": "Rank JSON mtime precedesSIGTERM~19.7ms, first observation follows~2ms. Atomic publication order cannot be resolved more precisely. Success rank does not override interrupted enclosing probe; no TrialResult success/training/acceptance."
+  },
+  "sampled_memory": {
+    "host_valid_samples": 22,
+    "host_minimum_free_MiB": 16798,
+    "native_outer_valid_samples": 22,
+    "native_outer_minimum_free_MiB": 16290,
+    "native_maximum_completed_sample_gap_seconds": 1.5756356659985613,
+    "limit": "Completed gaps exclude cancelled trailing query. No continuous reserve/video continuity proof; no observed reserve breach."
+  },
+  "kernel": {
+    "records": 516,
+    "message_counts": {
+      "misc dxg: dxgk: dxgkio_escape: Ioctl failed: -22": 507,
+      "misc dxg: dxgk: dxgvmb_send_sync_msg: wait_for_completion failed: fffffe00": 3,
+      "misc dxg: dxgk: dxgkio_query_adapter_info: Ioctl failed: -512": 1,
+      "misc dxg: dxgk: process_completion_packet: did not find packet to complete": 3,
+      "misc dxg: dxgk: dxgkio_escape: Ioctl failed: -512": 2
+    },
+    "non_minus22_events": [
+      {
+        "utc": "2026-11-16T18:54:29.223278+00:00",
+        "journal_monotonic": 77988.404079,
+        "kernel_source_monotonic": 77989.394564,
+        "message": "misc dxg: dxgk: dxgvmb_send_sync_msg: wait_for_completion failed: fffffe00"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.223639+00:00",
+        "journal_monotonic": 77988.404439,
+        "kernel_source_monotonic": 77989.395194,
+        "message": "misc dxg: dxgk: dxgkio_query_adapter_info: Ioctl failed: -512"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.723305+00:00",
+        "journal_monotonic": 77988.904105,
+        "kernel_source_monotonic": 77989.8919,
+        "message": "misc dxg: dxgk: process_completion_packet: did not find packet to complete"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.723666+00:00",
+        "journal_monotonic": 77988.904466,
+        "kernel_source_monotonic": 77989.896448,
+        "message": "misc dxg: dxgk: dxgvmb_send_sync_msg: wait_for_completion failed: fffffe00"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.727309+00:00",
+        "journal_monotonic": 77988.908109,
+        "kernel_source_monotonic": 77989.897291,
+        "message": "misc dxg: dxgk: dxgkio_escape: Ioctl failed: -512"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.727603+00:00",
+        "journal_monotonic": 77988.908404,
+        "kernel_source_monotonic": 77989.899464,
+        "message": "misc dxg: dxgk: dxgvmb_send_sync_msg: wait_for_completion failed: fffffe00"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.727750+00:00",
+        "journal_monotonic": 77988.90855,
+        "kernel_source_monotonic": 77989.900006,
+        "message": "misc dxg: dxgk: dxgkio_escape: Ioctl failed: -512"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.735295+00:00",
+        "journal_monotonic": 77988.916095,
+        "kernel_source_monotonic": 77989.905638,
+        "message": "misc dxg: dxgk: process_completion_packet: did not find packet to complete"
+      },
+      {
+        "utc": "2026-11-16T18:54:29.735523+00:00",
+        "journal_monotonic": 77988.916323,
+        "kernel_source_monotonic": 77989.906273,
+        "message": "misc dxg: dxgk: process_completion_packet: did not find packet to complete"
+      }
+    ],
+    "minimum_non_minus22_after_nativeSIGTERM_seconds": 0.002148151397705078,
+    "limit": "Journal realtime/monotonic align these observations; do not substitute kernel-source monotonic without calibration. Wait/-512/packet messages follow recorded cancellation in this window, consistent with interruption consequences; no PID association or causal proof."
+  },
+  "cleanup": {
+    "original_combined_cleanup": "unresolved; unchanged failed result",
+    "host_final_receipt_cleanup_complete": true,
+    "native_final_receipt_cleanup_complete": true,
+    "Windows_cancel_error": "\\\\wsl.localhost\\Ubuntu-26.04\\mnt\\wsl\\data\\nkt\\clearml-yolo\\.tmp\\verification-gap-closure\\ticket101-telemetry-diagnosis\\\nwindows-owned-query.ps1 : Exception calling \"KillExactProcess\" with \"2\" argument(s): \"The parameter is incorrect\"\n    + CategoryInfo          : NotSpecified: (:) [windows-owned-query.ps1], MethodInvocationException\n    + FullyQualifiedErrorId : Win32Exception,windows-owned-query.ps1\n \n",
+    "cancel_race_assessment": "Consistent with supervisor naturally exiting during cancellation helper bootstrap. Exact failing Win32 call/time is not separately logged; later absence does not prove historical call sequence. Current controller skips independent Windows identity inspection after nonzero cancellation, conservatively leaving cleanup unresolved.",
+    "later_root_Windows_direct_check": {
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/root-windows-postcheck.json",
+      "sha256": "04564f301775cda1e7b6c3469485b34f6a546d6273fca93291ed5099b77b7e96",
+      "identities": 24,
+      "all_recorded_absent": true
+    },
+    "later_root_postcleanup": {
+      "status": "passed",
+      "observed_native_identities": 165,
+      "linux_survivors": [],
+      "windows_nonce_or_owned_directory_matches": [],
+      "windows_query_exit": 0,
+      "compute_query_exit": 0,
+      "compute_query_stdout": "",
+      "windows_direct_pid_check": {
+        "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-comparison-20261116T185354Z-524e785d/root-windows-postcheck.json",
+        "sha256": "04564f301775cda1e7b6c3469485b34f6a546d6273fca93291ed5099b77b7e96"
+      },
+      "limitation": "Later independent cleanup proof; original combined failure and unresolved cleanup receipt remain unchanged."
+    },
+    "later_resolution": "Root independently proved recorded Windows/Linux identities absent plus no nonce/directory/compute matches. This resolves retained-resource concern at later observation, without changing original failure/unresolved receipt or promoting diagnostic to success."
+  },
+  "established": [
+    "Windows query22 exceeded its own configured5s timer and was terminated124 before nativeSIGTERM; no successful payload was retained.",
+    "Three Linux SMI owners were sampled in D/dxgvmb_send_sync_msg overlapping guaranteed pre-timer Windows process lifetime, including allthree query categories.",
+    "The combined stale detector correctly stopped on last successful sample conservative age>7; root did not see a successful new reading hidden by receipt age reset.",
+    "Native outer query was cancelled before reaching its own5s deadline; this is not a third reproduced outer5s TimeoutExpired.",
+    "This run does not demonstrate a responsive host query while WSL telemetry is stalled. Windows/UNC path also failed."
+  ],
+  "unknown": [
+    "No Windows thread stack or exact internal NVML timing was captured; empty stdout cannot distinguish computation/driver wait from blocked/buffered UNC output.",
+    "UNC output and receipt/compiler/helper I/O share WSL-backed storage, so the host CLI is not an independent host-driver-only path.",
+    "Actual native warmup/measurement/validation/destructor phase active during each wait is uninstrumented.",
+    "Cross-platform UTC offset may change; bounds are a startup bracket, and own-domain Stopwatch/boottime measurements must remain separate.",
+    "No driver defect, WSL-only cause, video interruption or benefit of deadline/monitor changes is established."
+  ],
+  "next_CPU_only_proposal": "A separate reviewed Windows-local-output variant can remove UNC from the timed host child: nonce-owned NTFS directory, local helper/compiler/stdout/stderr/receipts, same suspended JobObject ownership/5s timer and all3 Linux guards. Verify harmless ownership/copy/cleanup CPU-only before any separate live slot; copy and hash records after timed interval, retain raw clocks. Even NTFS CLI elapsed time is not internal NVML timing. count_review owns that proposal; no implementation or GPU execution here.",
+  "scope": {
+    "GPU_queries_executed_by_analysis": 0,
+    "product_or_helper_edits": false,
+    "new_processes": "short CPU/read-only analysis commands only; exited",
+    "writes": "new analysis JSON/MD only"
+  },
+  "ticket": 101,
+  "campaign_status": "unresolved; full GPU matrix paused",
+  "existing_DxgKrnl_channels": {
+    "channels": [
+      {
+        "name": "Microsoft-Windows-DxgKrnl/Diagnostic",
+        "enabled": false,
+        "status": "disabled",
+        "errors": [],
+        "log_type": "Analytical",
+        "record_count": null
+      },
+      {
+        "name": "Microsoft-Windows-DxgKrnl/Performance",
+        "enabled": false,
+        "status": "disabled",
+        "errors": [],
+        "log_type": "Analytical",
+        "record_count": null
+      },
+      {
+        "name": "Microsoft-Windows-DxgKrnl/Power",
+        "enabled": false,
+        "status": "disabled",
+        "errors": [],
+        "log_type": "Analytical",
+        "record_count": null
+      },
+      {
+        "name": "Microsoft-Windows-DxgKrnl/Contention",
+        "enabled": false,
+        "status": "disabled",
+        "errors": [],
+        "log_type": "Analytical",
+        "record_count": null
+      },
+      {
+        "name": "Microsoft-Windows-DxgKrnl-Admin",
+        "enabled": null,
+        "status": "unavailable",
+        "errors": [
+          "LogInfoUnavailable,Microsoft.PowerShell.Commands.GetWinEventCommand"
+        ],
+        "error_type": "System.Exception"
+      },
+      {
+        "name": "Microsoft-Windows-DxgKrnl-Operational",
+        "enabled": null,
+        "status": "unavailable",
+        "errors": [
+          "LogInfoUnavailable,Microsoft.PowerShell.Commands.GetWinEventCommand"
+        ],
+        "error_type": "System.Exception"
+      }
+    ],
+    "enabled_channels_queried": 0,
+    "limits": "Four disabled and two unavailable; no negative evidence about resets/stalls. No channel or host configuration changed."
+  }
+}
