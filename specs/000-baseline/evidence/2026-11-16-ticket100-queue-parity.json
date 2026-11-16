@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "ticket": 100,
+  "status": "accepted_completed_case_parity_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route pending",
+  "ticket92_scope": "Completed native case and direct/queued scientific parity only",
+  "ticket92_remaining": [
+    "cancellation",
+    "worker interruption",
+    "guardian recovery"
+  ],
+  "case": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed",
+  "documentation_source_commit": "001ce6c9406f44077dc1579c928b5799edf05a46",
+  "independent_review_source_commit": "c0576a49200e030c2315d6cbe9bc1269b7e34b2e",
+  "queue_revision": "d3627a0da85968429ddeaff4920c05825e6e05e2",
+  "package_identity": "70cb1afb0777588e7f399ad40ea21ccdac47c3f2aaf4566d558111baebe12fce",
+  "job_id": "d21e91d9-b38a-401a-a20a-d56703322741",
+  "task_id": "12dcd1aa6d4c41ccaf575af66f9d8941",
+  "output_model_id": "d0cb09bfda064ee39be60c9cf654d80e",
+  "checkpoint_sha256": "000700211156beb450cc5029983242b32a091166c980551f24e0fc543d0a07f9",
+  "runtime_cause_and_correction": {
+    "observed_confounder": "Overlapping declared OpenCV providers imported different binaries; deterministic affine-warp pixels differed at native augmentation boundary",
+    "historical_v2_scientific_divergence_preserved": true,
+    "prepared_cv2_version": "5.0.0",
+    "direct_execution_files_matched": 15,
+    "CPU_preprocessing": {
+      "status": "passed",
+      "image_count": 160,
+      "aggregate_hashes": {
+        "decode": "c7e7dc2b4abe6cbcbeaa93a1aebca570dfc0f83e3cc82498721e83a29c24af2e",
+        "resize": "ea329dc25e5d459e555dd9a33c5f35189ca289fdd581232c1d52b4fe57ac4361",
+        "warp": "ca5d51a6ab9bf9e0d0c6dbe358cc6c4c2f702a168b34a8b383349bbe9c550ffe",
+        "hsv": "ca37ba866c4184416cda0c60293c299c40c1c7d8e549eacb8b72fc4ab0256335"
+      },
+      "direct_receipt_sha256": "779120fcaf3175e524608bf691e421803ee27e9a1c4b65a49945ee3e7116767a",
+      "v3_output_sha256": "ba743acc7f543bcf8a56a7368ce64e4c51b8594380251afae09488d9a15d5834",
+      "comparison": "exact image inventory, decode/resize/warp/HSV aggregates, imported cv2 version and native binary hash",
+      "original_receipt_modified": false
+    },
+    "dependency_graph_repaired": false,
+    "precise_historical_installer_order_and_training_RNG_reconstructed": false,
+    "scope": "Observed preprocessing mismatch corrected in isolated runtime; fresh native parity established. No claim of sole-cause reconstruction of every historical divergence."
+  },
+  "frozen_preparation": {
+    "prelaunch_archive": ".tmp/verification-gap-closure/ticket92-v4-prelaunch-20261116T213447Z",
+    "archived_files_rehashed": 42,
+    "bound_manifest_files": 31,
+    "source_files": 351,
+    "distribution_pairs": 284,
+    "reuse": {
+      "resumption_review_sha256": "c23d4139827af237d058c8c89622d967ce9f5cc3265a86b8cb78571d211d5e92",
+      "prior_independent_review_sha256": "c2cc81be9fc9ed4ce9e2d6b5f9f6b686d9eb0d1d28c7055c1adc3343e3ac0f3d",
+      "prelaunch_inventory_sha256": "5f8f1a266d90d3a49ae74c30f139bd6a206117ef09eabc51bef104ae3c1fe815"
+    },
+    "allowed_generated_changes": "Source HEAD provenance and generated Hydra/log paths only; scientific configuration unchanged"
+  },
+  "capacity": {
+    "fresh_force": true,
+    "trial_batches": [
+      8,
+      16,
+      56,
+      64,
+      72,
+      72
+    ],
+    "all_success": true,
+    "final_two_distinct_trial_ids": [
+      "47f17b96cfc04e42863bff1cbec705e8",
+      "21a161d662734e5da278be6ac4318515"
+    ],
+    "status": "ceiling_limited",
+    "meaning": "Fresh capacity at prescribed72 ceiling and separate confirmation, not maximum-capacity discovery"
+  },
+  "training": {
+    "batch": 72,
+    "epochs": 2,
+    "updates": 6,
+    "skipped_updates": 0,
+    "parameters_changed": true,
+    "initial_optimizer_parameters_sha256": "fb23f16473f699e6f8ad26eb35e2cfa098d5d2c698244b390c317cbaa7e42b4d",
+    "precision": "FP32",
+    "nominal_resolution": 640,
+    "native_augmentation": true
+  },
+  "sampled_reserve": {
+    "admission": {
+      "samples": 484,
+      "minimum_free_bytes": 8649703424,
+      "minimum_free_MiB": 8249,
+      "maximum_gap_seconds": 0.510124683380127
+    },
+    "external_execution": {
+      "samples": 202,
+      "minimum_free_bytes": 8819572736,
+      "minimum_free_MiB": 8411,
+      "maximum_gap_seconds": 0.39891505241394043
+    },
+    "child_execution": {
+      "samples": 163,
+      "minimum_free_bytes": 8819572736,
+      "minimum_free_MiB": 8411,
+      "maximum_gap_seconds": 0.7306118011474609
+    }
+  },
+  "guards": "Existing queue8GiB reserve,15s query,30s discovery and1800s admission/execution bounds preserved. Sampled minima do not establish continuous observations between samples. Backend10GiB/5s bounds are separate.",
+  "scientific_comparison": {
+    "original_receipt_status": "needs_review",
+    "original_strict_receipt_preserved": true,
+    "strict_successful_checks": {
+      "checkpoint_tensors": {
+        "equal": true,
+        "tensors": 708
+      },
+      "native_epoch_science": {
+        "equal": true,
+        "rows": 2,
+        "columns": 14
+      },
+      "gt_csv": {
+        "equal": true,
+        "rows": 491,
+        "columns": 10
+      },
+      "metrics_best_confidences_val": {
+        "equal": true,
+        "rows": 4,
+        "columns": 2
+      },
+      "metrics_dashboard_dtrk_test/Sheet1": {
+        "equal": true,
+        "rows": 4,
+        "columns": 11
+      },
+      "metrics_dashboard_dtrk_test/Dataset counts": {
+        "equal": true,
+        "rows": 12,
+        "columns": 5
+      },
+      "metrics_dashboard_dtrk_val/Sheet1": {
+        "equal": true,
+        "rows": 4,
+        "columns": 11
+      },
+      "metrics_dashboard_dtrk_val/Dataset counts": {
+        "equal": true,
+        "rows": 12,
+        "columns": 5
+      },
+      "metrics_dashboard_full_test/Sheet1": {
+        "equal": true,
+        "rows": 4,
+        "columns": 26
+      },
+      "metrics_dashboard_full_test/Dataset counts": {
+        "equal": true,
+        "rows": 12,
+        "columns": 5
+      },
+      "metrics_dashboard_full_val/Sheet1": {
+        "equal": true,
+        "rows": 4,
+        "columns": 26
+      },
+      "metrics_dashboard_full_val/Dataset counts": {
+        "equal": true,
+        "rows": 12,
+        "columns": 5
+      }
+    },
+    "supplemental_review_status": "passed_supplemental_exact_science_reconciliation_completed_case_only",
+    "contract_interpretation": "Exact scientific values and complete relationship graph with validated invocation-local ID bijection; cross-invocation ordinal ID spelling and list order are not scientific identities",
+    "independent_relationship_audit": {
+      "pre_threshold": {
+        "occurrences": 22292,
+        "distinct_split_scoped_ids": 22249,
+        "changed_ID_occurrences": 22292,
+        "reordered_cells": [
+          [
+            "test",
+            "gt:232"
+          ],
+          [
+            "val",
+            "gt:278"
+          ],
+          [
+            "val",
+            "gt:433"
+          ]
+        ]
+      },
+      "post_threshold": {
+        "occurrences": 2387,
+        "distinct_split_scoped_ids": 2379,
+        "changed_ID_occurrences": 2384,
+        "reordered_cells": []
+      },
+      "both_phases": {
+        "all_non_ID_fields_exact": true,
+        "duplicate_non_ID_relationships_within_cell": 0,
+        "bijection_conflicts": 0,
+        "within_artifact_ID_consistent_content": true,
+        "actual_endpoint_incidence_equals_all_available_endpoints": true,
+        "endpoint_source_rows_exist_in_same_split_image": true,
+        "cross_artifact_endpoint_incidence_exact": true,
+        "phase_and_ID_format_valid": true
+      }
+    },
+    "numeric_method": "Exact Decimal values; no tolerance change",
+    "raw_match_IDs_preserved": true,
+    "blind_ID_exclusion": false,
+    "comparator_code_changed": false,
+    "waiver": false
+  },
+  "publication": {
+    "artifacts": 8,
+    "checkpoint_rehashed": true,
+    "fresh_CPU_images": 40,
+    "CPU_status": "passed",
+    "CPU_scope": "Native validation smoke, not scientific accuracy qualification",
+    "executor_PID_birth_limitation": "Readback process births were not captured; normal child completion/tool exit and exact post-exit scan retained"
+  },
+  "native_ownership": "All166 retained PID/birth identities independently checked gone; controller2796736 absent. Last queue observation is completed with claim null. No matching current durable coordination claim. Historical per-job claim.json remains as evidence, not active ownership; durable lock/control records remain preserved.",
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T21:58:55.172589+00:00",
+    "removed_logical_bytes": 46812352,
+    "directories_removed": [
+      {
+        "relative_path": "dataset-cache",
+        "files": 489,
+        "logical_bytes": 24454797,
+        "canonical_inventory_sha256": "05ba10574c10f1a12d2a30ada7b7d0bb54c7edea090becded87eb7243fb89614"
+      },
+      {
+        "relative_path": "readback/20261116T214115Z-e1073486/cache",
+        "files": 9,
+        "logical_bytes": 22357555,
+        "canonical_inventory_sha256": "d457bfeb0551ecebbe4618900fc72d924ecc606a75d5cfe54400a1bab4d83f7e"
+      }
+    ],
+    "protected_files_verified_before_after": 361,
+    "before_snapshot_path": "/mnt/wsl/data/nkt/clearml-yolo/.tmp/verification-gap-closure/queue-v4-cleanup-before.json",
+    "before_snapshot_sha256": "059ec8148dcdb9ab7dfa717e45f2ac210101439dab96c911c7ba5abe608fc661",
+    "exact_case_process_and_cache_handles": "empty",
+    "excluded_unrelated_user_systemd_pids": [
+      340,
+      344
+    ],
+    "scope": "Only the two reviewed caches; queue history, durable coordination, shared runtime, assets, all failures and protected artifacts retained",
+    "physical_reclaim": "Logical bytes only; physical reclaim not measured",
+    "known_pid_count": 167
+  },
+  "checks": {
+    "runtime_preparation": "passed",
+    "CPU_pixel_parity": "passed",
+    "fresh_capacity_confirmation": "passed",
+    "native_completed_case": "passed",
+    "remote_readback": "passed",
+    "CPU_validation": "passed",
+    "supplemental_exact_science": "passed",
+    "independent_acceptance": "passed",
+    "protected_cleanup": "passed"
+  },
+  "bindings": [
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/independent-review.json",
+      "sha256": "c2cc81be9fc9ed4ce9e2d6b5f9f6b686d9eb0d1d28c7055c1adc3343e3ac0f3d"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/resumption-readiness-review.json",
+      "sha256": "c23d4139827af237d058c8c89622d967ce9f5cc3265a86b8cb78571d211d5e92"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/source-applicability.json",
+      "sha256": "4cc16306441b27e9d982d05c3ff528e0515800bfc89d7941169777a8c5b24230"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/opencv-runtime-binding.json",
+      "sha256": "ab5efb908fa79382954308f365376b0ca4945518b068436b512e7dc88a53c8f3"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/fresh-admission.json",
+      "sha256": "23dfc2260535fd4643b140b19ac94dfc9197ec9b97069d89b4eda19f9cffb9a5"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/controller-preparation.json",
+      "sha256": "5f5c0d3ae6a798818c9000abd82300bda84624e8e8826feb7da459abbc0363f9"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/completed-scientific-config.json",
+      "sha256": "d2406bcac78ddc1977caf691f88208eb16f509fbf65a15a220f3c3493de7c82d"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/completed-snapshot-preparation.json",
+      "sha256": "8e771ad31633a747be037414dbc9fb29faaa227edaff79909edb64200f4de56c"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v4-20261116/controller-launch.json",
+      "sha256": "e2a55e9aaf325185e69f3fc290ccf7a9c57be410828f0148ee82fa168a9d58ac"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v3-20261116/pixel-comparison.json",
+      "sha256": "7d9b11168ea7635c0c0e47d2abfb05a6dbd803f9abc38ce1765f82a031a075ee"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-plan-v3-20261116/runtime-identity-normalized.json",
+      "sha256": "e5335f76ab3790de0054d3aca009e6ef11ac4941b06d21defd5607022e7878f0"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/controller-result.json",
+      "sha256": "45858002acd86f811455469970938b9780cf09afaf078dc3cb6c56b2a2b03f23"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/monitor-receipt.json",
+      "sha256": "8f2ad84b256b507e5cd94c0ed9a4309c4279d3f189367b98b6ca66dccc5f10e8"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/independent-process-cleanup.json",
+      "sha256": "f50e443462cc33a399d51b931b3ed86d1b2dca3438f3d3a9e4cdb20a4af678bc"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/admission/batch-estimates.json",
+      "sha256": "18847202a1cb476c3c87681e960571e4c043e15df7f14ad809a94aedca3b5c37"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/optimizer.json",
+      "sha256": "af96dbea87c55f21c1024f42d90ec63e56c54e5c9f1640397965fdb9b2cc1296"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/admission-telemetry.jsonl",
+      "sha256": "d9835185df9c545eb1baca6031887a8c9566d51cbfda5598c765262b6a59cfcc"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/external-memory.jsonl",
+      "sha256": "7c8ed3fe8048f8d1f17a6cd06abcdfb84254899ba2b7e8a1b2691f341fe7b2a3"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/child-memory.jsonl",
+      "sha256": "eb84608f1796c121652b87c85342d072f09eff361960a745f49d5368c428d17f"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/queue-observations.jsonl",
+      "sha256": "a98f33f920f3926f0148abd0fd391dbd2af95aad114d7cb7e01bf6a91ed0dfbc"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/receipt.json",
+      "sha256": "b9362093bec4f630b8a5008f472318faa9e14e7795aa9f71417bede5a699448a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/executor-receipt.json",
+      "sha256": "d79d8044e616a98b6203b224d45fb99a9fce0351957853820be6d633a452e2c2"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/comparison-diagnosis.json",
+      "sha256": "230d9edac250d64e9effea960234773535b89649ee779930d2d3686e2b064791"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/independent-comparison-review.json",
+      "sha256": "09b7411319928b8cf2b02dce67a67a2ba622e37ad9bf4fc38a5d861ed584345e"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/independent-acceptance-review.json",
+      "sha256": "f785f76b6108fbbc902fa480172fb8cc70137f1695e33aa9ab14045e6ad9c5a8"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/cleanup-plan.json",
+      "sha256": "3d3d6bab310b729911d5c1dbc23d730ba9def5ed7dab705c3901ccf80bdeaa69"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/queue-acceptance-v4/completed/readback/20261116T214115Z-e1073486/cleanup.json",
+      "sha256": "97f11dd9d81c56a38698ec71184d5ed460cde27b00c5cb5f2dd26c7e76fdaa5d"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/queue-v4-cleanup-before.json",
+      "sha256": "059ec8148dcdb9ab7dfa717e45f2ac210101439dab96c911c7ba5abe608fc661"
+    },
+    {
+      "path": "specs/000-baseline/evidence/2026-11-16-ticket100-opencv-runtime-diagnosis.json",
+      "sha256": "10c3e20babf0a9f6cb0dec57341f3d96581cb158d936472307c39ee070fc91cb"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-v4-prelaunch-20261116T213447Z/preserved-inventory.json",
+      "sha256": "5f8f1a266d90d3a49ae74c30f139bd6a206117ef09eabc51bef104ae3c1fe815"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket92-v4-prelaunch-20261116T213447Z/preparation-manifest.json",
+      "sha256": "eb97f8e5b6fa3b1cbc9064f2e18c32a4c5c19c81425975aabd041819bcddf96c"
+    }
+  ],
+  "limits": [
+    "Ticket92 fault cases remain open",
+    "Original strict needs_review and historical v2 true numerical divergence preserved",
+    "Hybrid OpenCV namespace overlap remains; no dependency pin change",
+    "No maximum capacity, accuracy, export, physical multi-GPU or WSL hang causality claim",
+    "Sampled reserve not continuous/playback proof; logical cleanup bytes only",
+    "Shared runtime, durable coordination/history and all failed cases retained",
+    "No live calls or tests during dated-record preparation",
+    "Delivery gate pending"
+  ]
+}
