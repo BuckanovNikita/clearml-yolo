@@ -101,6 +101,9 @@ def run_workers(
         raise ValueError("Worker timeout must be finite and positive")
     if not commands or any(not command.argv for command in commands):
         raise ValueError("At least one nonempty worker command is required")
+    # Nested supervisors replace the legacy marker but inherit every ancestor's
+    # distinct key, retaining positive ownership after detached children reparent.
+    owner_env = f"{_WORKER_OWNER}_{uuid4().hex}"
     processes: list[subprocess.Popen[bytes]] = []
     trees: list[LinuxProcessTree] = []
     with ExitStack() as stack, native_descendant_scope():
@@ -111,14 +114,14 @@ def run_workers(
                 stream: BinaryIO = stack.enter_context(command.log_path.open("xb"))
                 process = subprocess.Popen(  # noqa: S603 - explicit internal worker argv
                     command.argv,
-                    env=dict(os.environ) | dict(command.environment) | {_WORKER_OWNER: token},
+                    env=dict(os.environ) | dict(command.environment) | {_WORKER_OWNER: token, owner_env: token},
                     stdin=subprocess.DEVNULL,
                     stdout=stream,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
                 processes.append(process)
-                trees.append(ScopedProcessTree(process.pid, token, subreaper=os.getpid(), owner_env=_WORKER_OWNER))
+                trees.append(ScopedProcessTree(process.pid, token, subreaper=os.getpid(), owner_env=owner_env))
             status = _await_workers(processes, trees, time.monotonic() + timeout_seconds, monitor)
         finally:
             primary = sys.exception()
