@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class GPUDevice(BaseModel):
+    """CUDA profile identity with live unavailable bytes relative to its capacity."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     index: int = Field(ge=0)
@@ -26,11 +28,20 @@ class GPUDevice(BaseModel):
 
 @dataclass(frozen=True)
 class GPUState:
-    """Unavailable device bytes include driver reservations as well as allocations."""
+    """Raw NVML unavailable/free bytes from one row, including driver reservations."""
 
     used: int
     utilization: int
     pids: frozenset[int]
+    free_bytes: int
+
+    def used_for(self, total_memory_bytes: int) -> int:
+        """Express unavailable bytes against CUDA capacity without mixing total bases.
+
+        Clamp at zero when NVML free exceeds CUDA capacity; reconstructed free
+        memory then conservatively saturates at that CUDA capacity.
+        """
+        return max(total_memory_bytes - self.free_bytes, 0)
 
 
 def _attach_output(error: subprocess.CalledProcessError | subprocess.TimeoutExpired) -> None:
@@ -87,6 +98,7 @@ def gpu_states() -> dict[str, GPUState]:
             total_bytes - free_bytes,
             _telemetry_integer(utilization, "utilization.gpu"),
             frozenset(by_gpu.get(uuid, ())),
+            free_bytes,
         )
     return states
 
@@ -117,7 +129,9 @@ def discover_gpus() -> tuple[GPUDevice, ...]:
         if state is None:
             raise RuntimeError("Visible CUDA device lacks whole-GPU telemetry (MIG unsupported)")
         devices.append(
-            GPUDevice.model_validate(record | {"used_memory_bytes": state.used, "utilization": state.utilization})
+            GPUDevice.model_validate(
+                record | {"used_memory_bytes": state.used_for(record["total_memory_bytes"]), "utilization": state.utilization}
+            )
         )
     if not devices:
         raise RuntimeError("No visible CUDA GPUs; batch estimation requires idle GPUs")
@@ -138,7 +152,7 @@ def require_idle(devices: tuple[GPUDevice, ...], *, force: bool = False) -> tupl
             if state.utilization and not force:
                 active.append(device.index)
         if not active:
-            return tuple(states[device.uuid].used for device in devices)
+            return tuple(states[device.uuid].used_for(device.total_memory_bytes) for device in devices)
         if time.monotonic() >= deadline:
             raise RuntimeError(f"GPU {active[0]} is busy or its telemetry is unavailable")
         time.sleep(0.1)
@@ -165,7 +179,7 @@ def monitor_devices(
             raise RuntimeError(f"GPU {device.index} measurement contaminated by foreign PIDs {sorted(foreign)}")
         if state.utilization and not state.pids and not force:
             raise RuntimeError(f"GPU {device.index} measurement contaminated: active compute has no PID telemetry")
-        peaks.append(state.used)
+        peaks.append(state.used_for(device.total_memory_bytes))
     return tuple(peaks)
 
 

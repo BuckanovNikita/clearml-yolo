@@ -34,6 +34,24 @@
 - [x] T013 Run coordinator-admitted representative native GPU scenario through checkpoint reload and publication readback; record timing and cleanup (FR-007,008).
 - [x] T014 Obtain independent review after integration/checks, reconcile ticket03 and commit via coordinator (FR-001–008).
 
+## Follow-up: coherent reserve telemetry (ticket99)
+
+- [x] T015 Reproduce the captured CUDA/NVML total disagreement through inventory,
+  reserve and allocator product seams, including equality, real shortfall and
+  device identity cases (FR-006, SC-004).
+- [x] T016 Carry explicit whole-device free bytes and reconcile capacity-relative
+  usage at inventory, allocator and direct-harness boundaries without changing
+  CUDA profile identity or foreign-process enforcement (FR-001,006,008).
+- [ ] T017 Run affected product/static checks, scoped mutation analysis and fresh
+  independent review; retain original failed runs and precise evidence limitations
+  under `evidence/` (FR-005,006,008).
+- [ ] T018 Rerun the failed DEIMv2 S JSON case with fresh capacity measurement,
+  two-epoch execution, independent readback and cleanup after integration (FR-003–008).
+
+T015 precedes T016; T017 follows integrated implementation, and T018 requires the
+reviewed correction and a coordinator-admitted serial GPU slot. This routine fix
+implements the existing reserve contract rather than adding a new capability.
+
 ## Dependencies and execution order
 
 T001→T002→T003; T004/T005 proceed in vertical red/green slices, then T006.

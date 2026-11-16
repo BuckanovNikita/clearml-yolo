@@ -2,6 +2,7 @@
 
 import subprocess
 import time
+import json
 from pathlib import Path
 
 import pytest
@@ -84,15 +85,15 @@ def test_valid_memory_endpoints_preserve_exact_reserve_boundary(monkeypatch: pyt
 def test_measurements_accept_owned_ranks_and_compiler_children(
     monkeypatch: pytest.MonkeyPatch, pids: frozenset[int]
 ) -> None:
-    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(50, 75, pids)})
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(50, 75, pids, free_bytes=50)})
     assert gpu.monitor_devices((_device(),), lambda: (10, 11)) == (50,)
 
 
 @pytest.mark.parametrize(
     ("state", "message"),
     [
-        (gpu.GPUState(50, 75, frozenset({10, 12})), "foreign PIDs"),
-        (gpu.GPUState(50, 75, frozenset()), "no PID telemetry"),
+        (gpu.GPUState(50, 75, frozenset({10, 12}), free_bytes=50), "foreign PIDs"),
+        (gpu.GPUState(50, 75, frozenset(), free_bytes=50), "no PID telemetry"),
     ],
 )
 def test_unowned_or_unidentifiable_activity_rejects_trial(
@@ -106,7 +107,7 @@ def test_unowned_or_unidentifiable_activity_rejects_trial(
 def test_idle_preflight_waits_for_utilization_sampling_to_settle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    states = iter([gpu.GPUState(10, 20, frozenset()), gpu.GPUState(10, 0, frozenset())])
+    states = iter([gpu.GPUState(10, 20, frozenset(), free_bytes=90), gpu.GPUState(10, 0, frozenset(), free_bytes=90)])
     monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": next(states)})
     monkeypatch.setattr(time, "sleep", lambda _: None)
     assert gpu.require_idle((_device(),)) == (10,)
@@ -120,8 +121,8 @@ def test_idle_baseline_uses_fresh_telemetry_in_selected_device_order(
         gpu,
         "gpu_states",
         lambda: {
-            "GPU-test": gpu.GPUState(40, 0, frozenset()),
-            "GPU-peer": gpu.GPUState(70, 0, frozenset()),
+            "GPU-test": gpu.GPUState(40, 0, frozenset(), free_bytes=60),
+            "GPU-peer": gpu.GPUState(70, 0, frozenset(), free_bytes=30),
         },
     )
     assert gpu.require_idle((peer, _device())) == (70, 40)
@@ -130,7 +131,7 @@ def test_idle_baseline_uses_fresh_telemetry_in_selected_device_order(
 def test_idle_preflight_never_waits_on_or_accepts_foreign_compute(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 0, frozenset({42}))})
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 0, frozenset({42}), free_bytes=90)})
     monkeypatch.setattr(time, "sleep", lambda _: pytest.fail("Must reject foreign process"))
     with pytest.raises(RuntimeError, match="busy"):
         gpu.require_idle((_device(),))
@@ -142,7 +143,7 @@ def test_idle_preflight_remains_bounded_when_unidentified_activity_persists(
     ticks = iter([0, 1, 2])
     monkeypatch.setattr(time, "monotonic", lambda: next(ticks))
     monkeypatch.setattr(time, "sleep", lambda _: None)
-    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 30, frozenset())})
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 30, frozenset(), free_bytes=90)})
     with pytest.raises(RuntimeError, match="busy"):
         gpu.require_idle((_device(),))
 
@@ -159,7 +160,7 @@ def test_telemetry_cannot_reuse_a_previously_owned_pid_after_its_identity_change
     tree = process_tree.LinuxProcessTree(101, "private-token", identities={202: 2})
     monkeypatch.setattr(tree, "_table", lambda: dict(table))
     monkeypatch.setattr(tree, "_marked", lambda _: False)
-    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(50, 75, frozenset({202}))})
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(50, 75, frozenset({202}), free_bytes=50)})
     assert gpu.monitor_devices((_device(),), tree.live_pids) == (50,)
 
     def changed_telemetry() -> dict[str, gpu.GPUState]:
@@ -167,7 +168,7 @@ def test_telemetry_cannot_reuse_a_previously_owned_pid_after_its_identity_change
             table[202] = process_tree._Process(202, 1, 202, 3, "S")
         else:
             del table[202]
-        return {"GPU-test": gpu.GPUState(50, 75, frozenset({202}))}
+        return {"GPU-test": gpu.GPUState(50, 75, frozenset({202}), free_bytes=50)}
 
     monkeypatch.setattr(gpu, "gpu_states", changed_telemetry)
     with pytest.raises(RuntimeError, match=r"foreign PIDs \[202\]"):
@@ -202,7 +203,7 @@ def test_inconsistent_memory_telemetry_is_unavailable(monkeypatch: pytest.Monkey
 def test_force_allows_unattributed_activity_but_keeps_live_memory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(70, 65, frozenset())})
+    monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(70, 65, frozenset(), free_bytes=30)})
     assert gpu.require_idle((_device(),), force=True) == (70,)
     assert gpu.monitor_devices((_device(),), lambda: (), force=True) == (70,)
 
@@ -212,7 +213,7 @@ def test_force_still_rejects_foreign_compute_and_missing_telemetry(
     monkeypatch: pytest.MonkeyPatch,
     missing: bool,
 ) -> None:
-    states = {} if missing else {"GPU-test": gpu.GPUState(70, 65, frozenset({42}))}
+    states = {} if missing else {"GPU-test": gpu.GPUState(70, 65, frozenset({42}), free_bytes=30)}
     monkeypatch.setattr(gpu, "gpu_states", lambda: states)
     with pytest.raises(RuntimeError, match=r"busy|unavailable"):
         gpu.require_idle((_device(),), force=True)
@@ -267,3 +268,83 @@ def test_failed_query_with_empty_streams_adds_no_notes(monkeypatch: pytest.Monke
     with pytest.raises(subprocess.CalledProcessError) as caught:
         gpu.gpu_states()
     assert not hasattr(caught.value, "__notes__")
+
+
+def test_reserve_accepts_recorded_nvml_free_despite_lower_cuda_total(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mib = 1024**2
+
+    def query(selector: str) -> list[list[str]]:
+        return [] if selector.startswith("--query-compute-apps=") else [["GPU-test", "32607", "10261", "0"]]
+
+    monkeypatch.setattr(gpu, "_query", query)
+    device = _device().model_copy(update={"total_memory_bytes": 34_162_343_936})
+    unavailable = gpu.monitor_devices((device,), lambda: ())
+    gpu.require_memory_reserve((device,), unavailable, 10 * 1024**3)
+    assert unavailable == (22_318 * mib + 786_432,)
+
+
+@pytest.mark.parametrize(
+    ("nvml_total_mib", "cuda_total_mib", "free_mib", "raw_used_mib", "used_mib", "passes_floor"),
+    [
+        (32607, 32579.75, 10261, 22346, 22318.75, True),
+        (32607, 32579.75, 10240, 22367, 22339.75, True),
+        (32607, 32579.75, 10239, 22368, 22340.75, False),
+        (32579, 32607, 10261, 22318, 22346, True),
+        (32579, 32607, 10239, 22340, 22368, False),
+    ],
+)
+def test_discovery_admission_and_monitoring_use_coherent_free_memory(
+    monkeypatch: pytest.MonkeyPatch,
+    nvml_total_mib: int,
+    cuda_total_mib: float,
+    free_mib: int,
+    raw_used_mib: int,
+    used_mib: float,
+    passes_floor: bool,
+) -> None:
+    mib = 1024**2
+    record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
+
+    def query(selector: str) -> list[list[str]]:
+        return [] if selector.startswith("--query-compute-apps=") else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
+
+    monkeypatch.setattr(gpu, "_query", query)
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record])))
+    state = gpu.gpu_states()["GPU-test"]
+    assert state.used == raw_used_mib * mib
+    assert state.free_bytes == free_mib * mib
+    devices = gpu.discover_gpus()
+    assert devices[0].total_memory_bytes == int(cuda_total_mib * mib)
+    assert devices[0].used_memory_bytes == int(used_mib * mib)
+    for unavailable in (gpu.require_idle(devices), gpu.monitor_devices(devices, lambda: ())):
+        assert unavailable == (int(used_mib * mib),)
+        gpu.require_memory_reserve(devices, unavailable, free_mib * mib)
+        with pytest.raises(RuntimeError, match="reserve"):
+            gpu.require_memory_reserve(devices, unavailable, free_mib * mib + 1)
+        if passes_floor:
+            gpu.require_memory_reserve(devices, unavailable, 10 * 1024**3)
+        else:
+            with pytest.raises(RuntimeError, match="reserve"):
+                gpu.require_memory_reserve(devices, unavailable, 10 * 1024**3)
+
+
+def test_normalized_memory_saturates_at_cuda_capacity_in_caller_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    mib = 1024**2
+    devices = (
+        _device().model_copy(update={"uuid": "GPU-peer", "total_memory_bytes": 100 * mib}),
+        _device().model_copy(update={"total_memory_bytes": 200 * mib}),
+    )
+
+    def query(selector: str) -> list[list[str]]:
+        return [] if selector.startswith("--query-compute-apps=") else [
+            ["GPU-test", "150", "70", "0"], ["GPU-peer", "200", "150", "0"]
+        ]
+
+    monkeypatch.setattr(gpu, "_query", query)
+    for unavailable in (gpu.require_idle(devices), gpu.monitor_devices(devices, lambda: ())):
+        assert unavailable == (0, 130 * mib)
+        gpu.require_memory_reserve((devices[0],), (unavailable[0],), 100 * mib)
+        with pytest.raises(RuntimeError, match="reserve"):
+            gpu.require_memory_reserve((devices[0],), (unavailable[0],), 100 * mib + 1)

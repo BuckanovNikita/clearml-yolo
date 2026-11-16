@@ -38,7 +38,7 @@ def check_reserve(device: GPUDevice, reserve: int) -> None:
     state = gpu_states().get(device.uuid)
     if state is None:
         raise RuntimeError("GPU telemetry disappeared during native acceptance")
-    require_memory_reserve((device,), (state.used,), reserve)
+    require_memory_reserve((device,), (state.used_for(device.total_memory_bytes),), reserve)
 
 
 def estimate_scenario(root: Path, request: dict[str, Any]) -> dict[str, Any]:

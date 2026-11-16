@@ -26,7 +26,7 @@ def reserve_cuda_memory(minimum_free_bytes: int, device: int = 0) -> float | Non
     state = gpu_states().get(f"GPU-{properties.uuid}")
     if state is None:
         raise RuntimeError("Selected CUDA device lacks whole-GPU telemetry for the requested reserve")
-    free = min(free, properties.total_memory - state.used)
+    free = min(free, state.free_bytes)
     budget = free + current - minimum_free_bytes - 256 * 1024**2
     if budget <= current:
         raise RuntimeError("GPU has insufficient free memory for the requested reserve and driver headroom")

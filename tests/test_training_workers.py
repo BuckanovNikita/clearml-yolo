@@ -163,7 +163,7 @@ def test_gpu_telemetry_accepts_owned_child_spawned_during_its_query(
         pid = int(pid_file.read_text())
         assert b"CY_TRAINING_WORKER_OWNER=" in Path(f"/proc/{pid}/environ").read_bytes()
         observed.append(pid)
-        return {device.uuid: gpu.GPUState(50, 75, frozenset({pid}))}
+        return {device.uuid: gpu.GPUState(50, 75, frozenset({pid}), free_bytes=device.total_memory_bytes - 50)}
 
     def monitor(owned_pids: Callable[[], tuple[int, ...]]) -> None:
         if not observed:
