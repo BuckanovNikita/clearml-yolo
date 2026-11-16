@@ -104,3 +104,9 @@ remains pending. No supplemental mutation test was started. The resumed coordina
 No product changes outside `adapters/runtime/workers.py` belong to this ticket. The neighboring acceptance
 harness and its independent-pool cleanup test are owned by ticket 03. No GPU, service, dependency, user cache,
 release or push action was performed.
+
+Coordinator acceptance on 2026-11-16: the full unit baseline passed (4,766 passed,
+one skipped; 84.67% coverage), and the canonical automatic gate passed on integrated
+content `7c8f694`. The reviewed worker implementation was unchanged. Commit `e1fe64e`
+was fast-forwarded to local `master` after byte-identity checks, preserving unrelated
+pending work. Ticket 95 is accepted; no push or release occurred.

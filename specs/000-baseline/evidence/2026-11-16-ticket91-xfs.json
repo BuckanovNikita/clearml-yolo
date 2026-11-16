@@ -1,0 +1,565 @@
+{
+  "date_utc": "2026-11-16T06:53:04.752536+00:00",
+  "source_tip": "5dda250c56a074f1dd174783e4d71025f673083a",
+  "remote_references_fetched": false,
+  "source_sha256": {
+    "src/clearml_yolo/adapters/storage/dedup.py": "98d2332b733f1c62977297bed21c227f14012ec03c674b980f11b09752240027",
+    "src/clearml_yolo/adapters/storage/filesystem.py": "6d307b3851e94b832f264ed6bb7139d39d34810bb8537603a4f61a105fde9837",
+    "src/clearml_yolo/adapters/runtime/bootstrap.py": "8fba105782edf8f854825f8ab6a9d659f29ebf0da669eb1a71209c67a5b84ff5",
+    "src/clearml_yolo/adapters/observability/tracing.py": "65d8456c2c3a2848807183888fc2ad5494b938b48894ae8243964277c297d744",
+    "tests/test_dedup.py": "9340cfbe6c7d88d54b47a23d5a9e0009ad2f971ffaa45aae162494b4a025c2da",
+    "tests/test_dedup_cli.py": "cc5488fda0acf9d045b404de39fa97413663f0563b33bc6c92982e31ec05a0ab",
+    "tests/conftest.py": "150a7d8fd3ff384b28c95e22c54816eb975492228355a33a63fa1ecfb5d8efaf",
+    "tests/env_isolation.py": "b6a995f418b5f4282516155234b726481d83b91993076868a17612645593b2f9",
+    "pyproject.toml": "c862794ac2164d82dbf8ff4dfa53b274cbd40d429261978b66bf4f3232904ba8",
+    "uv.lock": "93d8365190c796529bff2b1ebe7951cef2f77ff290d19bb6645f3123ec115635"
+  },
+  "containers": [
+    {
+      "Id": "c703e0a9308c1c362ba7deccc34c8d55e2a6c80aec383c6a5954337af5ea0a77",
+      "Name": "/cy-ticket91-xfs-prep-20261116t064912z",
+      "Image": "sha256:7ce244f009b63c85f9fe5f94a5cb21820c85e5ece56769ad9484d76e64ac30cb",
+      "State": {
+        "Status": "exited",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-11-16T06:49:24.106462758Z",
+        "FinishedAt": "2026-11-16T06:49:31.971468745Z"
+      },
+      "Mounts": [],
+      "constraints": {
+        "NetworkMode": "bridge",
+        "NanoCpus": 2000000000,
+        "Memory": 2147483648,
+        "PidsLimit": 128,
+        "CapAdd": null,
+        "Privileged": false,
+        "Devices": [],
+        "SecurityOpt": null
+      },
+      "command": [
+        "sh",
+        "-eu",
+        "-c",
+        "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xfsprogs util-linux && mkfs.xfs -V && losetup --version"
+      ]
+    },
+    {
+      "Id": "3337e2ec14bbb5bb3a65d71026075f6667b0de0136024f131205b3b33ef19f96",
+      "Name": "/cy-ticket91-xfs-verify-20261116t064912z",
+      "Image": "sha256:880572be66395802f49bdead9925bd3d234e51b024dc2b8ae09372a82b977182",
+      "State": {
+        "Status": "exited",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-11-16T06:52:00.018759159Z",
+        "FinishedAt": "2026-11-16T06:52:02.77250113Z"
+      },
+      "Mounts": [
+        {
+          "Type": "bind",
+          "Source": "/mnt/wsl/data/nkt/clearml-yolo",
+          "Destination": "/mnt/wsl/data/nkt/clearml-yolo",
+          "Mode": "",
+          "RW": false,
+          "Propagation": "rprivate"
+        },
+        {
+          "Type": "bind",
+          "Source": "/mnt/wsl/data/nkt/.local/share/uv/python/cpython-3.12-linux-x86_64-gnu",
+          "Destination": "/mnt/wsl/data/nkt/.local/share/uv/python/cpython-3.12-linux-x86_64-gnu",
+          "Mode": "",
+          "RW": false,
+          "Propagation": "rprivate"
+        }
+      ],
+      "constraints": {
+        "NetworkMode": "none",
+        "NanoCpus": 2000000000,
+        "Memory": 2147483648,
+        "PidsLimit": 128,
+        "CapAdd": [
+          "CAP_SYS_ADMIN"
+        ],
+        "Privileged": false,
+        "Devices": [
+          {
+            "PathOnHost": "/dev/loop-control",
+            "PathInContainer": "/dev/loop-control",
+            "CgroupPermissions": "rwm"
+          },
+          {
+            "PathOnHost": "/dev/loop2",
+            "PathInContainer": "/dev/loop2",
+            "CgroupPermissions": "rwm"
+          }
+        ],
+        "SecurityOpt": null
+      },
+      "command": [
+        "/usr/local/bin/python",
+        "-B",
+        ".tmp/ticket91-xfs-20261116T064912Z/container.py"
+      ]
+    }
+  ],
+  "preparation": {
+    "command": "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xfsprogs util-linux",
+    "exit_code": 0
+  },
+  "native": {
+    "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+    "uid": 1001,
+    "gid": 1001,
+    "dry_run": {
+      "scanned": 2,
+      "duplicates": 1,
+      "reflinked": 0,
+      "skipped": 0,
+      "failures": 0,
+      "issues": []
+    },
+    "before_dry": [
+      {
+        "device": 1794,
+        "inode": 262273,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 420,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920581445799,
+        "mtime_ns": 1794811920584179299,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {}
+      },
+      {
+        "device": 1794,
+        "inode": 655489,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920584179299,
+        "mtime_ns": 1794811920585110481,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "6e617469766520584653206d65746164617461"
+        }
+      }
+    ],
+    "after_dry": [
+      {
+        "device": 1794,
+        "inode": 262273,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 420,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920585110481,
+        "mtime_ns": 1794811920584179299,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {}
+      },
+      {
+        "device": 1794,
+        "inode": 655489,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920586042500,
+        "mtime_ns": 1794811920585110481,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "6e617469766520584653206d65746164617461"
+        }
+      }
+    ],
+    "result": {
+      "scanned": 2,
+      "duplicates": 1,
+      "reflinked": 1,
+      "skipped": 0,
+      "failures": 0,
+      "issues": []
+    },
+    "before": [
+      {
+        "device": 1794,
+        "inode": 262273,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 420,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920585110481,
+        "mtime_ns": 1794811920584179299,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {}
+      },
+      {
+        "device": 1794,
+        "inode": 655489,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1600000000000000000,
+        "mtime_ns": 1610000000000000000,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "6e617469766520584653206d65746164617461"
+        }
+      }
+    ],
+    "after": [
+      {
+        "device": 1794,
+        "inode": 262273,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 420,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920585110481,
+        "mtime_ns": 1794811920584179299,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {}
+      },
+      {
+        "device": 1794,
+        "inode": 655490,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1600000000000000000,
+        "mtime_ns": 1610000000000000000,
+        "sha256": "19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e",
+        "xattrs": {
+          "user.cy-ticket91": "6e617469766520584653206d65746164617461"
+        }
+      }
+    ],
+    "shared_extents_before_writes": [
+      [
+        {
+          "logical": 0,
+          "physical": 134316032,
+          "length": 61440,
+          "reserved1": 0,
+          "reserved2": 0,
+          "flags": 8193,
+          "reserved3": 0,
+          "reserved4": 0,
+          "reserved5": 0
+        }
+      ],
+      [
+        {
+          "logical": 0,
+          "physical": 134316032,
+          "length": 61440,
+          "reserved1": 0,
+          "reserved2": 0,
+          "flags": 8193,
+          "reserved3": 0,
+          "reserved4": 0,
+          "reserved5": 0
+        }
+      ]
+    ],
+    "after_independent_writes": [
+      {
+        "device": 1794,
+        "inode": 262273,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 420,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920661444199,
+        "mtime_ns": 1794811920649444439,
+        "sha256": "bca08b0102a79fa3546ecc3c4cc03e1d7c1ac28f44cd1c41d2500146835fc342",
+        "xattrs": {}
+      },
+      {
+        "device": 1794,
+        "inode": 655490,
+        "nlink": 1,
+        "size": 61440,
+        "mode": 416,
+        "uid": 1001,
+        "gid": 1001,
+        "atime_ns": 1794811920649444439,
+        "mtime_ns": 1794811920629637640,
+        "sha256": "fb171be5c1177bdc2b3aba53c2ecde0aaef6cb63deb61ed78a56d7cc1aa808d6",
+        "xattrs": {
+          "user.cy-ticket91": "6e617469766520584653206d65746164617461"
+        }
+      }
+    ],
+    "independent_destination_write": true,
+    "independent_source_write": true,
+    "exact_destination_metadata": true,
+    "owned_temporary_siblings_absent": true
+  },
+  "lifecycle": {
+    "commands": [
+      {
+        "argv": [
+          "losetup",
+          "/dev/loop2"
+        ],
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "losetup: /dev/loop2: No such file or directory\n"
+      },
+      {
+        "argv": [
+          "mkfs.xfs",
+          "-V"
+        ],
+        "returncode": 0,
+        "stdout": "mkfs.xfs version 6.1.0\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "losetup",
+          "--version"
+        ],
+        "returncode": 0,
+        "stdout": "losetup from util-linux 2.38.1\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "uname",
+          "-a"
+        ],
+        "returncode": 0,
+        "stdout": "Linux 3337e2ec14bb 6.18.58.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct 27 00:24:11 UTC 2026 x86_64 GNU/Linux\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "dpkg-query",
+          "-W",
+          "xfsprogs",
+          "util-linux"
+        ],
+        "returncode": 0,
+        "stdout": "util-linux\t2.38.1-5+deb12u3\nxfsprogs\t6.1.0-1\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "mkfs.xfs",
+          "-m",
+          "reflink=1",
+          "/owned/ticket91.xfs"
+        ],
+        "returncode": 0,
+        "stdout": "meta-data=/owned/ticket91.xfs    isize=512    agcount=4, agsize=32768 blks\n         =                       sectsz=512   attr=2, projid32bit=1\n         =                       crc=1        finobt=1, sparse=1, rmapbt=0\n         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0\ndata     =                       bsize=4096   blocks=131072, imaxpct=25\n         =                       sunit=0      swidth=0 blks\nnaming   =version 2              bsize=4096   ascii-ci=0, ftype=1\nlog      =internal log           bsize=4096   blocks=16384, version=2\n         =                       sectsz=512   sunit=0 blks, lazy-count=1\nrealtime =none                   extsz=4096   blocks=0, rtextents=0\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "losetup",
+          "/dev/loop2",
+          "/owned/ticket91.xfs"
+        ],
+        "returncode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "losetup",
+          "--json",
+          "--list",
+          "--output",
+          "NAME,BACK-FILE,BACK-INO,BACK-MAJ:MIN",
+          "/dev/loop2"
+        ],
+        "returncode": 0,
+        "stdout": "{\n   \"loopdevices\": [\n      {\n         \"name\": \"/dev/loop2\",\n         \"back-file\": \"/owned/ticket91.xfs\",\n         \"back-ino\": 67008,\n         \"back-maj:min\": \"       0:614\"\n      }\n   ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "mount",
+          "-t",
+          "xfs",
+          "-o",
+          "nodev,nosuid,noexec",
+          "/dev/loop2",
+          "/native"
+        ],
+        "returncode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "findmnt",
+          "-T",
+          "/native",
+          "-o",
+          "TARGET,SOURCE,FSTYPE,OPTIONS,PROPAGATION"
+        ],
+        "returncode": 0,
+        "stdout": "TARGET  SOURCE     FSTYPE OPTIONS                                                                PROPAGATION\n/native /dev/loop2 xfs    rw,nosuid,nodev,noexec,relatime,inode64,logbufs=8,logbsize=32k,noquota private\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "xfs_info",
+          "/native"
+        ],
+        "returncode": 0,
+        "stdout": "meta-data=/dev/loop2             isize=512    agcount=4, agsize=32768 blks\n         =                       sectsz=512   attr=2, projid32bit=1\n         =                       crc=1        finobt=1, sparse=1, rmapbt=0\n         =                       reflink=1    bigtime=1 inobtcount=1 nrext64=0\ndata     =                       bsize=4096   blocks=131072, imaxpct=25\n         =                       sunit=0      swidth=0 blks\nnaming   =version 2              bsize=4096   ascii-ci=0, ftype=1\nlog      =internal log           bsize=4096   blocks=16384, version=2\n         =                       sectsz=512   sunit=0 blks, lazy-count=1\nrealtime =none                   extsz=4096   blocks=0, rtextents=0\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "setpriv",
+          "--reuid=1001",
+          "--regid=1001",
+          "--clear-groups",
+          "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python",
+          "-B",
+          "/mnt/wsl/data/nkt/clearml-yolo/.tmp/ticket91-xfs-20261116T064912Z/probe.py"
+        ],
+        "returncode": 0,
+        "stdout": "{\n  \"python\": \"3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]\",\n  \"uid\": 1001,\n  \"gid\": 1001,\n  \"dry_run\": {\n    \"scanned\": 2,\n    \"duplicates\": 1,\n    \"reflinked\": 0,\n    \"skipped\": 0,\n    \"failures\": 0,\n    \"issues\": []\n  },\n  \"before_dry\": [\n    {\n      \"device\": 1794,\n      \"inode\": 262273,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 420,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920581445799,\n      \"mtime_ns\": 1794811920584179299,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {}\n    },\n    {\n      \"device\": 1794,\n      \"inode\": 655489,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 416,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920584179299,\n      \"mtime_ns\": 1794811920585110481,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {\n        \"user.cy-ticket91\": \"6e617469766520584653206d65746164617461\"\n      }\n    }\n  ],\n  \"after_dry\": [\n    {\n      \"device\": 1794,\n      \"inode\": 262273,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 420,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920585110481,\n      \"mtime_ns\": 1794811920584179299,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {}\n    },\n    {\n      \"device\": 1794,\n      \"inode\": 655489,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 416,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920586042500,\n      \"mtime_ns\": 1794811920585110481,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {\n        \"user.cy-ticket91\": \"6e617469766520584653206d65746164617461\"\n      }\n    }\n  ],\n  \"result\": {\n    \"scanned\": 2,\n    \"duplicates\": 1,\n    \"reflinked\": 1,\n    \"skipped\": 0,\n    \"failures\": 0,\n    \"issues\": []\n  },\n  \"before\": [\n    {\n      \"device\": 1794,\n      \"inode\": 262273,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 420,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920585110481,\n      \"mtime_ns\": 1794811920584179299,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {}\n    },\n    {\n      \"device\": 1794,\n      \"inode\": 655489,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 416,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1600000000000000000,\n      \"mtime_ns\": 1610000000000000000,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {\n        \"user.cy-ticket91\": \"6e617469766520584653206d65746164617461\"\n      }\n    }\n  ],\n  \"after\": [\n    {\n      \"device\": 1794,\n      \"inode\": 262273,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 420,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920585110481,\n      \"mtime_ns\": 1794811920584179299,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {}\n    },\n    {\n      \"device\": 1794,\n      \"inode\": 655490,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 416,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1600000000000000000,\n      \"mtime_ns\": 1610000000000000000,\n      \"sha256\": \"19dabd08eccede3906bca2d0aaf9c9f382d1d2e9748ec03fef1b9beb7f021e0e\",\n      \"xattrs\": {\n        \"user.cy-ticket91\": \"6e617469766520584653206d65746164617461\"\n      }\n    }\n  ],\n  \"shared_extents_before_writes\": [\n    [\n      {\n        \"logical\": 0,\n        \"physical\": 134316032,\n        \"length\": 61440,\n        \"reserved1\": 0,\n        \"reserved2\": 0,\n        \"flags\": 8193,\n        \"reserved3\": 0,\n        \"reserved4\": 0,\n        \"reserved5\": 0\n      }\n    ],\n    [\n      {\n        \"logical\": 0,\n        \"physical\": 134316032,\n        \"length\": 61440,\n        \"reserved1\": 0,\n        \"reserved2\": 0,\n        \"flags\": 8193,\n        \"reserved3\": 0,\n        \"reserved4\": 0,\n        \"reserved5\": 0\n      }\n    ]\n  ],\n  \"after_independent_writes\": [\n    {\n      \"device\": 1794,\n      \"inode\": 262273,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 420,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920661444199,\n      \"mtime_ns\": 1794811920649444439,\n      \"sha256\": \"bca08b0102a79fa3546ecc3c4cc03e1d7c1ac28f44cd1c41d2500146835fc342\",\n      \"xattrs\": {}\n    },\n    {\n      \"device\": 1794,\n      \"inode\": 655490,\n      \"nlink\": 1,\n      \"size\": 61440,\n      \"mode\": 416,\n      \"uid\": 1001,\n      \"gid\": 1001,\n      \"atime_ns\": 1794811920649444439,\n      \"mtime_ns\": 1794811920629637640,\n      \"sha256\": \"fb171be5c1177bdc2b3aba53c2ecde0aaef6cb63deb61ed78a56d7cc1aa808d6\",\n      \"xattrs\": {\n        \"user.cy-ticket91\": \"6e617469766520584653206d65746164617461\"\n      }\n    }\n  ],\n  \"independent_destination_write\": true,\n  \"independent_source_write\": true,\n  \"exact_destination_metadata\": true,\n  \"owned_temporary_siblings_absent\": true\n}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "setpriv",
+          "--reuid=1001",
+          "--regid=1001",
+          "--clear-groups",
+          "/mnt/wsl/data/nkt/clearml-yolo/.venv/bin/python",
+          "-B",
+          "-m",
+          "pytest",
+          "/mnt/wsl/data/nkt/clearml-yolo/tests/test_dedup.py",
+          "/mnt/wsl/data/nkt/clearml-yolo/tests/test_dedup_cli.py",
+          "-n",
+          "0",
+          "--basetemp",
+          "/native/pytest",
+          "-p",
+          "no:cacheprovider",
+          "-ra",
+          "-q"
+        ],
+        "returncode": 0,
+        "stdout": "...............................                                          [100%]\n31 passed in 1.21s\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "umount",
+          "/native"
+        ],
+        "returncode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "losetup",
+          "--json",
+          "--list",
+          "--output",
+          "NAME,BACK-FILE,BACK-INO,BACK-MAJ:MIN",
+          "/dev/loop2"
+        ],
+        "returncode": 0,
+        "stdout": "{\n   \"loopdevices\": [\n      {\n         \"name\": \"/dev/loop2\",\n         \"back-file\": \"/owned/ticket91.xfs\",\n         \"back-ino\": 67008,\n         \"back-maj:min\": \"       0:614\"\n      }\n   ]\n}\n",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "losetup",
+          "--detach",
+          "/dev/loop2"
+        ],
+        "returncode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "losetup",
+          "--associated",
+          "/owned/ticket91.xfs"
+        ],
+        "returncode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "findmnt",
+          "--mountpoint",
+          "/native"
+        ],
+        "returncode": 1,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "device": "/dev/loop2",
+    "image": "/owned/ticket91.xfs",
+    "initial_device": 1,
+    "image_identity": {
+      "inode": 67008,
+      "device": 2097254,
+      "size": 536870912
+    },
+    "association": "{\n   \"loopdevices\": [\n      {\n         \"name\": \"/dev/loop2\",\n         \"back-file\": \"/owned/ticket91.xfs\",\n         \"back-ino\": 67008,\n         \"back-maj:min\": \"       0:614\"\n      }\n   ]\n}\n",
+    "pytest_exit": 0,
+    "checks_passed": true,
+    "pre_detach_association": "{\n   \"loopdevices\": [\n      {\n         \"name\": \"/dev/loop2\",\n         \"back-file\": \"/owned/ticket91.xfs\",\n         \"back-ino\": 67008,\n         \"back-maj:min\": \"       0:614\"\n      }\n   ]\n}\n",
+    "backing_association_absent": true,
+    "mount_absent": true,
+    "image_removed": true
+  },
+  "pytest_output": "...............................                                          [100%]\n31 passed in 1.21s\n",
+  "manual_probe_source": "import dataclasses\nimport fcntl\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport struct\nimport sys\n\nfrom clearml_yolo.adapters.storage.dedup import deduplicate\n\nroot = Path('/native/manual')\nroot.mkdir()\nos.environ['CY_HOME'] = str(root)\nsource, destination = root / 'a/image.jpg', root / 'b/image.jpg'\npayload = b'native fixture\\0' * 4096\nfor path in (source, destination):\n    path.parent.mkdir()\n    path.write_bytes(payload)\ndestination.chmod(0o640)\nos.setxattr(destination, 'user.cy-ticket91', b'native XFS metadata')\n\ndef snapshot(path):\n    info = path.stat()\n    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOATIME), 'rb') as stream:\n        digest = hashlib.file_digest(stream, 'sha256').hexdigest()\n    return dict(device=info.st_dev, inode=info.st_ino, nlink=info.st_nlink,\n                size=info.st_size, mode=stat.S_IMODE(info.st_mode),\n                uid=info.st_uid, gid=info.st_gid, atime_ns=info.st_atime_ns,\n                mtime_ns=info.st_mtime_ns, sha256=digest,\n                xattrs={name: os.getxattr(path, name).hex() for name in os.listxattr(path)})\n\ndef extents(path):\n    buffer = bytearray(32 + 16 * 56)\n    struct.pack_into('=QQIIII', buffer, 0, 0, 2**64 - 1, 1, 0, 16, 0)\n    with path.open('rb') as stream:\n        fcntl.ioctl(stream.fileno(), 0xC020660B, buffer, True)\n    mapped = struct.unpack_from('=I', buffer, 20)[0]\n    return [dict(zip(('logical', 'physical', 'length', 'reserved1', 'reserved2',\n                     'flags', 'reserved3', 'reserved4', 'reserved5'),\n                    struct.unpack_from('=QQQQQIIII', buffer, 32 + i * 56)))\n            for i in range(mapped)]\n\nbefore_dry = [snapshot(path) for path in (source, destination)]\ndry = deduplicate(root, dry_run=True)\nafter_dry = [snapshot(path) for path in (source, destination)]\nassert (dry.scanned, dry.duplicates, dry.reflinked, dry.skipped, dry.failures) == (2, 1, 0, 0, 0)\nassert [{k: v for k, v in row.items() if k != 'atime_ns'} for row in before_dry] == [\n    {k: v for k, v in row.items() if k != 'atime_ns'} for row in after_dry]\nos.utime(destination, ns=(1600000000000000000, 1610000000000000000))\nbefore = [snapshot(path) for path in (source, destination)]\nresult = deduplicate(root)\nafter = [snapshot(path) for path in (source, destination)]\nassert (result.scanned, result.duplicates, result.reflinked, result.skipped, result.failures) == (2, 1, 1, 0, 0), result\nassert before[1]['inode'] != after[1]['inode'] != after[0]['inode']\nassert before[0]['inode'] == after[0]['inode']\nassert after[0]['nlink'] == after[1]['nlink'] == 1\nassert {k: v for k, v in before[1].items() if k != 'inode'} == {\n    k: v for k, v in after[1].items() if k != 'inode'}\nshared = [extents(path) for path in (source, destination)]\nassert shared[0] and shared[1]\nassert any(a['physical'] == b['physical'] and a['length'] == b['length']\n           and a['flags'] & 0x2000 and b['flags'] & 0x2000\n           for a in shared[0] for b in shared[1]), shared\nwith destination.open('r+b') as stream:\n    stream.write(b'DESTINATION')\n    stream.flush()\n    os.fsync(stream.fileno())\nassert source.read_bytes() == payload\ndestination_bytes = destination.read_bytes()\nwith source.open('r+b') as stream:\n    stream.seek(4096)\n    stream.write(b'SOURCE')\n    stream.flush()\n    os.fsync(stream.fileno())\nassert destination.read_bytes() == destination_bytes\nassert source.read_bytes() != payload\nassert not list(root.rglob('.cy-dedup-*'))\nevidence = dict(python=sys.version, uid=os.getuid(), gid=os.getgid(),\n                dry_run=dataclasses.asdict(dry), before_dry=before_dry, after_dry=after_dry,\n                result=dataclasses.asdict(result), before=before, after=after,\n                shared_extents_before_writes=shared,\n                after_independent_writes=[snapshot(path) for path in (source, destination)],\n                independent_destination_write=True, independent_source_write=True,\n                exact_destination_metadata=True, owned_temporary_siblings_absent=True)\nPath('/owned/native-results.json').write_text(json.dumps(evidence, indent=2) + '\\n')\nprint(json.dumps(evidence, indent=2), flush=True)\n",
+  "container_orchestration_source": "import json\nimport os\nfrom pathlib import Path\nimport subprocess\nimport sys\nimport traceback\n\nrepo = Path('/mnt/wsl/data/nkt/clearml-yolo')\nscripts = repo / '.tmp/ticket91-xfs-20261116T064912Z'\npython = str(repo / '.venv/bin/python')\nimage = Path('/owned/ticket91.xfs')\ndevice = '/dev/loop2'\nrecord = {'commands': [], 'device': device, 'image': str(image)}\nattached = mounted = False\n\ndef run(args, *, check=True, timeout=120, env=None):\n    print('+ ' + ' '.join(args), flush=True)\n    result = subprocess.run(args, text=True, capture_output=True, timeout=timeout, env=env)\n    print(result.stdout, end='', flush=True)\n    print(result.stderr, end='', file=sys.stderr, flush=True)\n    record['commands'].append(dict(argv=args, returncode=result.returncode,\n                                   stdout=result.stdout, stderr=result.stderr))\n    if check:\n        result.check_returncode()\n    return result\n\ntry:\n    for directory in ('/owned', '/owned/home', '/owned/tmp', '/native'):\n        Path(directory).mkdir(exist_ok=True)\n        os.chown(directory, 1001, 1001)\n    record['initial_device'] = run(['losetup', device], check=False).returncode\n    assert record['initial_device'] != 0, 'Selected loop device is already associated'\n    run(['mkfs.xfs', '-V'])\n    run(['losetup', '--version'])\n    run(['uname', '-a'])\n    run(['dpkg-query', '-W', 'xfsprogs', 'util-linux'])\n    with image.open('xb') as stream:\n        stream.truncate(512 * 1024 * 1024)\n    info = image.stat()\n    record['image_identity'] = dict(inode=info.st_ino, device=info.st_dev, size=info.st_size)\n    run(['mkfs.xfs', '-m', 'reflink=1', str(image)])\n    # Explicit attachment is atomic: an intervening owner yields EBUSY, never replacement.\n    run(['losetup', device, str(image)])\n    attached = True\n    record['association'] = run(['losetup', '--json', '--list', '--output',\n                                  'NAME,BACK-FILE,BACK-INO,BACK-MAJ:MIN', device]).stdout\n    association = json.loads(record['association'])['loopdevices'][0]\n    assert association['back-file'] == str(image)\n    assert int(association['back-ino']) == info.st_ino\n    run(['mount', '-t', 'xfs', '-o', 'nodev,nosuid,noexec', device, '/native'])\n    mounted = True\n    os.chown('/native', 1001, 1001)\n    run(['findmnt', '-T', '/native', '-o', 'TARGET,SOURCE,FSTYPE,OPTIONS,PROPAGATION'])\n    run(['xfs_info', '/native'])\n    environment = dict(os.environ, HOME='/owned/home', USERPROFILE='/owned/home',\n                       XDG_CACHE_HOME='/owned/home/.cache', XDG_CONFIG_HOME='/owned/home/.config',\n                       TMPDIR='/owned/tmp', CY_HOME='/native', PYTHONDONTWRITEBYTECODE='1',\n                       OMP_NUM_THREADS='2', OPENBLAS_NUM_THREADS='2', MKL_NUM_THREADS='2',\n                       CUDA_VISIBLE_DEVICES='', PYTHONPATH=str(repo / 'src') + ':' + str(repo))\n    prefix = ['setpriv', '--reuid=1001', '--regid=1001', '--clear-groups', python, '-B']\n    run(prefix + [str(scripts / 'probe.py')], env=environment)\n    test = run(prefix + ['-m', 'pytest', str(repo / 'tests/test_dedup.py'),\n                        str(repo / 'tests/test_dedup_cli.py'), '-n', '0',\n                        '--basetemp', '/native/pytest', '-p', 'no:cacheprovider',\n                        '-ra', '-q'], env=environment, check=False)\n    Path('/owned/pytest.txt').write_text(test.stdout + test.stderr)\n    record['pytest_exit'] = test.returncode\n    assert test.returncode == 0\n    assert 'skipped' not in test.stdout\n    record['checks_passed'] = True\nexcept BaseException:\n    record['error'] = traceback.format_exc()\n    traceback.print_exc()\nfinally:\n    try:\n        if mounted:\n            run(['umount', '/native'])\n            mounted = False\n        if attached:\n            current = run(['losetup', '--json', '--list', '--output',\n                           'NAME,BACK-FILE,BACK-INO,BACK-MAJ:MIN', device]).stdout\n            record['pre_detach_association'] = current\n            identity = json.loads(current)['loopdevices'][0]\n            assert identity['back-file'] == str(image)\n            assert int(identity['back-ino']) == record['image_identity']['inode']\n            run(['losetup', '--detach', device])\n            attached = False\n        absence = run(['losetup', '--associated', str(image)]).stdout\n        assert not absence.strip(), absence\n        record['backing_association_absent'] = True\n        absent_mount = run(['findmnt', '--mountpoint', '/native'], check=False)\n        assert absent_mount.returncode == 1\n        record['mount_absent'] = True\n        if image.exists():\n            image.unlink()\n        record['image_removed'] = not image.exists()\n    except BaseException:\n        record['cleanup_error'] = traceback.format_exc()\n        traceback.print_exc()\n    Path('/owned/lifecycle.json').write_text(json.dumps(record, indent=2) + '\\n')\n    print(json.dumps(record, indent=2), flush=True)\nsys.exit(0 if record.get('checks_passed') and not record.get('cleanup_error') else 1)\n",
+  "host_cleanup": {
+    "removed_container_ids": [
+      "c703e0a9308c1c362ba7deccc34c8d55e2a6c80aec383c6a5954337af5ea0a77",
+      "3337e2ec14bbb5bb3a65d71026075f6667b0de0136024f131205b3b33ef19f96"
+    ],
+    "removed_image_output": "Untagged: cy-ticket91-xfs-tools:20261116t064912z\nDeleted: sha256:880572be66395802f49bdead9925bd3d234e51b024dc2b8ae09372a82b977182\n",
+    "owned_containers_absent": true,
+    "owned_image_inspection_exit": 1,
+    "final_loop_inventory": "NAME       BACK-FILE\n/dev/loop1 /mnt/docker-desktop-disk/isocache/entries/docker-desktop.iso/61f33cc0561befdf61fedbe61ea8d0832518c3200382a25e0bc1e8738d96ecd7\n/dev/loop0 /mnt/docker-desktop-disk/isocache/entries/docker-wsl-cli.iso/088fba78db1002688f30b332ea5b2a99b724e793b319407fd7fdafc71a0bfdc5\n",
+    "owned_scratch_removed": true
+  }
+}
