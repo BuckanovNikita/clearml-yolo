@@ -27,14 +27,14 @@ raw_used_mib = 22367, used_mib = 22339.75, passes_floor = True
     ) -> None:
         mib = 1024**2
         record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
-    
+
         def query(selector: str) -> list[list[str]]:
             return (
                 []
                 if selector.startswith("--query-compute-apps=")
                 else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
             )
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         monkeypatch.setattr(
             subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record]))
@@ -60,19 +60,19 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74ed6c565190>
             _device().model_copy(update={"uuid": "GPU-peer", "total_memory_bytes": 100 * mib}),
             _device().model_copy(update={"total_memory_bytes": 200 * mib}),
         )
-    
+
         def query(selector: str) -> list[list[str]]:
             return (
                 []
                 if selector.startswith("--query-compute-apps=")
                 else [["GPU-test", "150", "70", "0"], ["GPU-peer", "200", "150", "0"]]
             )
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         for unavailable in (gpu.require_idle(devices), gpu.monitor_devices(devices, lambda: ())):
 >           assert unavailable == (0, 130 * mib)
 E           assert (52428800, 83886080) == (0, 136314880)
-E             
+E
 E             At index 0 diff: 52428800 != 0
 E             Use -v to get more diff
 
@@ -104,14 +104,14 @@ raw_used_mib = 22340, used_mib = 22368, passes_floor = False
     ) -> None:
         mib = 1024**2
         record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
-    
+
         def query(selector: str) -> list[list[str]]:
             return (
                 []
                 if selector.startswith("--query-compute-apps=")
                 else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
             )
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         monkeypatch.setattr(
             subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record]))
@@ -154,14 +154,14 @@ raw_used_mib = 22346, used_mib = 22318.75, passes_floor = True
     ) -> None:
         mib = 1024**2
         record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
-    
+
         def query(selector: str) -> list[list[str]]:
             return (
                 []
                 if selector.startswith("--query-compute-apps=")
                 else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
             )
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         monkeypatch.setattr(
             subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record]))
@@ -204,14 +204,14 @@ raw_used_mib = 22318, used_mib = 22346, passes_floor = True
     ) -> None:
         mib = 1024**2
         record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
-    
+
         def query(selector: str) -> list[list[str]]:
             return (
                 []
                 if selector.startswith("--query-compute-apps=")
                 else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
             )
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         monkeypatch.setattr(
             subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record]))
@@ -254,14 +254,14 @@ raw_used_mib = 22368, used_mib = 22340.75, passes_floor = False
     ) -> None:
         mib = 1024**2
         record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
-    
+
         def query(selector: str) -> list[list[str]]:
             return (
                 []
                 if selector.startswith("--query-compute-apps=")
                 else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
             )
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         monkeypatch.setattr(
             subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record]))
@@ -285,17 +285,17 @@ monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74ed5fb3f560>
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         mib = 1024**2
-    
+
         def query(selector: str) -> list[list[str]]:
             return [] if selector.startswith("--query-compute-apps=") else [["GPU-test", "32607", "10261", "0"]]
-    
+
         monkeypatch.setattr(gpu, "_query", query)
         device = _device().model_copy(update={"total_memory_bytes": 34_162_343_936})
         unavailable = gpu.monitor_devices((device,), lambda: ())
 >       gpu.require_memory_reserve((device,), unavailable, 10 * 1024**3)
 
-tests/test_gpu_inventory.py:284: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_gpu_inventory.py:284:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 devices = (GPUDevice(index=0, uuid='GPU-test', name='test', total_memory_bytes=34162343936, used_memory_bytes=10, utilization=0),)
 used = (23431479296,), reserve = 10737418240
