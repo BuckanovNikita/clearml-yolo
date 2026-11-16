@@ -1,7 +1,7 @@
 x__augmented_batch__mutmut_105
---- 
+---
 
-+++ 
++++
 
 @@ -17 +17 @@
 
@@ -9,9 +9,9 @@ x__augmented_batch__mutmut_105
 +        pixels = (pixels - torch.tensor(mean).view(1, 3, 1, 1)) / torch.tensor(std).view(3, 1, 1)
 
 x__augmented_batch__mutmut_114
---- 
+---
 
-+++ 
++++
 
 @@ -18 +18 @@
 
@@ -19,9 +19,9 @@ x__augmented_batch__mutmut_114
 +    return (pixels.to(None), targets)
 
 x__augmented_batch__mutmut_20
---- 
+---
 
-+++ 
++++
 
 @@ -8 +8 @@
 
@@ -29,9 +29,9 @@ x__augmented_batch__mutmut_20
 +        boxes = torch.from_numpy(sample.boxes.copy()).to(None)
 
 x__augmented_batch__mutmut_39
---- 
+---
 
-+++ 
++++
 
 @@ -12 +12 @@
 
@@ -39,9 +39,9 @@ x__augmented_batch__mutmut_39
 +        boxes /= torch.tensor([width, height, width, height], device=None)
 
 x__augmented_batch__mutmut_41
---- 
+---
 
-+++ 
++++
 
 @@ -12 +12 @@
 
@@ -49,9 +49,9 @@ x__augmented_batch__mutmut_41
 +        boxes /= torch.tensor([width, height, width, height])
 
 x__augmented_batch__mutmut_47
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -59,9 +59,9 @@ x__augmented_batch__mutmut_47
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(None), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_53
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -69,9 +69,9 @@ x__augmented_batch__mutmut_53
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(None), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_58
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -79,9 +79,9 @@ x__augmented_batch__mutmut_58
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=None), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_60
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -89,9 +89,9 @@ x__augmented_batch__mutmut_60
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index]), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_66
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -99,9 +99,9 @@ x__augmented_batch__mutmut_66
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=None), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_68
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -109,9 +109,9 @@ x__augmented_batch__mutmut_68
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height]), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_72
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -119,9 +119,9 @@ x__augmented_batch__mutmut_72
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=None), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_74
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -129,9 +129,9 @@ x__augmented_batch__mutmut_74
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height]), 'mixup': torch.ones(augmentation.target_bound, device=device)})
 
 x__augmented_batch__mutmut_78
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -139,9 +139,9 @@ x__augmented_batch__mutmut_78
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound, device=None)})
 
 x__augmented_batch__mutmut_80
---- 
+---
 
-+++ 
++++
 
 @@ -13 +13 @@
 
@@ -149,9 +149,9 @@ x__augmented_batch__mutmut_80
 +        targets.append({'boxes': boxes, 'labels': torch.from_numpy(sample.labels).to(device), 'area': area, 'iscrowd': torch.from_numpy(sample.iscrowd).to(device), 'image_id': torch.tensor([rank * batch + index], device=device), 'orig_size': torch.tensor([width, height], device=device), 'size': torch.tensor([width, height], device=device), 'mixup': torch.ones(augmentation.target_bound)})
 
 x__augmented_batch__mutmut_92
---- 
+---
 
-+++ 
++++
 
 @@ -17 +17 @@
 
@@ -162,9 +162,9 @@ x_synthetic_batch__mutmut_1
 
 
 x_synthetic_batch__mutmut_10
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -172,9 +172,9 @@ x_synthetic_batch__mutmut_10
 +        return _augmented_batch(augmentation, batch, rank, normalization)
 
 x_synthetic_batch__mutmut_3
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -182,9 +182,9 @@ x_synthetic_batch__mutmut_3
 +        return _augmented_batch(None, batch, device, rank, normalization)
 
 x_synthetic_batch__mutmut_4
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -192,9 +192,9 @@ x_synthetic_batch__mutmut_4
 +        return _augmented_batch(augmentation, None, device, rank, normalization)
 
 x_synthetic_batch__mutmut_5
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -202,9 +202,9 @@ x_synthetic_batch__mutmut_5
 +        return _augmented_batch(augmentation, batch, None, rank, normalization)
 
 x_synthetic_batch__mutmut_6
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -212,9 +212,9 @@ x_synthetic_batch__mutmut_6
 +        return _augmented_batch(augmentation, batch, device, None, normalization)
 
 x_synthetic_batch__mutmut_7
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -222,9 +222,9 @@ x_synthetic_batch__mutmut_7
 +        return _augmented_batch(augmentation, batch, device, rank, None)
 
 x_synthetic_batch__mutmut_8
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -232,9 +232,9 @@ x_synthetic_batch__mutmut_8
 +        return _augmented_batch(batch, device, rank, normalization)
 
 x_synthetic_batch__mutmut_9
---- 
+---
 
-+++ 
++++
 
 @@ -4 +4 @@
 
@@ -242,9 +242,9 @@ x_synthetic_batch__mutmut_9
 +        return _augmented_batch(augmentation, device, rank, normalization)
 
 x_target_bound__mutmut_21
---- 
+---
 
-+++ 
++++
 
 @@ -5 +5 @@
 
@@ -252,9 +252,9 @@ x_target_bound__mutmut_21
 +    mosaic = any((operation['type'] == 'Mosaic' and operation.get('probability', None) > 0 for operation in operations))
 
 x_target_bound__mutmut_23
---- 
+---
 
-+++ 
++++
 
 @@ -5 +5 @@
 
@@ -262,9 +262,9 @@ x_target_bound__mutmut_23
 +    mosaic = any((operation['type'] == 'Mosaic' and operation.get('probability') > 0 for operation in operations))
 
 x_target_bound__mutmut_26
---- 
+---
 
-+++ 
++++
 
 @@ -5 +5 @@
 
@@ -272,9 +272,9 @@ x_target_bound__mutmut_26
 +    mosaic = any((operation['type'] == 'Mosaic' and operation.get('probability', 2) > 0 for operation in operations))
 
 x_target_bound__mutmut_44
---- 
+---
 
-+++ 
++++
 
 @@ -8 +8 @@
 
@@ -282,9 +282,9 @@ x_target_bound__mutmut_44
 +    mixed = count * (2 if collate.get('mixup_prob', None) > 0 else 1)
 
 x_target_bound__mutmut_46
---- 
+---
 
-+++ 
++++
 
 @@ -8 +8 @@
 
@@ -292,9 +292,9 @@ x_target_bound__mutmut_46
 +    mixed = count * (2 if collate.get('mixup_prob') > 0 else 1)
 
 x_target_bound__mutmut_49
---- 
+---
 
-+++ 
++++
 
 @@ -8 +8 @@
 
@@ -302,9 +302,9 @@ x_target_bound__mutmut_49
 +    mixed = count * (2 if collate.get('mixup_prob', 1) > 0 else 1)
 
 x_target_bound__mutmut_57
---- 
+---
 
-+++ 
++++
 
 @@ -9 +9 @@
 
@@ -312,9 +312,9 @@ x_target_bound__mutmut_57
 +    copied = count + (collate.get(None, 3) if collate.get('copyblend_prob', 0) > 0 else 0)
 
 x_target_bound__mutmut_61
---- 
+---
 
-+++ 
++++
 
 @@ -9 +9 @@
 
@@ -322,9 +322,9 @@ x_target_bound__mutmut_61
 +    copied = count + (collate.get('XXnum_objectsXX', 3) if collate.get('copyblend_prob', 0) > 0 else 0)
 
 x_target_bound__mutmut_62
---- 
+---
 
-+++ 
++++
 
 @@ -9 +9 @@
 
@@ -332,9 +332,9 @@ x_target_bound__mutmut_62
 +    copied = count + (collate.get('NUM_OBJECTS', 3) if collate.get('copyblend_prob', 0) > 0 else 0)
 
 x_target_bound__mutmut_65
---- 
+---
 
-+++ 
++++
 
 @@ -9 +9 @@
 
@@ -342,9 +342,9 @@ x_target_bound__mutmut_65
 +    copied = count + (collate.get('num_objects', 3) if collate.get('copyblend_prob', None) > 0 else 0)
 
 x_target_bound__mutmut_67
---- 
+---
 
-+++ 
++++
 
 @@ -9 +9 @@
 
@@ -352,9 +352,9 @@ x_target_bound__mutmut_67
 +    copied = count + (collate.get('num_objects', 3) if collate.get('copyblend_prob') > 0 else 0)
 
 x_target_bound__mutmut_70
---- 
+---
 
-+++ 
++++
 
 @@ -9 +9 @@
 

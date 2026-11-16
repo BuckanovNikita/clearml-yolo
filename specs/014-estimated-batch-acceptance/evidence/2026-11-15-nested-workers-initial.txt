@@ -105,21 +105,21 @@ stop = 'timeout'
         environment = {"CY_TEST_NESTED_OWNER": token, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
         command = WorkerCommand((sys.executable, "-c", outer), environment, tmp_path / "outer.log")
         sibling = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(60)"])
-    
+
         def cancel(_owned: Callable[[], tuple[int, ...]]) -> None:
             if ready.exists() and ready.read_text():
                 if stop == "reserve":
                     raise RuntimeError("GPU memory reserve breached")
                 if stop == "interrupt":
                     raise KeyboardInterrupt
-    
+
         try:
             if stop == "timeout":
 >               result = run_workers([command], timeout_seconds=2, monitor=cancel)
                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-tests/test_nested_worker_cleanup.py:55: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_nested_worker_cleanup.py:55:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 src/clearml_yolo/adapters/runtime/workers.py:106: in run_workers
     with ExitStack() as stack, native_descendant_scope():
                                ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -136,7 +136,7 @@ src/clearml_yolo/adapters/runtime/process_tree.py:330: in terminate
 src/clearml_yolo/adapters/runtime/process_tree.py:324: in terminate
     if not self.running():
            ^^^^^^^^^^^^^^
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = <clearml_yolo.adapters.runtime.process_tree._NativeProcessTree object at 0x775c930cb350>
 
