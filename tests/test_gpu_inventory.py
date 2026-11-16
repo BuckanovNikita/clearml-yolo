@@ -1,9 +1,11 @@
 """Foreign GPU workloads remain protected even when a trial has native children."""
 
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -109,8 +111,10 @@ def test_idle_preflight_waits_for_utilization_sampling_to_settle(
 ) -> None:
     states = iter([gpu.GPUState(10, 20, frozenset(), free_bytes=90), gpu.GPUState(10, 0, frozenset(), free_bytes=90)])
     monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": next(states)})
-    monkeypatch.setattr(time, "sleep", lambda _: None)
+    delays: list[float] = []
+    monkeypatch.setattr(time, "sleep", delays.append)
     assert gpu.require_idle((_device(),)) == (10,)
+    assert delays == [0.1]
 
 
 def test_idle_baseline_uses_fresh_telemetry_in_selected_device_order(
@@ -140,12 +144,22 @@ def test_idle_preflight_never_waits_on_or_accepts_foreign_compute(
 def test_idle_preflight_remains_bounded_when_unidentified_activity_persists(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    ticks = iter([0, 1, 2])
-    monkeypatch.setattr(time, "monotonic", lambda: next(ticks))
-    monkeypatch.setattr(time, "sleep", lambda _: None)
+    elapsed = 0.0
+    delays: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        nonlocal elapsed
+        assert 0 < seconds <= 0.1
+        elapsed += seconds
+        delays.append(seconds)
+
+    monkeypatch.setattr(time, "monotonic", lambda: elapsed)
+    monkeypatch.setattr(time, "sleep", sleep)
     monkeypatch.setattr(gpu, "gpu_states", lambda: {"GPU-test": gpu.GPUState(10, 30, frozenset(), free_bytes=90)})
-    with pytest.raises(RuntimeError, match="busy"):
+    with pytest.raises(RuntimeError, match="GPU 0 is busy"):
         gpu.require_idle((_device(),))
+    assert 2 <= elapsed < 2.1
+    assert delays
 
 
 @pytest.mark.parametrize("replacement", [True, False])
@@ -226,6 +240,101 @@ def _fake_nvidia_smi(directory: Path, body: str) -> None:
     script = directory / "nvidia-smi"
     script.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
     script.chmod(0o755)
+
+
+def _metadata_child(monkeypatch: pytest.MonkeyPatch, directory: Path, body: str) -> None:
+    """Replace only the child interpreter's CUDA boundary, never its product script."""
+    module = directory / "fake-cuda"
+    module.mkdir()
+    (module / "torch.py").write_text(body, encoding="utf-8")
+    monkeypatch.setenv("PYTHONPATH", str(module))
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+
+
+def test_discovery_executes_isolated_metadata_script_and_joins_visible_uuid_order(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    _metadata_child(
+        monkeypatch,
+        tmp_path,
+        "from types import SimpleNamespace\n"
+        "import sys\n"
+        "print('metadata diagnostic', file=sys.stderr)\n"
+        "devices = [SimpleNamespace(uuid='second', name='Second CUDA device', total_memory=209715200),\n"
+        "           SimpleNamespace(uuid='first', name='First CUDA device', total_memory=104857600)]\n"
+        "cuda = SimpleNamespace(device_count=lambda: len(devices), get_device_properties=devices.__getitem__)\n",
+    )
+    _fake_nvidia_smi(
+        tmp_path / "bin",
+        "case \"$1\" in\n"
+        "  --query-gpu=*) printf 'GPU-first, 120, 50, 0\\nGPU-second, 210, 150, 7\\n' ;;\n"
+        "  --query-compute-apps=*) exit 0 ;;\n"
+        "  *) exit 2 ;;\nesac",
+    )
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    assert [device.model_dump() for device in gpu.discover_gpus()] == [
+        {"index": 0, "uuid": "GPU-second", "name": "Second CUDA device", "total_memory_bytes": 209715200,
+         "used_memory_bytes": 52428800, "utilization": 7},
+        {"index": 1, "uuid": "GPU-first", "name": "First CUDA device", "total_memory_bytes": 104857600,
+         "used_memory_bytes": 52428800, "utilization": 0},
+    ]
+    assert capfd.readouterr() == ("", "")
+
+
+def test_discovery_preserves_metadata_child_exit_and_captured_diagnostics(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _metadata_child(
+        monkeypatch, tmp_path,
+        "import sys\nprint('metadata context')\n"
+        "print('CUDA metadata unavailable', file=sys.stderr)\nraise SystemExit(23)\n",
+    )
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        gpu.discover_gpus()
+    assert caught.value.returncode == 23
+    assert caught.value.stdout == "metadata context\n"
+    assert caught.value.stderr == "CUDA metadata unavailable\n"
+
+
+@pytest.mark.parametrize(("device_count", "message"), [(0, "No visible CUDA GPUs"), (1, "lacks whole-GPU telemetry")])
+def test_discovery_explains_absent_visible_devices_or_nvml_identity(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, device_count: int, message: str
+) -> None:
+    _metadata_child(
+        monkeypatch, tmp_path,
+        "from types import SimpleNamespace\n"
+        f"cuda = SimpleNamespace(device_count=lambda: {device_count}, "
+        "get_device_properties=lambda index: SimpleNamespace(uuid='missing', name='test', total_memory=104857600))\n",
+    )
+    _fake_nvidia_smi(tmp_path / "bin", "exit 0")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    with pytest.raises(RuntimeError, match=message):
+        gpu.discover_gpus()
+
+
+def test_discovery_bounds_and_reaps_stalled_metadata_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pid_file = tmp_path / "metadata.pid"
+    _metadata_child(
+        monkeypatch, tmp_path,
+        "import os, time\nfrom pathlib import Path\n"
+        f"Path({str(pid_file)!r}).write_text(str(os.getpid()))\ntime.sleep(60)\n",
+    )
+    run = subprocess.run
+
+    def bounded(command: list[str], *, timeout: float, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        # Assert a bounded external-process policy, then accelerate only the clock
+        # for this real sleeping child. Do not replace execution or termination.
+        assert timeout is not None and 0 < timeout <= 60
+        return run(command, timeout=0.5, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", bounded)
+    with pytest.raises(subprocess.TimeoutExpired):
+        gpu.discover_gpus()
+    pid = int(pid_file.read_text())
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
 
 
 def test_failed_query_keeps_its_type_and_attaches_nvml_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

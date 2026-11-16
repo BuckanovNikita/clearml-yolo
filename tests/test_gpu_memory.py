@@ -233,3 +233,36 @@ def test_allocator_reserve_does_not_mix_cuda_and_nvml_memory_totals(
     fraction = reserve_cuda_memory(8 * 1024**3, 0)
     assert fraction == pytest.approx(budget_mib / cuda_total_mib)
     assert limits == [(fraction, 0)]
+
+
+def test_allocator_fraction_caps_racing_free_and_reserved_snapshots(monkeypatch: pytest.MonkeyPatch) -> None:
+    import torch
+
+    from clearml_yolo.adapters.runtime import gpu_inventory
+    from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
+
+    gib = 1024**3
+    limits: list[tuple[float, int]] = []
+    samples: list[str] = []
+
+    def memory_info(device: int) -> tuple[int, int]:
+        samples.append("free-before-growth")
+        return 20 * gib, 24 * gib
+
+    def reserved(device: int) -> int:
+        samples.append("reserved-after-growth")
+        return 16 * gib
+
+    monkeypatch.setattr(torch.cuda, "mem_get_info", memory_info)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", reserved)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: SimpleNamespace(uuid="selected"))
+    monkeypatch.setattr(
+        gpu_inventory, "gpu_states",
+        lambda: {"GPU-selected": gpu_inventory.GPUState(4 * gib, 0, frozenset(), free_bytes=20 * gib)},
+    )
+    monkeypatch.setattr(
+        torch.cuda, "set_per_process_memory_fraction", lambda fraction, device: limits.append((fraction, device))
+    )
+    assert reserve_cuda_memory(8 * gib, 0) == 1.0
+    assert limits == [(1.0, 0)]
+    assert samples == ["free-before-growth", "reserved-after-growth"]
