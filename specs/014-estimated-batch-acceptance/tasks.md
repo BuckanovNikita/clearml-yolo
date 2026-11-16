@@ -42,10 +42,10 @@
 - [x] T016 Carry explicit whole-device free bytes and reconcile capacity-relative
   usage at inventory, allocator and direct-harness boundaries without changing
   CUDA profile identity or foreign-process enforcement (FR-001,006,008).
-- [ ] T017 Run affected product/static checks, scoped mutation analysis and fresh
+- [x] T017 Run affected product/static checks, scoped mutation analysis and fresh
   independent review; retain original failed runs and precise evidence limitations
   under `evidence/` (FR-005,006,008).
-- [ ] T018 Rerun the failed DEIMv2 S JSON case with fresh capacity measurement,
+- [x] T018 Rerun the failed DEIMv2 S JSON case with fresh capacity measurement,
   two-epoch execution, independent readback and cleanup after integration (FR-003–008).
 
 T015 precedes T016; T017 follows integrated implementation, and T018 requires the

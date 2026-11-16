@@ -38,10 +38,18 @@ that capacity; this remains conservative rather than claiming extra CUDA space.
   30-to31-second metadata timeout and an extra poll at exact idle-deadline equality
   retain the bounded policy. The original174 killed/59 survivors report remains
   unchanged; its substantive gaps motivated the strengthened tests.
-- **Pending:** final automatic gate and fresh independent review of the integrated
-  evidence; previous source/test review found no correctness blocker.
-- **Deferred until integration/review:** new live DEIMv2 S JSON capacity/training
-  and independent publication/readback. Original failed cases remain failed.
+- **Passed:** canonical automatic gate exited0 on clean `ba2b984`; independent
+  reviewer `count_review` verified the complete integrated diff, check evidence,
+  native consistency and raw/normalized artifact links with no outstanding findings.
+  This approves the offline correction for separately admitted serial native validation.
+- **Passed live execution/readback and independent evidence review:** new DEIMv2 S
+  JSON case `deimv2-s-json-22b56424f0` freshly confirmed batch24 and completed two
+  epochs with14 optimizer updates. Native ownership cleanup passed; all459 launcher
+  source inputs remained unchanged. The207 supplemental samples reached a minimum
+  of10347 MiB free, with a maximum1.177-second sample gap; they do not establish a
+  continuous measured minimum. The native reserve guard also passed throughout.
+  Independent remote readback and CPU prediction passed; original failed cases
+  remain failed.
 
 Exact checked hashes and red/green logs are retained in
 `.tmp/ticket99-count-fix/verification.json`. CPU tests inject CUDA/NVML boundary
@@ -52,6 +60,17 @@ The strengthening receipt is
 Actual preformat snapshots were committed as `93680d2`; independently reproduced
 automatic fixes/formatting were committed separately as `b3a8bd8`. Both final test
 files match the focused-check receipt. Product source remains identical to `8b7b4b3`.
+Before live validation, all537 tracked source/test paths in the root working tree
+were compared with clean `ba2b984` and matched exactly. Root HEAD `0e1d039` alone
+does not identify the uncommitted correction. The separate prelive identity receipt
+and launcher source manifest establish the executed inputs. Independent reviewer
+`count_review` approved T018 after checking all129 protected file hashes and the
+removal of exactly197,970,881 duplicate logical bytes. The original failed case's
+seven retained diagnosis files remain unchanged. See the
+[ticket09 execution/readback evidence](../../000-baseline/evidence/2026-11-16-ticket09-deim-json.md).
+No selected correction check remains deferred; final evidence-only reconciliation
+uses the canonical automatic gate before local main integration. No push or release
+is part of this acceptance.
 
 Full offline coverage is selected because the corrected runtime is shared across
 backends. Previously accepted full-suite coverage remains historical evidence at
