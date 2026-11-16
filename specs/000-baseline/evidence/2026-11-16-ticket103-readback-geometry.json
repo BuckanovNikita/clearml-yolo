@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "ticket": 103,
+  "status": "accepted_verification_helper_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route pending",
+  "source_commit": "c0576a49200e030c2315d6cbe9bc1269b7e34b2e",
+  "problem": "Predictions boxes must have ordered corners and positive area.",
+  "change_scope": {
+    "changed_existing_functions": [
+      "cpu_validate"
+    ],
+    "added_functions": [
+      "geometry_evaluation_copy"
+    ],
+    "unchanged_other_functions": 15,
+    "product_changes": false,
+    "dependency_changes": false,
+    "original_helper_preserved": true,
+    "original_failed_attempt_preserved": true
+  },
+  "candidate_sha256": "10505a719da3729707dbf96c1b0efaa6b948f254c5d01567575711731d579752",
+  "preparation_revision": "v2 exact current-source diff binding; candidate and manual proof unchanged",
+  "independent_helper_review_sha256": "a7ae9af016ea09f16b1a4d71fd88858b07f9465e140418ad8cf26fec042b96e4",
+  "manual_retained_row_proof": {
+    "status": "passed_manual_retained_row_CPU_proof_only",
+    "session": 34062,
+    "exit_code": 0,
+    "raw_rows": 10962,
+    "evaluation_rows": 10959,
+    "excluded_rows": 3,
+    "zero_area": 3,
+    "reversed_corners": 0,
+    "raw_file_unchanged": true,
+    "raw_frame_unchanged": true,
+    "all_invalid_false_negatives": 64,
+    "required_refusals": {
+      "invalid_confidence": {
+        "type": "ValueError",
+        "message": "Predictions confidence must be numeric and finite."
+      },
+      "missing_confidence": {
+        "type": "ValueError",
+        "message": "Predictions DataFrame is missing columns: ['confidence']"
+      },
+      "nonfinite_geometry": {
+        "type": "ValueError",
+        "message": "Nonfinite excluded prediction"
+      },
+      "invalid_confidence_on_zero_area": {
+        "type": "ValueError",
+        "message": "Predictions confidence must be numeric and finite."
+      },
+      "missing_confidence_on_zero_area": {
+        "type": "ValueError",
+        "message": "Predictions DataFrame is missing columns: ['confidence']"
+      }
+    },
+    "prior_accepted_readback_applicability": {
+      "ticket20": {
+        "raw_predictions_sha256": "6c7d64ee2a03dce90bd4999aae5b0902bf7bdbef8d62cce8a1daafa613acfcd1",
+        "prior_passed_receipt_sha256": "160519c834faa8e8f076ad1880f99f3714b10e788bdc6a5236f3300512411dbc",
+        "rows": 10884,
+        "excluded_rows": 0,
+        "evaluation_frame_identical": true,
+        "raw_file_unchanged": true,
+        "remote_or_inference_repeated": false
+      },
+      "ticket21": {
+        "raw_predictions_sha256": "5ae6f802dd2c78ddfae9173fe2fba8d414001252b82a065e3229a113fcdcbc53",
+        "prior_passed_receipt_sha256": "83e9ea7dbeb05747f46db7d3467c4bdd16a4d08151bb38229befab2ed4255968",
+        "rows": 10980,
+        "excluded_rows": 0,
+        "evaluation_frame_identical": true,
+        "raw_file_unchanged": true,
+        "remote_or_inference_repeated": false
+      }
+    }
+  },
+  "fresh_readback": {
+    "status": "corrected_readback_execution_passed_pending_independent_acceptance",
+    "executor": "/root/local_diag_fixes_v2",
+    "local_admission_tool_session": 64437,
+    "local_admission_exit_code": 0,
+    "tool_session": 42794,
+    "exit_code": 0,
+    "receipt_sha256": "1cda74f7e87fcf3570acf472cfdeb8af83bc3ff5e69829413947a530c48e737d",
+    "helper_sha256": "10505a719da3729707dbf96c1b0efaa6b948f254c5d01567575711731d579752",
+    "helper_independent_review_sha256": "a7ae9af016ea09f16b1a4d71fd88858b07f9465e140418ad8cf26fec042b96e4",
+    "CPU_timeout_seconds": 600,
+    "CUDA_VISIBLE_DEVICES": "",
+    "owned_process_identities": [
+      {
+        "pid": 3029267,
+        "start_ticks": 809997,
+        "cuda_hidden_observed": true,
+        "same_identity_alive": false
+      },
+      {
+        "pid": 3029490,
+        "start_ticks": 810689,
+        "parent_pid": 3029267,
+        "cuda_hidden_observed": true,
+        "same_identity_alive": false
+      }
+    ],
+    "remaining_readback_python_pids": [],
+    "task_id": "c73785c39f2742f89aeca4d54e06f973",
+    "output_model_id": "61d1766ef6ae4cc58f69d3d2130b3a43",
+    "checkpoint_sha256": "fc2bc14387424b0ab4217b2229ba31448fa1d3e6d2ec47a3a2ac478beddde3a5",
+    "CPU_validation_images": 40,
+    "CPU_background_images": 15,
+    "CPU_raw_prediction_rows": 10962,
+    "CPU_evaluation_prediction_rows": 10959,
+    "CPU_excluded_rows": 3,
+    "CPU_exclusion_reasons": {
+      "zero_area": 3,
+      "reversed_corners": 0
+    },
+    "CPU_raw_prediction_sha256": "f2384d6aa261143f2c1eca78cdc41140c6a468f1278ff5d97bea766a6673ea0a",
+    "CPU_raw_prediction_hash_matches_original_failed_attempt": true,
+    "CPU_evaluation_prediction_sha256": "652d8289f7a83d800b2a699ef7b988649f2b55cb8fc929b8815d4d261696934f",
+    "original_failed_receipt_sha256_unchanged": "83ed49e58ad5b86a27a1d70e27622ddb36a5d98ecbb48b0fe065543d8d22d38d",
+    "GPU_work_by_readback": false,
+    "cache_cleanup_performed": false,
+    "limitations": [
+      "No accuracy, CPU/GPU numerical parity or export claim",
+      "One fresh corrected-helper readback; original failed attempt preserved",
+      "Native GPU reserve and cleanup evidence remains in original launch receipts",
+      "Executor evidence is not independent acceptance"
+    ]
+  },
+  "independent_acceptance": {
+    "status": "accepted_native_ticket22_scope_pending_coordinator_cleanup_and_recording",
+    "receipt": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/independent-acceptance-review.json",
+    "geometry_copy_exact": true,
+    "raw_predictions_match_failed_attempt": true
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T21:50:10.598607+00:00",
+    "directories_removed": [
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24347007
+      },
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cache",
+        "files": 9,
+        "logical_bytes": 137040207
+      }
+    ],
+    "removed_logical_bytes": 161387214,
+    "protected_files_verified_before_after": 157,
+    "known_pids_absent": [
+      2599769,
+      2604403,
+      2606483,
+      3029267,
+      3029490
+    ],
+    "exact_case_process_scan": "empty",
+    "cache_open_handle_scan": "empty",
+    "acceptance_review_sha256": "1369c2a2890fc58152abbf7f90ca682a5e29f5112ca2784764132a24a2451961",
+    "scope": "Exact case only; other ticket workloads may run; no global compute-empty claim",
+    "physical_reclaim": "Logical bytes only; physical reclaim not separately measured",
+    "excluded_unrelated_user_systemd_pids": [
+      340,
+      344
+    ],
+    "entire_original_failed_attempt_and_cache_preserved": true
+  },
+  "checks": {
+    "syntax_AST": "passed",
+    "candidate_format": "passed",
+    "candidate_full_lint": "24 historical standalone-helper diagnostics; no new-function diagnostics; not a clean full lint claim",
+    "retained_row_proof": "passed",
+    "independent_helper_review": "passed",
+    "fresh_corrected_readback": "passed",
+    "independent_acceptance": "passed",
+    "protected_cleanup": "passed"
+  },
+  "additional_native_GPU_execution": false,
+  "bindings": [
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/preparation-v2.json",
+      "sha256": "657d450821c349b31623e413c4900adf054139c709db0bb369fd7686f950e718"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/candidate-source.txt",
+      "sha256": "10505a719da3729707dbf96c1b0efaa6b948f254c5d01567575711731d579752"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/candidate-exact-v2.diff",
+      "sha256": "48f7e074c289671155283c0162e8f8e00eb46c091b85fa497923d8e187be3ddb"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/independent-review.json",
+      "sha256": "a7ae9af016ea09f16b1a4d71fd88858b07f9465e140418ad8cf26fec042b96e4"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/manual-proof.json",
+      "sha256": "14d60582e14e1281521b1c3a08c32fecf84e71920db68148ce327529e4beef11"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/manual-proof.py",
+      "sha256": "333d652ef4e0a795fb237b7569167021df198cc0b62e7e1e2e0f31c0534d46d5"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T213251Z-a65df157/receipt.json",
+      "sha256": "83ed49e58ad5b86a27a1d70e27622ddb36a5d98ecbb48b0fe065543d8d22d38d"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T213251Z-a65df157/cpu-predictions.csv",
+      "sha256": "f2384d6aa261143f2c1eca78cdc41140c6a468f1278ff5d97bea766a6673ea0a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/receipt.json",
+      "sha256": "1cda74f7e87fcf3570acf472cfdeb8af83bc3ff5e69829413947a530c48e737d"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/executor-receipt.json",
+      "sha256": "a57d53dc2c762640e6011615daa9a52d94e9f56c179ff1c4c69ffeb860984d66"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cpu-geometry.json",
+      "sha256": "2e655e0a25ceef4e90e438c7d964937cefbd2f06c863684eed2a8f99637811b0"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cpu-predictions.csv",
+      "sha256": "f2384d6aa261143f2c1eca78cdc41140c6a468f1278ff5d97bea766a6673ea0a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cpu-evaluation-predictions.csv",
+      "sha256": "652d8289f7a83d800b2a699ef7b988649f2b55cb8fc929b8815d4d261696934f"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/independent-acceptance-review.json",
+      "sha256": "1369c2a2890fc58152abbf7f90ca682a5e29f5112ca2784764132a24a2451961"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cleanup.json",
+      "sha256": "996eb9c90c630eb3d10943ef0882b3db87d9975c825db5499ebf31d9b0495840"
+    }
+  ],
+  "limitations": [
+    "Verification-helper evaluation boundary correction only; no product or dependency change",
+    "No accuracy, upstream solver validation, CPU/GPU parity or export claim",
+    "Earlier failed receipt and whole failed cache retained",
+    "No live calls or new checks during dated-record preparation",
+    "Delivery gate pending"
+  ]
+}

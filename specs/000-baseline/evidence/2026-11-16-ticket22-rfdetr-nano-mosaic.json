@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "ticket": 22,
+  "selection": "rfdetr/nano",
+  "variant": "json_mosaic",
+  "status": "accepted_native_scope",
+  "delivery_gate": "Coordinator review, commit and native documentation route pending",
+  "case": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c",
+  "source_commit": "17fdb61e426c7c690e3be4220228c1de21613abf",
+  "documentation_source_commit": "c0576a49200e030c2315d6cbe9bc1269b7e34b2e",
+  "environment": "cy-it-ded7c4",
+  "project": "cy-it-ded7c4 ticket22",
+  "task_id": "c73785c39f2742f89aeca4d54e06f973",
+  "output_model_id": "61d1766ef6ae4cc58f69d3d2130b3a43",
+  "checkpoint_sha256": "fc2bc14387424b0ab4217b2229ba31448fa1d3e6d2ec47a3a2ac478beddde3a5",
+  "source_applicability": {
+    "launch_source_map_identical": 459,
+    "readback_source_map_identical": 238,
+    "shared_inputs_identical": true,
+    "scope": "Reused ticket15 source/fixture review. RF-specific helper, native configuration/CSV and registered initialization independently inspected."
+  },
+  "fixture": {
+    "canonical_manifest_sha256": "356d4c02883226678e4ae474d54f21a8820fb31fc8f3eefe13ac177684396a33",
+    "train_images": 160,
+    "val_images": 40,
+    "test_images": 40,
+    "seed": 0,
+    "images": 240,
+    "heldout_images": 80,
+    "heldout_backgrounds": 34,
+    "contexts": [
+      "prediction:b415d1e6a2dbf54c900d"
+    ],
+    "pixel_leakage": false
+  },
+  "training": {
+    "status": "passed",
+    "epochs": [
+      0,
+      1
+    ],
+    "optimizer": {
+      "steps": 14,
+      "skipped_steps": 0,
+      "parameter_changed": true,
+      "initial_optimizer_parameters_sha256": "a45679bd5c1cc935475000d0a3524115b2ad22229d86e7a80ca1cbc31b8b8d6e"
+    },
+    "step_derivation": "2 epochs * ceil(160 / 24) = 14 updates, native metrics steps 6 and 13",
+    "seed": 0,
+    "precision": "fp32",
+    "precision_evidence": "Native amp_dtype is null. CY maps amp=false to null and RF trainer resolves null to 32-true. Saved model.amp=true is not the Lightning execution precision.",
+    "native_loss_count": 34,
+    "remote_scalar_loss_count": 42,
+    "native_seconds": 214.76139573199998,
+    "launcher_seconds": 217.7842668859994
+  },
+  "augmentation": {
+    "status": "passed",
+    "mode": "albumentations",
+    "snapshot_sha256": "96aee2170d79d2955a5008cbe425f98e8ba2fbc89fe41851e8c3fb466cbdf8b4",
+    "aug_config": {},
+    "augmentation_backend": "torchvision",
+    "scale_jitter": false,
+    "multi_scale": "off",
+    "expanded_scales": true,
+    "scope": "JSON recipe and unchanged adapter agree. Overlapping RF native augmentation disabled. No per-image trace"
+  },
+  "estimator": {
+    "chosen_batch": 24,
+    "fresh_forced": true,
+    "trials": [
+      {
+        "batch": 8,
+        "status": "success",
+        "peak_memory_bytes": [
+          11025514496
+        ]
+      },
+      {
+        "batch": 16,
+        "status": "success",
+        "peak_memory_bytes": [
+          15772418048
+        ]
+      },
+      {
+        "batch": 24,
+        "status": "success",
+        "peak_memory_bytes": [
+          20756299776
+        ]
+      },
+      {
+        "batch": 32,
+        "status": "oom",
+        "peak_memory_bytes": []
+      },
+      {
+        "batch": 24,
+        "status": "success",
+        "peak_memory_bytes": [
+          20785659904
+        ]
+      }
+    ],
+    "nominal_size": [
+      384,
+      384
+    ],
+    "effective_size": [
+      384,
+      384
+    ],
+    "scope": "Fixed custom-augmentation probe shape under admitted allocator budget, not unrestricted device capacity"
+  },
+  "telemetry": {
+    "status": "passed",
+    "samples": 208,
+    "minimum_free_mib": 10703,
+    "guard_mib": 10240,
+    "maximum_completed_sample_gap_seconds": 1.0988116210000953,
+    "outer_query_timeout": false
+  },
+  "publication": {
+    "status": "passed",
+    "task_id": "c73785c39f2742f89aeca4d54e06f973",
+    "model_id": "61d1766ef6ae4cc58f69d3d2130b3a43",
+    "checkpoint_sha256": "fc2bc14387424b0ab4217b2229ba31448fa1d3e6d2ec47a3a2ac478beddde3a5",
+    "checkpoint_name": "checkpoint_best_total.pth",
+    "eight_artifacts_and_checkpoint_rehashed": true,
+    "force_download_helper_reviewed": true
+  },
+  "cpu_validation": {
+    "status": "passed",
+    "images": 40,
+    "background_images": 15,
+    "prediction_rows": 10962,
+    "counts": {
+      "1": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 8
+      },
+      "2": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 1
+      },
+      "3": {
+        "tp": 7,
+        "fp": 347,
+        "fn": 41
+      },
+      "4": {
+        "tp": 3,
+        "fp": 481,
+        "fn": 4
+      }
+    },
+    "prediction_sha256": "f2384d6aa261143f2c1eca78cdc41140c6a468f1278ff5d97bea766a6673ea0a",
+    "geometry": {
+      "raw_rows": 10962,
+      "evaluation_rows": 10959,
+      "excluded_rows": 3,
+      "reason_counts": {
+        "reversed_corners": 0,
+        "zero_area": 3
+      },
+      "exclusions": [
+        {
+          "raw_row_index": 1586,
+          "image_name": "20e93e1cb.jpg",
+          "instance_label": "3",
+          "confidence": 0.01330975815653801,
+          "xyxy": [
+            1600.0,
+            74.10739135742188,
+            1600.0,
+            248.58676147460938
+          ],
+          "reason": "zero_area"
+        },
+        {
+          "raw_row_index": 4347,
+          "image_name": "534991d20.jpg",
+          "instance_label": "3",
+          "confidence": 0.007864966057240963,
+          "xyxy": [
+            1600.0,
+            173.5667724609375,
+            1600.0,
+            251.95428466796875
+          ],
+          "reason": "zero_area"
+        },
+        {
+          "raw_row_index": 4358,
+          "image_name": "534991d20.jpg",
+          "instance_label": "3",
+          "confidence": 0.007699045352637768,
+          "xyxy": [
+            1600.0,
+            208.7369842529297,
+            1600.0,
+            256.0
+          ],
+          "reason": "zero_area"
+        }
+      ],
+      "raw_prediction_sha256": "f2384d6aa261143f2c1eca78cdc41140c6a468f1278ff5d97bea766a6673ea0a",
+      "evaluation_prediction_sha256": "652d8289f7a83d800b2a699ef7b988649f2b55cb8fc929b8815d4d261696934f"
+    },
+    "totals": {
+      "tp": 10,
+      "fp": 828,
+      "fn": 54
+    }
+  },
+  "corrected_readback": {
+    "independent_helper_review": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/independent-review.json",
+    "raw_predictions_identical_to_failed_attempt": true,
+    "geometry": {
+      "raw_rows": 10962,
+      "evaluation_rows": 10959,
+      "excluded_rows": 3,
+      "reason_counts": {
+        "reversed_corners": 0,
+        "zero_area": 3
+      },
+      "exclusions": [
+        {
+          "raw_row_index": 1586,
+          "image_name": "20e93e1cb.jpg",
+          "instance_label": "3",
+          "confidence": 0.01330975815653801,
+          "xyxy": [
+            1600.0,
+            74.10739135742188,
+            1600.0,
+            248.58676147460938
+          ],
+          "reason": "zero_area"
+        },
+        {
+          "raw_row_index": 4347,
+          "image_name": "534991d20.jpg",
+          "instance_label": "3",
+          "confidence": 0.007864966057240963,
+          "xyxy": [
+            1600.0,
+            173.5667724609375,
+            1600.0,
+            251.95428466796875
+          ],
+          "reason": "zero_area"
+        },
+        {
+          "raw_row_index": 4358,
+          "image_name": "534991d20.jpg",
+          "instance_label": "3",
+          "confidence": 0.007699045352637768,
+          "xyxy": [
+            1600.0,
+            208.7369842529297,
+            1600.0,
+            256.0
+          ],
+          "reason": "zero_area"
+        }
+      ],
+      "raw_prediction_sha256": "f2384d6aa261143f2c1eca78cdc41140c6a468f1278ff5d97bea766a6673ea0a",
+      "evaluation_prediction_sha256": "652d8289f7a83d800b2a699ef7b988649f2b55cb8fc929b8815d4d261696934f"
+    },
+    "filtered_rows_exact_without_modification": true,
+    "original_failed_receipt_preserved": true,
+    "old_failed_cache_retained": true
+  },
+  "cleanup": {
+    "status": "passed",
+    "finished_utc": "2026-11-16T21:50:10.598607+00:00",
+    "directories_removed": [
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/dataset-cache",
+        "files": 249,
+        "logical_bytes": 24347007
+      },
+      {
+        "path": "/mnt/wsl/data/nkt/clearml-yolo/runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cache",
+        "files": 9,
+        "logical_bytes": 137040207
+      }
+    ],
+    "removed_logical_bytes": 161387214,
+    "protected_files_verified_before_after": 157,
+    "known_pids_absent": [
+      2599769,
+      2604403,
+      2606483,
+      3029267,
+      3029490
+    ],
+    "exact_case_process_scan": "empty",
+    "cache_open_handle_scan": "empty",
+    "acceptance_review_sha256": "1369c2a2890fc58152abbf7f90ca682a5e29f5112ca2784764132a24a2451961",
+    "scope": "Exact case only; other ticket workloads may run; no global compute-empty claim",
+    "physical_reclaim": "Logical bytes only; physical reclaim not separately measured",
+    "excluded_unrelated_user_systemd_pids": [
+      340,
+      344
+    ],
+    "entire_original_failed_attempt_and_cache_preserved": true
+  },
+  "checks": {
+    "preparation": "passed",
+    "native_execution": "passed",
+    "capacity": "passed",
+    "publication_readback": "passed",
+    "corrected_CPU_scoring": "passed",
+    "independent_acceptance": "passed",
+    "protected_cleanup": "passed",
+    "original_failed_readback": "failed_preserved"
+  },
+  "bindings": [
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket22-20261116T212818Z-22497de8/inputs.json",
+      "sha256": "d9cd3a74b6dce58dbf60aae0d62cc8f69260ab9a72d9923361e15eb6fe38fb54"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket22-20261116T212818Z-22497de8/result.json",
+      "sha256": "6cd87a9548acbbd2d351bd20186aef6011d1b691397675bdfbc8060ba680ad24"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket22-20261116T212818Z-22497de8/independent-input-review.json",
+      "sha256": "dfea36f072a93845293d281c0eff140ae2e72885ec0d47a4a55c9b1dd2388656"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket22-20261116T212818Z-22497de8/gpu-telemetry.jsonl",
+      "sha256": "8634bf617d58f1954ee471ff9dbd2e2bc3476af119d68b523b9e489f732d4fbf"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/backend-preparation/ticket22-20261116T212527Z-50f05d81/fresh-admission.json",
+      "sha256": "57621a49398d22e590bd19d84b16c99d5300b1fb0c7d4d27f9ba6f44bfca0fef"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/summary.json",
+      "sha256": "c8c56746eda8e41057d5b2d13da1524d7f0b1309f1691c1131108794961bd501"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/verification.json",
+      "sha256": "2df6bc35bcc0ddcc67ed06717b225bb9e49181c7635fa344e3a944678f7b9f0a"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/batch-admission.json",
+      "sha256": "7d51be73ff9ddc2a0ec29f7d11fb0ca1d41c807a2ec2d536f4f2ac2b0ef7d964"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/batch-estimates.json",
+      "sha256": "89f11dd0d9cd20fed8990988715198b6e73c8d9c637fce903922d6caaa02fe84"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/training-inputs.json",
+      "sha256": "4d76567e2d5cfdf79790558cfca52cfb968a4466a8e824cdbf938f7ee2a7b640"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/pipeline.json",
+      "sha256": "f672caec492eb257701d3f5d7a06109a9e7aaf95a33abcc8d00cfbafa8b0c75c"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/receipt.json",
+      "sha256": "1cda74f7e87fcf3570acf472cfdeb8af83bc3ff5e69829413947a530c48e737d"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/executor-receipt.json",
+      "sha256": "a57d53dc2c762640e6011615daa9a52d94e9f56c179ff1c4c69ffeb860984d66"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/independent-acceptance-review.json",
+      "sha256": "1369c2a2890fc58152abbf7f90ca682a5e29f5112ca2784764132a24a2451961"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cleanup-plan.json",
+      "sha256": "27f248ae8433a0ebc6194ff913d3c2f73386fbb083e4946314c54d7e0da9faab"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cleanup.json",
+      "sha256": "996eb9c90c630eb3d10943ef0882b3db87d9975c825db5499ebf31d9b0495840"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cpu-validation.json",
+      "sha256": "07fc0c0b026e673f2297ed5950a8e41c055cd3553b7b218318eddd178cac9128"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/cpu-geometry.json",
+      "sha256": "2e655e0a25ceef4e90e438c7d964937cefbd2f06c863684eed2a8f99637811b0"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T214528Z-24da4dff/readback_torch_detector_case.py",
+      "sha256": "10505a719da3729707dbf96c1b0efaa6b948f254c5d01567575711731d579752"
+    },
+    {
+      "path": "runs/verification-gap-closure/assets-v1/estimated-acceptance-v2/rfdetr-nano-json_mosaic-9414f1024c/readback/20261116T213251Z-a65df157/receipt.json",
+      "sha256": "83ed49e58ad5b86a27a1d70e27622ddb36a5d98ecbb48b0fe065543d8d22d38d"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/preparation-v2.json",
+      "sha256": "657d450821c349b31623e413c4900adf054139c709db0bb369fd7686f950e718"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/independent-review.json",
+      "sha256": "a7ae9af016ea09f16b1a4d71fd88858b07f9465e140418ad8cf26fec042b96e4"
+    },
+    {
+      "path": ".tmp/verification-gap-closure/ticket103-readback-geometry-20261116/manual-proof.json",
+      "sha256": "14d60582e14e1281521b1c3a08c32fecf84e71920db68148ce327529e4beef11"
+    },
+    {
+      "path": "runs/verification-gap-closure/fixtures-v1/prepared/manifest.json",
+      "sha256": "4308e0bf241675bc07d0e0fce9fe75a516fddd322e1d359f09bf6e4f56eb4973"
+    }
+  ],
+  "limitations": [
+    "Two-epoch smoke, not scientific accuracy or convergence",
+    "Sampled memory only, no continuous reserve or playback proof",
+    "One GPU/backend variant, no numerical parity, export or physical multi-GPU claim",
+    "Historical WSL hang cause unproven",
+    "No per-image Mosaic trace",
+    "Whole failed readback/cache retained; logical cleanup bytes only",
+    "Delivery gate pending"
+  ]
+}
