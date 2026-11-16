@@ -70,9 +70,9 @@ remote service was used.
   was the only automatic mechanical correction.
 - **Passed**: native `task --exit-code architecture`: 21 contracts kept, zero broken.
   The backend uses its own config helper rather than importing the integration layer.
-- **Deferred to coordinator**: integrated full coverage, scoped mutation selection
-  against staged inputs, and fresh independent review. Existing pre-fix mutation
-  evidence does not establish the new admission helper or BF16 branches.
+- **Deferred to coordinator**: integrated full coverage and fresh independent review.
+  Existing pre-fix mutation evidence does not establish the new admission helper or
+  BF16 branches; the bounded follow-up below judged no mutants.
 - **Unverified here**: physical CUDA BF16, compiled CUDA execution, GPU capacity,
   multi-GPU execution, and live training/publication. These remain separate campaign
   acceptance work; the CPU checks are not substitutes.
@@ -81,6 +81,27 @@ An initial focused invocation named nonexistent `test_yolo_config.py` and collec
 no tests; it was corrected to the actual native configuration module. One expanded
 test run had a test-only mismatch in the expected native BF16 error text; correcting
 that expectation preceded the final passing run.
+
+### Bounded mutation follow-up
+
+After coordinator readmission on 2026-11-16, the unchanged native mutation driver was
+called through its export/selection/mutation API with a unique `GIT_INDEX_FILE`.
+The temporary index contained current `src/` and `tests/` inputs needed for the
+integrated ticket03 snapshot; the shared index was never modified. Exact target
+functions were `batch_probe.probe`, `batch_probe._optimize`, and
+`config.batch_probe_settings`. Native dependency selection retained 202 test nodes
+or modules across 43 files, including the entire new precision regression module.
+The execution used one child, CPU affinity 0,1, nice19, and a 180-second native budget.
+
+The stats test pass printed **351 passed, 99 warnings in 177.09 seconds**. The budget
+then interrupted statistics collection (`runner returned 2`), before any mutant was
+judged. Native advisory exit was 0, but this is **budget-limited evidence**, not a
+completed mutation assessment or proof of test strength. Inventory: 349 mutants,
+zero killed, zero survived, zero classified unreached, **349 unrun** (220 in `probe`,
+67 in `_optimize`, 62 in `batch_probe_settings`). No survivor disposition is possible.
+No budget extension or broad repeat was performed. The owned process exited and the
+temporary export/index were removed in `finally`; the compact findings replace the
+temporary raw report.
 
 ## Snapshot and cleanup
 

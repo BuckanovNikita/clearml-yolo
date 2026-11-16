@@ -46,6 +46,40 @@ def test_driver_reserved_memory_is_unavailable_to_reserve_monitor(
     assert unavailable == (19 * 1024**3,)
 
 
+def test_queried_processes_remain_bound_to_their_gpu_uuid(monkeypatch: pytest.MonkeyPatch) -> None:
+    def query(selector: str) -> list[list[str]]:
+        if selector.startswith("--query-compute-apps="):
+            return [["GPU-test", "10"], ["GPU-test", "11"], ["GPU-peer", "12"]]
+        # Inventory order need not match either the process list or selection.
+        return [["GPU-peer", "100", "70", "0"], ["GPU-test", "100", "80", "0"]]
+
+    monkeypatch.setattr(gpu, "_query", query)
+    device = _device().model_copy(update={"total_memory_bytes": 100 * 1024**2})
+    peer = device.model_copy(update={"index": 1, "uuid": "GPU-peer"})
+    # A foreign process on an unselected GPU cannot contaminate the selected GPU.
+    assert gpu.monitor_devices((device,), lambda: (10, 11)) == (20 * 1024**2,)
+    with pytest.raises(RuntimeError, match=r"foreign PIDs \[12\]"):
+        gpu.monitor_devices((device, peer), lambda: (10, 11))
+    assert gpu.monitor_devices((device, peer), lambda: (10, 11, 12)) == (20 * 1024**2, 30 * 1024**2)
+    with pytest.raises(RuntimeError, match="busy"):
+        gpu.require_idle((device,), force=True)
+
+
+@pytest.mark.parametrize("free_mib", [0, 100])
+def test_valid_memory_endpoints_preserve_exact_reserve_boundary(monkeypatch: pytest.MonkeyPatch, free_mib: int) -> None:
+    def query(selector: str) -> list[list[str]]:
+        return [] if selector.startswith("--query-compute-apps=") else [["GPU-test", "100", str(free_mib), "0"]]
+
+    monkeypatch.setattr(gpu, "_query", query)
+    device = _device().model_copy(update={"total_memory_bytes": 100 * 1024**2})
+    unavailable = gpu.monitor_devices((device,), lambda: ())
+    # Empty and full devices both produce valid telemetry, including zero-reserve
+    # use. Admission accepts equality and rejects even one byte more than free.
+    gpu.require_memory_reserve((device,), unavailable, free_mib * 1024**2)
+    with pytest.raises(RuntimeError, match="reserve"):
+        gpu.require_memory_reserve((device,), unavailable, free_mib * 1024**2 + 1)
+
+
 @pytest.mark.parametrize("pids", [frozenset({10}), frozenset({10, 11})])
 def test_measurements_accept_owned_ranks_and_compiler_children(
     monkeypatch: pytest.MonkeyPatch, pids: frozenset[int]
