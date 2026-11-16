@@ -1,0 +1,158 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________ test_nested_sessions_are_reaped_on_outer_cancellation[reserve] ________
+  + Exception Group Traceback (most recent call last):
+  |   File "/mnt/wsl/data/nkt/clearml-yolo/tests/test_nested_worker_cleanup.py", line 60, in test_nested_sessions_are_reaped_on_outer_cancellation
+  |     run_workers([command], timeout_seconds=10, monitor=cancel)
+  |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/workers.py", line 106, in run_workers
+  |     with ExitStack() as stack, native_descendant_scope():
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/mnt/wsl/data/nkt/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 158, in __exit__
+  |     self.gen.throw(value)
+  |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 753, in native_descendant_scope
+  |     raise BaseExceptionGroup("Native execution, descendant cleanup or restoration failed", errors) from None
+  | ExceptionGroup: Native execution, descendant cleanup or restoration failed (2 sub-exceptions)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 737, in native_descendant_scope
+    |     yield
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/workers.py", line 122, in run_workers
+    |     status = _await_workers(processes, trees, time.monotonic() + timeout_seconds, monitor)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/workers.py", line 54, in _await_workers
+    |     monitor(owned_pids)
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/tests/test_nested_worker_cleanup.py", line 49, in cancel
+    |     raise RuntimeError("GPU memory reserve breached")
+    | RuntimeError: GPU memory reserve breached
+    +---------------- 2 ----------------
+    | Traceback (most recent call last):
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 678, in _collect_scope_failure
+    |     yield
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 747, in native_descendant_scope
+    |     tree.terminate()
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 330, in terminate
+    |     raise verification_error
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 324, in terminate
+    |     if not self.running():
+    |            ^^^^^^^^^^^^^^
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 667, in running
+    |     raise UnverifiableProcessTreeError(
+    | clearml_yolo.adapters.runtime.process_tree.UnverifiableProcessTreeError: Cannot prove native ownership of adopted children with preexisting helper branches: [3778192]; children remain untouched
+    +------------------------------------
+_______ test_nested_sessions_are_reaped_on_outer_cancellation[interrupt] _______
+  + Exception Group Traceback (most recent call last):
+  |   File "/mnt/wsl/data/nkt/clearml-yolo/tests/test_nested_worker_cleanup.py", line 60, in test_nested_sessions_are_reaped_on_outer_cancellation
+  |     run_workers([command], timeout_seconds=10, monitor=cancel)
+  |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/workers.py", line 106, in run_workers
+  |     with ExitStack() as stack, native_descendant_scope():
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/mnt/wsl/data/nkt/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 158, in __exit__
+  |     self.gen.throw(value)
+  |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 753, in native_descendant_scope
+  |     raise BaseExceptionGroup("Native execution, descendant cleanup or restoration failed", errors) from None
+  | BaseExceptionGroup: Native execution, descendant cleanup or restoration failed (2 sub-exceptions)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 737, in native_descendant_scope
+    |     yield
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/workers.py", line 122, in run_workers
+    |     status = _await_workers(processes, trees, time.monotonic() + timeout_seconds, monitor)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/workers.py", line 54, in _await_workers
+    |     monitor(owned_pids)
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/tests/test_nested_worker_cleanup.py", line 51, in cancel
+    |     raise KeyboardInterrupt
+    | KeyboardInterrupt
+    +---------------- 2 ----------------
+    | Traceback (most recent call last):
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 678, in _collect_scope_failure
+    |     yield
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 747, in native_descendant_scope
+    |     tree.terminate()
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 330, in terminate
+    |     raise verification_error
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 324, in terminate
+    |     if not self.running():
+    |            ^^^^^^^^^^^^^^
+    |   File "/mnt/wsl/data/nkt/clearml-yolo/src/clearml_yolo/adapters/runtime/process_tree.py", line 667, in running
+    |     raise UnverifiableProcessTreeError(
+    | clearml_yolo.adapters.runtime.process_tree.UnverifiableProcessTreeError: Cannot prove native ownership of adopted children with preexisting helper branches: [3778777]; children remain untouched
+    +------------------------------------
+________ test_nested_sessions_are_reaped_on_outer_cancellation[timeout] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-nkt/pytest-23/test_nested_sessions_are_reape2')
+stop = 'timeout'
+
+    @pytest.mark.parametrize("stop", ["reserve", "interrupt", "timeout"])
+    def test_nested_sessions_are_reaped_on_outer_cancellation(tmp_path: Path, stop: str) -> None:
+        ready, outer_pid = tmp_path / "ready.json", tmp_path / "outer.pid"
+        token = uuid4().hex
+        leaf = "import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(60)"
+        child = (
+            "import json,os,signal,subprocess,sys,time\n"
+            f"leaf=subprocess.Popen([sys.executable,'-c',{leaf!r}],start_new_session=True)\n"
+            "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+            f"open({str(ready)!r},'w').write(json.dumps([os.getpid(),leaf.pid]))\n"
+            "time.sleep(60)\n"
+        )
+        outer = (
+            "import os,sys\nfrom pathlib import Path\n"
+            "from clearml_yolo.adapters.runtime.workers import WorkerCommand,run_workers\n"
+            f"Path({str(outer_pid)!r}).write_text(str(os.getpid()))\n"
+            f"run_workers([WorkerCommand((sys.executable,'-c',{child!r}),{{}},"
+            f"Path({str(tmp_path / 'inner.log')!r}))],timeout_seconds=45)\n"
+        )
+        environment = {"CY_TEST_NESTED_OWNER": token, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src")}
+        command = WorkerCommand((sys.executable, "-c", outer), environment, tmp_path / "outer.log")
+        sibling = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(60)"])
+    
+        def cancel(_owned: Callable[[], tuple[int, ...]]) -> None:
+            if ready.exists() and ready.read_text():
+                if stop == "reserve":
+                    raise RuntimeError("GPU memory reserve breached")
+                if stop == "interrupt":
+                    raise KeyboardInterrupt
+    
+        try:
+            if stop == "timeout":
+>               result = run_workers([command], timeout_seconds=2, monitor=cancel)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_nested_worker_cleanup.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/clearml_yolo/adapters/runtime/workers.py:106: in run_workers
+    with ExitStack() as stack, native_descendant_scope():
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+../.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/contextlib.py:144: in __exit__
+    next(self.gen)
+src/clearml_yolo/adapters/runtime/process_tree.py:752: in native_descendant_scope
+    raise errors[0]
+src/clearml_yolo/adapters/runtime/process_tree.py:678: in _collect_scope_failure
+    yield
+src/clearml_yolo/adapters/runtime/process_tree.py:747: in native_descendant_scope
+    tree.terminate()
+src/clearml_yolo/adapters/runtime/process_tree.py:330: in terminate
+    raise verification_error
+src/clearml_yolo/adapters/runtime/process_tree.py:324: in terminate
+    if not self.running():
+           ^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <clearml_yolo.adapters.runtime.process_tree._NativeProcessTree object at 0x775c930cb350>
+
+    @override
+    def running(self) -> bool:
+        alive = super().running()
+        if self._ambiguous:
+>           raise UnverifiableProcessTreeError(
+                "Cannot prove native ownership of adopted children with preexisting "
+                f"helper branches: {sorted(self._ambiguous)}; children remain untouched"
+            )
+E           clearml_yolo.adapters.runtime.process_tree.UnverifiableProcessTreeError: Cannot prove native ownership of adopted children with preexisting helper branches: [3779293]; children remain untouched
+
+src/clearml_yolo/adapters/runtime/process_tree.py:667: UnverifiableProcessTreeError
+=========================== short test summary info ============================
+FAILED tests/test_nested_worker_cleanup.py::test_nested_sessions_are_reaped_on_outer_cancellation[reserve]
+FAILED tests/test_nested_worker_cleanup.py::test_nested_sessions_are_reaped_on_outer_cancellation[interrupt]
+FAILED tests/test_nested_worker_cleanup.py::test_nested_sessions_are_reaped_on_outer_cancellation[timeout]
+3 failed in 32.69s

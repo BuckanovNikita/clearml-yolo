@@ -167,6 +167,7 @@ class SearchSettings(_Record):
     force: StrictBool = False
     search_strategy: SearchStrategy = "memory_guided_small_batches_v1"
     memory_fraction: Annotated[float, Field(gt=0, le=1, allow_inf_nan=False)] = 0.9
+    minimum_free_memory_bytes: NonnegativeInt = 0
     max_global_batch: PositiveInt = 1024
     warmup_steps: PositiveInt = 5
     measured_steps: PositiveInt = 10
@@ -179,6 +180,8 @@ class SearchSettings(_Record):
         data: dict[str, object] = handler(self)
         if not self.force:
             data.pop("force", None)
+        if not self.minimum_free_memory_bytes:
+            data.pop("minimum_free_memory_bytes", None)
         return data
 
 
@@ -440,6 +443,19 @@ class EstimateCase(_Record):
     @property
     def usable(self) -> bool:
         return self.status in {"validated", "ceiling_limited", "numerically_limited"}
+
+
+def select_training_batch(case: EstimateCase, training_images: int) -> int:
+    """Choose the largest world-size-valid batch inside measured and corpus bounds."""
+    if not case.usable or case.global_batch is None:
+        raise ValueError("Training requires a usable confirmed capacity estimate")
+    if isinstance(training_images, bool) or training_images <= 0:
+        raise ValueError("Training population must be positive")
+    world = case.profile.world_size
+    batch = min(case.global_batch, training_images) // world * world
+    if batch < world:
+        raise ValueError("Training population cannot provide one image per selected GPU")
+    return batch
 
 
 class EstimateCatalogue(_Record):

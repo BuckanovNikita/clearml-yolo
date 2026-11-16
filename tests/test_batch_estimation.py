@@ -23,8 +23,31 @@ from clearml_yolo.core.batch_estimation import (
     select_estimate,
     select_models,
     select_recommendation,
+    select_training_batch,
 )
 from clearml_yolo.core.models import PRESETS
+
+
+@pytest.mark.parametrize(("capacity", "population", "expected"), [(256, 160, 160), (7, 160, 7), (2, 1, 1)])
+def test_training_batch_is_largest_valid_bounded_capacity(capacity: int, population: int, expected: int) -> None:
+    assert select_training_batch(_case(_search(capacity, ceiling=512)), population) == expected
+
+
+def test_training_batch_rejects_failed_capacity_and_empty_population() -> None:
+    with pytest.raises(ValueError, match="usable"):
+        select_training_batch(_case(_search(0)), 160)
+    with pytest.raises(ValueError, match="positive"):
+        select_training_batch(_case(_search(8)), 0)
+
+
+def test_memory_reserve_is_optional_and_affects_measurement_identity() -> None:
+    ordinary = SearchSettings()
+    assert "minimum_free_memory_bytes" not in ordinary.model_dump()
+    reserved = SearchSettings(minimum_free_memory_bytes=100)
+    assert reserved.model_dump()["minimum_free_memory_bytes"] == 100
+    assert estimate_key(_profile(), SyntheticWorkload(), ordinary) != estimate_key(
+        _profile(), SyntheticWorkload(), reserved
+    )
 
 
 def _profile(count: int = 1) -> TrainingProfile:

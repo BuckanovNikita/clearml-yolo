@@ -1,5 +1,8 @@
 """Native trainer with process-local callback ownership in spawned DDP workers."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, override
 
 from ultralytics.cfg import get_save_dir
@@ -13,6 +16,20 @@ from clearml_yolo.adapters.integrations.native_runtime import (
 from clearml_yolo.adapters.storage.filesystem import validate_output_tree
 from clearml_yolo.core.transforms import TransformConfig
 
+_fixed_recipe: ContextVar[tuple[int, int] | None] = ContextVar("fixed_training_recipe", default=None)
+
+
+@contextmanager
+def fixed_training_recipe(*, batch: int, epochs: int) -> Iterator[None]:
+    """Opt into a fixed native execution recipe, including serialized worker classes."""
+    if batch < 1 or epochs < 1:
+        raise ValueError("Fixed training batch and epochs must be positive")
+    token = _fixed_recipe.set((batch, epochs))
+    try:
+        yield
+    finally:
+        _fixed_recipe.reset(token)
+
 
 class OwnedDetectionTrainer(DetectionTrainer):
     """Retain native loops while scoping callbacks before trainer initialization.
@@ -23,6 +40,30 @@ class OwnedDetectionTrainer(DetectionTrainer):
     """
 
     transform_config = TransformConfig()
+    required_recipe: tuple[int, int] | None = None
+    _last_checked_epoch = -1
+
+    def _check_fixed_recipe(self) -> None:
+        if self.required_recipe is not None:
+            batch, epochs = self.required_recipe
+            if self.batch_size != batch or self.epochs != epochs:
+                raise RuntimeError("Native training changed the fixed batch or epoch recipe")
+
+    @override
+    def _build_train_pipeline(self) -> None:
+        self._check_fixed_recipe()
+        super()._build_train_pipeline()  # type: ignore[no-untyped-call]
+
+    @override
+    def run_callbacks(self, event: str) -> None:
+        if self.required_recipe is not None and event == "on_train_epoch_start":
+            self._check_fixed_recipe()
+            if not 0 <= self.epoch < self.required_recipe[1]:
+                raise RuntimeError("Native training exceeded the fixed epoch recipe")
+            if self.epoch <= self._last_checked_epoch:
+                raise RuntimeError("Native training repeated an epoch in a fixed recipe")
+            self._last_checked_epoch = self.epoch
+        super().run_callbacks(event)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         with native_runtime():
@@ -79,15 +120,17 @@ class OwnedDetectionTrainer(DetectionTrainer):
 
 def trainer_with_transforms(transforms: TransformConfig | None) -> type[OwnedDetectionTrainer]:
     """Capture frozen configuration in the class serialized by native DDP cloudpickle."""
-    if transforms is None or transforms.mode == "native":
+    recipe = _fixed_recipe.get()
+    if (transforms is None or transforms.mode == "native") and recipe is None:
         return OwnedDetectionTrainer
-    if transforms.snapshot is None:
+    if transforms is not None and transforms.mode != "native" and transforms.snapshot is None:
         raise ValueError("Custom trainer requires a resolved transform snapshot")
-    captured = transforms.model_copy(deep=True)
+    captured = transforms.model_copy(deep=True) if transforms is not None else TransformConfig()
 
     # A task-local class is serialized by value, so fresh ranks inherit the snapshot
     # without adding unknown native arguments or changing global trainer classes.
     class CustomDetectionTrainer(OwnedDetectionTrainer):
         transform_config = captured
+        required_recipe = recipe
 
     return CustomDetectionTrainer

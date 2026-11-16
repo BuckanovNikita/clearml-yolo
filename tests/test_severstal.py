@@ -68,7 +68,7 @@ def test_native_scenario_composes(selection: str, variant: str, tmp_path: Path) 
         )
     assert config.splits == ["val", "test"]
     settings = config.ultralytics if selection == "ultralytics" else config.model.train
-    assert settings.epochs == 1
-    assert settings.batch == 1
+    assert settings.epochs == 2
+    assert settings.batch is None
     assert settings.seed == 0
     assert settings.amp is False

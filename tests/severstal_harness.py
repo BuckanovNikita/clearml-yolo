@@ -1,15 +1,14 @@
-"""Opt-in one-epoch Severstal acceptance; no automatic downloads or full training."""
+"""Opt-in two-epoch Severstal acceptance with fresh recipe-bound batch estimation."""
 
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import time
 from collections import UserDict
 from collections.abc import Mapping, Sequence
-from contextlib import suppress
+from contextlib import chdir
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -63,9 +62,15 @@ class SeverstalOptions:
     tags: tuple[str, ...]
     device: str = "0"
     timeout: float = 1800
+    minimum_free_memory_bytes: int = 0
+    home: Path | None = None
     backbone_weights: Mapping[str, Path] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.minimum_free_memory_bytes < 0:
+            raise ValueError("Free-memory reserve must not be negative")
+        if self.home is not None and not self.artifacts.resolve().is_relative_to(self.home.resolve()):
+            raise ValueError("Scenario artifacts must remain inside the explicitly shared CY_HOME")
         object.__setattr__(
             self,
             "backbone_weights",
@@ -124,13 +129,13 @@ def scenario_overrides(
     ]
     prefix = "ultralytics" if selection == "ultralytics" else "model.train"
     result += [
-        f"{prefix}.epochs=1",
-        f"{prefix}.batch=1",
+        f"{prefix}.epochs=2",
+        f"{prefix}.batch=null",
         f"{prefix}.seed=0",
         f"{prefix}.workers=2",
         f"{prefix}.imgsz={resolution}",
         f"{prefix}.device={options.device}",
-        # The tiny one-epoch corpus must execute updates, not just AMP scale warm-up.
+        # The two-epoch corpus must execute updates, not just AMP scale warm-up.
         f"{prefix}.amp=false",
     ]
     if selection == "ultralytics":
@@ -159,12 +164,14 @@ class _WorkerEnvironment(UserDict[str, str]):
         return "<worker environment values hidden>"
 
 
-def worker_environment(root: Path) -> Mapping[str, str]:
+def worker_environment(root: Path, *, home: Path | None = None) -> Mapping[str, str]:
     """Keep generated data and native outputs within this scenario's allowed home."""
     return _WorkerEnvironment(
         os.environ
         | {
-            "CY_HOME": str(root),
+            "CY_HOME": str(home.resolve() if home is not None else root),
+            "CY_RUNTIME_TEMP_ROOT": str(root / ".tmp"),
+            "CY_RUNTIME_ARENA": "",
             "PYTHONPATH": os.pathsep.join([str(_REPOSITORY / "src"), str(_REPOSITORY), str(_REPOSITORY / "tests")]),
             "HYDRA_FULL_ERROR": "1",
         }
@@ -187,12 +194,14 @@ def run_scenario(options: SeverstalOptions, selection: str, variant: str) -> Pat
             "tags": list(options.tags),
             "device": options.device,
             "overrides": overrides,
+            "minimum_free_memory_bytes": options.minimum_free_memory_bytes,
+            "home": str(options.home.resolve() if options.home is not None else root),
         }
         write_json(root / "request.json", request)
         command = [sys.executable, str(Path(__file__).resolve()), "worker", str(root)]
-        environment = worker_environment(root)
+        environment = worker_environment(root, home=options.home)
         summary["command"] = command
-        _run_worker(command, environment, root, options.timeout)
+        _run_worker(command, environment, root, options.timeout, options=options)
         verification = json.loads((root / "verification.json").read_text(encoding="utf-8"))
         validate_observation(verification["optimizer"])
         verification["initialization_comparisons"] = _verify_initialization(root, selection, verification)
@@ -226,31 +235,37 @@ def _verify_initialization(root: Path, selection: str, result: dict[str, Any]) -
     return comparisons
 
 
-def _run_worker(command: list[str], environment: Mapping[str, str], root: Path, timeout: float) -> None:
-    with (root / "native.log").open("w", encoding="utf-8") as output:
-        process = subprocess.Popen(  # noqa: S603 - fixed project test worker, no shell
-            command,
-            env=environment,
-            cwd=_REPOSITORY,
-            stdout=output,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        try:
-            status = process.wait(timeout=timeout)
-        except BaseException:
-            # The new session is exclusively this scenario's subprocess tree.
-            # A failure can race normal exit; then no process group remains.
-            with suppress(ProcessLookupError):
-                os.killpg(process.pid, signal.SIGTERM)
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=10)
-            raise
-    if status:
-        raise AssertionError(f"Native Severstal worker exited {status}; inspect {root / 'native.log'}")
+def _run_worker(
+    command: list[str], environment: Mapping[str, str], root: Path, timeout: float, *, options: SeverstalOptions
+) -> None:
+    from clearml_yolo.adapters.runtime.worker_pool import IndependentWorkerPool
+    from clearml_yolo.adapters.runtime.workers import WorkerCommand
+    from severstal_batch import check_reserve, selected_device
+
+    device = selected_device(options.device) if options.minimum_free_memory_bytes else None
+    if device is not None:
+        check_reserve(device, options.minimum_free_memory_bytes)
+    checked_at = time.monotonic()
+
+    with chdir(_REPOSITORY), IndependentWorkerPool() as pool:
+        pool.start("scenario", WorkerCommand(tuple(command), environment, root / "native.log"))
+        deadline = time.monotonic() + timeout
+        while True:
+            if device is not None and time.monotonic() - checked_at >= 0.25:
+                check_reserve(device, options.minimum_free_memory_bytes)
+                checked_at = time.monotonic()
+            completed = pool.poll()
+            if completed:
+                outcome = completed[0]
+                if not outcome.cleanup_complete or outcome.exit_code:
+                    raise AssertionError(
+                        f"Native Severstal worker exited {outcome.exit_code}; "
+                        f"cleanup={outcome.cleanup_complete}: {outcome.diagnostic}; inspect {root / 'native.log'}"
+                    )
+                return
+            if time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(command, timeout)
+            time.sleep(0.05)
 
 
 def _worker(root: Path) -> None:
@@ -269,18 +284,29 @@ def _worker(root: Path) -> None:
     config = model_preset(request["selection"])
     if request["variant"] != "default":
         write_pipeline(root / "pipeline.json", request["variant"], PRESETS[config.backend][config.preset])
+    from severstal_batch import estimate_scenario
+
+    request["manifest_sha256"] = manifest["sha256"]
+    measured = estimate_scenario(root, request)
+    request["overrides"] = measured["overrides"]
+    from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
+
+    measured["allocator_fraction"] = reserve_cuda_memory(request["minimum_free_memory_bytes"], int(request["device"]))
+    write_json(root / "training-inputs.json", measured)
+    from clearml_yolo.adapters.integrations.native_trainer import fixed_training_recipe
     from clearml_yolo.entrypoints.pipeline import main
 
     observation = OptimizerObservation()
     sys.argv = ["clearml-yolo-pipeline", *request["overrides"]]
     try:
-        with observation.installed():
+        with fixed_training_recipe(batch=measured["chosen_batch"], epochs=2), observation.installed():
             main()
     finally:
         write_json(root / "optimizer.json", observation.result())
     validate_observation(observation.result())
     result = _verify_publication(root, request, manifest)
-    result.update(optimizer=observation.result(), manifest_sha256=manifest["sha256"])
+    measured = json.loads((root / "training-inputs.json").read_text(encoding="utf-8"))
+    result.update(optimizer=observation.result(), manifest_sha256=manifest["sha256"], batch_estimation=measured)
     write_json(root / "verification.json", redact_data(result))
 
 
@@ -309,6 +335,12 @@ def _verify_publication(root: Path, request: dict[str, Any], manifest: dict[str,
 
     task, canonical = _completed_task(request)
     write_json(root / "configuration.json", redact_data(canonical))
+    measured = json.loads((root / "training-inputs.json").read_text(encoding="utf-8"))
+    measured["canonical_configuration_sha256"] = file_sha256(root / "configuration.json")
+    write_json(root / "training-inputs.json", measured)
+    training = canonical["ultralytics"] if request["selection"] == "ultralytics" else canonical["model"]["train"]
+    assert training["epochs"] == 2
+    assert training["batch"] == measured["chosen_batch"]
     if request["variant"] == "default":
         assert canonical["transforms"]["mode"] == "native"
     else:

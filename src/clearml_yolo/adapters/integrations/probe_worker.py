@@ -7,6 +7,7 @@ from contextlib import chdir
 from pathlib import Path
 
 from clearml_yolo.adapters.runtime.distributed import native_rank
+from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
 from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 
 _CUDA_OUT_OF_MEMORY = 2
@@ -28,6 +29,7 @@ def run(request_path: Path) -> int:
         else:
             from clearml_yolo.adapters.fasterrcnn.backend import probe
         with chdir(request.output), native_rank(initialize=backend != "rfdetr"):
+            reserve_cuda_memory(request.settings.minimum_free_memory_bytes, rank)
             record = probe(request)
     except Exception as error:  # noqa: BLE001 - every private-process failure needs a receipt
         import torch

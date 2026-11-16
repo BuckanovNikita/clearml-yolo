@@ -14,7 +14,7 @@ from clearml_yolo.adapters.storage.batch_sizes import BatchSizeStore
 from clearml_yolo.application.use_cases.batch_estimate import estimate_batches
 from clearml_yolo.core.batch_estimation import SearchSettings, SyntheticWorkload, select_models
 from clearml_yolo.core.models import ModelConfig, model_preset
-from clearml_yolo.core.transforms import TransformConfig
+from clearml_yolo.core.transforms import TransformConfig, TransformSnapshot, pipeline_digest
 from test_batch_estimate_workflow import MemoryStore, RecordingProbe
 from test_batch_lookup import _dataset
 
@@ -35,7 +35,7 @@ def sample_devices() -> tuple[GPUDevice, ...]:
 
 @pytest.fixture(autouse=True)
 def stable_profile_versions(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(profiles, "_versions", lambda backend: {backend: "test"})
+    monkeypatch.setattr(profiles, "_versions", lambda backend, **_: {backend: "test"})
     monkeypatch.setattr(profiles, "_implementation", lambda: "test-source")
 
 
@@ -164,13 +164,32 @@ def test_untrained_native_profile_does_not_resolve_unused_assets(
     profiles.training_profile(model, 960, sample_devices(), native=config)
 
 
-def test_no_cuda_and_custom_transforms_fail_before_asset_preparation(tmp_path: Path) -> None:
+def test_no_cuda_and_unresolved_transforms_fail_before_asset_preparation(tmp_path: Path) -> None:
     model = select_models(("yolo11n",))[0]
     with pytest.raises(ValueError, match="resolved CUDA devices"):
         profiles.training_profile(model, 960, ())
     transforms = TransformConfig(mode="albumentations", pipeline_file=tmp_path / "custom.yaml")
-    with pytest.raises(ValueError, match="explicit batch"):
+    with pytest.raises(ValueError, match="resolved snapshot"):
         profiles.training_profile(model, 960, sample_devices(), transforms=transforms)
+
+
+@pytest.mark.parametrize("selection", ["yolo26n", "deimv2/s", "rfdetr/nano", "fcos/resnet50_fpn"])
+def test_custom_profile_binds_content_and_custom_shape_policy(selection: str) -> None:
+    import albumentations as alb
+
+    pipeline = alb.to_dict(alb.Compose([alb.HorizontalFlip(p=1)]))
+    snapshot = TransformSnapshot(pipeline=pipeline, sha256=pipeline_digest(pipeline), source="recipe.json")
+    transforms = TransformConfig(mode="albumentations", snapshot=snapshot)
+    model = select_models((selection,))[0]
+    ordinary = profiles.training_profile(model, 640, sample_devices())
+    custom = profiles.training_profile(model, 640, sample_devices(), transforms=transforms)
+    assert custom.augmentation != ordinary.augmentation
+    assert custom.effective_size == (640, 640)
+    relocated = transforms.model_copy(update={"snapshot": snapshot.model_copy(update={"source": "moved.json"})})
+    assert profiles.training_profile(model, 640, sample_devices(), transforms=relocated) == custom
+    snapshot.pipeline["transform"] = {}
+    with pytest.raises(ValueError, match="sha256"):
+        profiles.training_profile(model, 640, sample_devices(), transforms=transforms)
 
 
 def test_catalogue_metadata_is_reused_but_trials_revalidate_visibility(

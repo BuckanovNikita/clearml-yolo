@@ -75,10 +75,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     severstal.addoption("--run-severstal-gpu", action="store_true")
     severstal.addoption("--severstal-dataset", default="")
     severstal.addoption("--severstal-artifacts", default="")
+    severstal.addoption("--severstal-home", default="", help="Explicit shared CY_HOME containing scenario artifacts")
     severstal.addoption("--severstal-clearml-project", default="")
     severstal.addoption("--severstal-tags", default="", help="Comma-separated ownership tags")
     severstal.addoption("--severstal-device", default="0")
     severstal.addoption("--severstal-timeout", type=float, default=1800)
+    severstal.addoption(
+        "--severstal-free-vram-mib", type=int, default=0, help="Minimum free VRAM throughout a scenario"
+    )
     severstal.addoption(
         "--severstal-backbone",
         action="append",
@@ -164,5 +168,7 @@ def severstal_options(request: pytest.FixtureRequest) -> "SeverstalOptions":
         tags=tuple(value.strip() for value in config.getoption("--severstal-tags").split(",")),
         device=config.getoption("--severstal-device"),
         timeout=config.getoption("--severstal-timeout"),
+        minimum_free_memory_bytes=config.getoption("--severstal-free-vram-mib") * 1024**2,
+        home=Path(config.getoption("--severstal-home")) if config.getoption("--severstal-home") else None,
         backbone_weights=parse_backbone_options(config.getoption("--severstal-backbone")),
     )

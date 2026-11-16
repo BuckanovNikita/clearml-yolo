@@ -1,7 +1,7 @@
 """Serializable native worker contracts; no SDK objects or effect ownership."""
 
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -62,6 +62,8 @@ class BatchProbeRequest(BaseModel):
     optimizer: str
     output: Path
     config: ModelConfig | None = None
+    yolo: dict[str, Any] | None = None
+    transforms: TransformConfig | None = None
 
 
 class ProbeRankResult(BaseModel):

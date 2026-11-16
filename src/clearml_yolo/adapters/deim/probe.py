@@ -6,12 +6,14 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from clearml_yolo.adapters.augmentation.probe import SyntheticAugmentation
 from clearml_yolo.adapters.deim.backend import (
     _native_writer,
     synchronize_buffers,
     training_configuration,
     training_world,
 )
+from clearml_yolo.adapters.deim.transforms import custom_training_recipe
 from clearml_yolo.adapters.runtime.gpu_memory import GPUMemory
 from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 
@@ -31,6 +33,13 @@ def target_bound(configuration: dict[str, Any], objects_per_image: int) -> int:
     return int(max(mixed, copied))
 
 
+def _normalization(configuration: dict[str, Any]) -> tuple[list[float], list[float]] | None:
+    for operation in configuration["train_dataloader"]["dataset"]["transforms"]["ops"]:
+        if operation["type"] == "Normalize":
+            return operation["mean"], operation["std"]
+    return None
+
+
 def synthetic_batch(
     batch: int,
     shape: tuple[int, int],
@@ -39,9 +48,13 @@ def synthetic_batch(
     device: "torch.device",
     *,
     rank: int = 0,
+    augmentation: SyntheticAugmentation | None = None,
+    normalization: tuple[list[float], list[float]] | None = None,
 ) -> tuple["torch.Tensor", list[dict[str, "torch.Tensor"]]]:
     import torch
 
+    if augmentation is not None:
+        return _augmented_batch(augmentation, batch, device, rank, normalization)
     height, width = shape
     images = torch.rand((batch, 3, height, width), device=device).mul_(4).sub_(2)
     sequence = torch.arange(objects, device=device)
@@ -72,6 +85,44 @@ def synthetic_batch(
     return images, targets
 
 
+def _augmented_batch(
+    augmentation: SyntheticAugmentation,
+    batch: int,
+    device: "torch.device",
+    rank: int,
+    normalization: tuple[list[float], list[float]] | None,
+) -> tuple["torch.Tensor", list[dict[str, "torch.Tensor"]]]:
+    import torch
+
+    images, targets = [], []
+    height, width = augmentation.shape
+    for index in range(batch):
+        sample = augmentation.sample(index)
+        images.append(torch.from_numpy(sample.image.copy()).permute(2, 0, 1).float().div(255))
+        boxes = torch.from_numpy(sample.boxes.copy()).to(device)
+        boxes[:, 2:] -= boxes[:, :2]
+        area = boxes[:, 2] * boxes[:, 3]
+        boxes[:, :2] += boxes[:, 2:] / 2
+        boxes /= torch.tensor([width, height, width, height], device=device)
+        targets.append(
+            {
+                "boxes": boxes,
+                "labels": torch.from_numpy(sample.labels).to(device),
+                "area": area,
+                "iscrowd": torch.from_numpy(sample.iscrowd).to(device),
+                "image_id": torch.tensor([rank * batch + index], device=device),
+                "orig_size": torch.tensor([width, height], device=device),
+                "size": torch.tensor([width, height], device=device),
+                "mixup": torch.ones(augmentation.target_bound, device=device),
+            }
+        )
+    pixels = torch.stack(images)
+    if normalization is not None:
+        mean, std = normalization
+        pixels = (pixels - torch.tensor(mean).view(1, 3, 1, 1)) / torch.tensor(std).view(1, 3, 1, 1)
+    return pixels.to(device), targets
+
+
 @dataclass
 class _OptimizerUpdates:
     completed: int = 0
@@ -87,6 +138,7 @@ def training_steps(
     objects: int,
     *,
     memory: GPUMemory | None = None,
+    normalization: tuple[list[float], list[float]] | None = None,
 ) -> int:
     """Count real optimizer calls, including AMP skips, with finite-loss checks."""
     import torch
@@ -97,6 +149,17 @@ def training_steps(
     solver.model.train()
     solver.criterion.train()
     attempts = 0
+    augmentation = (
+        SyntheticAugmentation(
+            request.transforms,
+            request.profile.effective_size,
+            request.workload.classes,
+            request.workload.objects_per_image,
+            seed=request.config.train.seed if request.config is not None else 0,
+        )
+        if request.transforms is not None and request.transforms.mode == "albumentations"
+        else None
+    )
     try:
         while updates.completed < total:
             if attempts >= total * 4:
@@ -107,6 +170,8 @@ def training_steps(
                 objects,
                 request.workload.classes,
                 solver.device,
+                augmentation=augmentation,
+                normalization=normalization,
             )
             solver.optimizer.zero_grad(set_to_none=True)
             with torch.autocast(solver.device.type, enabled=solver.scaler is not None):
@@ -241,6 +306,9 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     memory = GPUMemory(torch.cuda.current_device())
     names = tuple(str(label) for label in range(request.workload.classes))
     cfg, solver_module = training_configuration(config, names, request.output)
+    if request.transforms is not None and request.transforms.mode == "albumentations":
+        loader = cfg.yaml_cfg["train_dataloader"]
+        custom_training_recipe(loader["dataset"]["transforms"], loader["collate_fn"])
     writer = _native_writer(lambda *_args: None)
     writer.enabled = False
     cfg.writer = writer
@@ -258,6 +326,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
             request.global_batch // world,
             target_bound(cfg.yaml_cfg, request.workload.objects_per_image),
             memory=memory,
+            normalization=_normalization(cfg.yaml_cfg),
         )
         module_name = solver_module.__package__.rsplit(".", 1)[0]
         validate(solver, module_name, request, request.global_batch // world, rank)

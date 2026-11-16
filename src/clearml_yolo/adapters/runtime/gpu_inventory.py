@@ -161,3 +161,10 @@ def monitor_devices(
             raise RuntimeError(f"GPU {device.index} measurement contaminated: active compute has no PID telemetry")
         peaks.append(state.used)
     return tuple(peaks)
+
+
+def require_memory_reserve(devices: tuple[GPUDevice, ...], used: tuple[int, ...], reserve: int) -> None:
+    """Admission and monitoring share the same optional whole-device free-byte floor."""
+    for device, allocated in zip(devices, used, strict=True):
+        if device.total_memory_bytes - allocated < reserve:
+            raise RuntimeError(f"GPU {device.index} free memory fell below the required reserve of {reserve} bytes")

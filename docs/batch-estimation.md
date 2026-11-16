@@ -12,7 +12,7 @@ cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 
 cy-batch-estimate --imgsz 960 --models yolo11n --search-limit 3 --jobs 1
 ```
 
-Measurements always use **150 synthetic classes**. `--classes` is not supported.
+CLI measurements use **150 synthetic classes**. `--classes` is not supported.
 The default catalogue contains the 44 standard pretrained YOLO detection variants
 and all native presets in the [model guide](multi-model-backends.md). YOLO aliases
 such as `yolo11n.pt` resolve to canonical `ultralytics/yolo11n`.
@@ -63,6 +63,31 @@ training resolution, including multiscale behavior. YOLO `optimizer=auto` measur
 both supported resolved optimizer paths and retains the smaller confirmed capacity.
 The budget includes the idle-device baseline, native CUDA allocations outside the
 tensor allocator, allocator peaks and whole-device telemetry.
+
+Programmatic probes may supply an explicit native model configuration, YOLO arguments
+and a resolved custom augmentation snapshot. These settings form the measurement
+identity and reach the worker unchanged apart from candidate batch/device binding.
+Custom probes execute the production CPU augmentation while the native GPU model is
+resident, retain backend preprocessing, and pad filtered targets to a conservative
+Mosaic population bound. They require the pipeline to preserve the measured image
+shape; unsupported geometry fails explicitly. Native defaults and CLI workloads stay
+unchanged. The Severstal acceptance caller uses its frozen corpus class count and
+maximum per-image target density instead of the CLI workload.
+
+Explicit YOLO recipes must use the selected catalogue architecture and its pretrained
+asset. Measurement rejects custom weight paths, disabled pretraining, distillation,
+resume, single-class conversion, quantization, class filtering or weighting, and
+non-detection tasks. It also rejects additional frozen layers, disabled channels-last
+layout, and native `augmentations` lists; custom augmentation uses the resolved
+snapshot above. These checks run during profile creation and again before worker
+allocation. BF16 follows native autocast and disables gradient scaling, retaining the
+installed trainer's requirement for CUDA with native BF16 support.
+
+An optional programmatic `minimum_free_memory_bytes` setting defaults to zero.
+Admission and whole-device monitoring reject a breached reserve as contamination,
+not a capacity boundary. A conservative Torch allocator cap helps limit overshoot;
+external and native non-Torch allocations still require the monitor. Acceptance
+remeasures each scenario and rejects materially increased memory use before training.
 
 Before YOLO workers launch, persist an absolute Ultralytics `weights_dir` and synchronize
 the current process cache constant. Relative paths are anchored to invocation cwd;

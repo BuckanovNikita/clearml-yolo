@@ -7,14 +7,17 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, cast
 
+from clearml_yolo.adapters.augmentation.probe import SyntheticAugmentation
 from clearml_yolo.adapters.runtime.gpu_memory import GPUMemory
-from clearml_yolo.adapters.yolo.config import native_defaults
+from clearml_yolo.adapters.yolo.config import batch_probe_settings
 from clearml_yolo.application.training_workers import BatchProbeRequest, ProbeRankResult
 
 
 def _batch(request: BatchProbeRequest, count: int, device: Any, *, validation: bool = False) -> dict[str, Any]:
     import torch
 
+    if not validation and request.transforms is not None and request.transforms.mode == "albumentations":
+        return _custom_batch(request, count, device)
     stride = 64 if request.profile.model.architecture.endswith("6u.pt") else 32
     height, width = (
         tuple(math.ceil(size / stride) * stride for size in request.profile.nominal_size)
@@ -46,6 +49,33 @@ def _batch(request: BatchProbeRequest, count: int, device: Any, *, validation: b
     return result
 
 
+def _custom_batch(request: BatchProbeRequest, count: int, device: Any) -> dict[str, Any]:
+    import torch
+
+    if request.transforms is None:
+        raise ValueError("Custom input requires augmentation")
+    augmentation = SyntheticAugmentation(
+        request.transforms,
+        request.profile.effective_size,
+        request.workload.classes,
+        request.workload.objects_per_image,
+        seed=int((request.yolo or {}).get("seed", 0)),
+    )
+    samples = [augmentation.sample(index) for index in range(count)]
+    images = torch.stack([torch.from_numpy(sample.image.copy()).permute(2, 0, 1) for sample in samples])
+    boxes = torch.cat([torch.from_numpy(sample.boxes) for sample in samples])
+    boxes[:, 2:] -= boxes[:, :2]
+    boxes[:, :2] += boxes[:, 2:] / 2
+    height, width = request.profile.effective_size
+    boxes /= torch.tensor([width, height, width, height])
+    return {
+        "img": images.to(device=device, dtype=torch.float32).div_(255),
+        "batch_idx": torch.arange(count, device=device).repeat_interleave(augmentation.target_bound),
+        "cls": torch.cat([torch.from_numpy(sample.labels) for sample in samples]).to(device).float().unsqueeze(1),
+        "bboxes": boxes.to(device),
+    }
+
+
 def _amp_decision(model: Any, device: Any, world_size: int, requested: bool | str) -> bool:
     """Match the native rank-zero AMP check and its collective precision decision."""
     import torch
@@ -69,6 +99,8 @@ def _amp_decision(model: Any, device: Any, world_size: int, requested: bool | st
 
 
 def probe(request: BatchProbeRequest) -> ProbeRankResult:
+    values = batch_probe_settings(request.profile.model.architecture, request.yolo)
+
     import torch
     from torch.nn.parallel import DistributedDataParallel
     from ultralytics.models import YOLO
@@ -80,7 +112,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     world_size = request.profile.world_size
     batch = request.global_batch // world_size
     device = torch.device("cuda", rank)
-    torch.manual_seed(0)
+    torch.manual_seed(int((request.yolo or {}).get("seed", 0)))
     torch.cuda.reset_peak_memory_stats(device)
     memory = GPUMemory(rank)
     weights: Any = YOLO(request.profile.model.architecture).model
@@ -90,7 +122,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     )
     model.load(weights)
     del weights
-    values = native_defaults() | {"imgsz": request.profile.effective_size[0]}
+    values = values | {"imgsz": request.profile.effective_size[0]}
     model.args = SimpleNamespace(**values)
     model.names = {index: str(index) for index in range(request.workload.classes)}
     model.nc = request.workload.classes
@@ -114,7 +146,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     optimizer = DetectionTrainer.build_optimizer(  # type: ignore[no-untyped-call]
         trainer,
         model,
-        name="auto",
+        name=values["optimizer"],
         lr=values["lr0"],
         momentum=values["momentum"],
         decay=values["weight_decay"] * request.global_batch * accumulation / values["nbs"],
@@ -123,7 +155,7 @@ def probe(request: BatchProbeRequest) -> ProbeRankResult:
     if trainer.args.optimizer != request.optimizer:
         raise ValueError("Installed YOLO auto optimizer differs from the recorded profile")
     ema = ModelEMA(model)  # type: ignore[no-untyped-call]
-    scaler = torch.amp.GradScaler("cuda", enabled=amp)
+    scaler = torch.amp.GradScaler("cuda", enabled=amp and values["amp"] != "bf16")
     trainer.model, trainer.optimizer, trainer.scaler, trainer.ema = model, optimizer, scaler, ema
     trainer.device = device
     memory.observe()
@@ -162,7 +194,7 @@ def _optimize(
 ) -> None:
     import torch
     from ultralytics.models.yolo.detect import DetectionTrainer
-    from ultralytics.utils.torch_utils import unwrap_model
+    from ultralytics.utils.torch_utils import autocast, unwrap_model
 
     model, optimizer, scaler = trainer.model, trainer.optimizer, trainer.scaler
     world_size, device = request.profile.world_size, trainer.device
@@ -173,7 +205,7 @@ def _optimize(
         optimizer.zero_grad(set_to_none=True)
         for _microstep in range(accumulation):
             data = _batch(request, batch, device)
-            with torch.autocast("cuda", enabled=amp):
+            with autocast(torch.bfloat16 if (request.yolo or {}).get("amp") == "bf16" else amp, device=device.type):
                 if request.profile.compilation:
                     # Match native training: compile inference, leave target assignment
                     # and loss outside the compiled graph (including its int8 scatter).

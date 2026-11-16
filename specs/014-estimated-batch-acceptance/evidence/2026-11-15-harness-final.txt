@@ -1,0 +1,8 @@
+..................................................................       [100%]
+=============================== warnings summary ===============================
+tests/test_severstal.py: 19 warnings
+  /mnt/wsl/data/nkt/clearml-yolo/.venv/lib/python3.12/site-packages/hydra_zen/structured_configs/_implementations.py:2619: PydanticDeprecatedSince20: The `__fields__` attribute is deprecated, use the `model_fields` class property instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    _fields = target.__fields__  # type: ignore
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+66 passed, 19 warnings in 5.19s

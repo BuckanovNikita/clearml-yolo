@@ -4,6 +4,8 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
+from copy import deepcopy
+from typing import Any
 from uuid import uuid4
 
 from clearml_yolo.adapters.assets.execution import prepare_model_assets
@@ -14,6 +16,7 @@ from clearml_yolo.adapters.runtime.gpu_inventory import (
     discover_gpus,
     monitor_devices,
     require_idle,
+    require_memory_reserve,
 )
 from clearml_yolo.adapters.runtime.workers import WorkerCommand, run_workers
 from clearml_yolo.adapters.storage.filesystem import temporary_root
@@ -27,7 +30,8 @@ from clearml_yolo.core.batch_estimation import (
     TrialResult,
     error_diagnostic,
 )
-from clearml_yolo.core.models import model_preset
+from clearml_yolo.core.models import ModelConfig, model_preset
+from clearml_yolo.core.transforms import TransformConfig
 
 _TELEMETRY_INTERVAL_SECONDS = 0.25
 
@@ -47,8 +51,19 @@ def _devices(profile: TrainingProfile) -> tuple[GPUDevice, ...]:
 
 
 class NativeBatchProbe:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        native: ModelConfig | None = None,
+        yolo: dict[str, Any] | None = None,
+        transforms: TransformConfig | None = None,
+    ) -> None:
         self._profile_devices: dict[int, GPUDevice] | None = None
+        self._native = native.model_copy(deep=True) if native is not None else None
+        self._yolo = deepcopy(yolo)
+        self._transforms = (
+            TransformConfig.model_validate(transforms.model_dump(mode="json")) if transforms is not None else None
+        )
 
     def profile(self, model: ModelVariant, imgsz: int, devices: tuple[int, ...]) -> TrainingProfile:
         # Catalogue construction shares one metadata snapshot. Every actual trial
@@ -56,7 +71,9 @@ class NativeBatchProbe:
         if self._profile_devices is None:
             self._profile_devices = {device.index: device for device in discover_gpus()}
         selected = tuple(self._profile_devices[index] for index in devices)
-        return training_profile(model, imgsz, selected)
+        return training_profile(
+            model, imgsz, selected, native=self._native, yolo=self._yolo, transforms=self._transforms
+        )
 
     def run(
         self,
@@ -73,7 +90,19 @@ class NativeBatchProbe:
         path_peaks: list[tuple[int, ...]] = []
         try:
             devices = _devices(profile)
-            require_idle(devices, force=settings.force)
+            if self._native is not None or self._yolo is not None or self._transforms is not None:
+                expected = training_profile(
+                    profile.model,
+                    profile.nominal_size[0],
+                    devices,
+                    native=self._native,
+                    yolo=self._yolo,
+                    transforms=self._transforms,
+                )
+                if expected != profile:
+                    raise ValueError("Probe recipe does not match its measured training profile")
+            baseline = require_idle(devices, force=settings.force)
+            require_memory_reserve(devices, baseline, settings.minimum_free_memory_bytes)
             for optimizer in profile.optimizers:
                 path_results, peaks = self._path(
                     profile,
@@ -142,6 +171,22 @@ class NativeBatchProbe:
             duration_seconds=time.monotonic() - start,
         )
 
+    def _configuration(self, profile: TrainingProfile, global_batch: int) -> ModelConfig | None:
+        if profile.model.backend == "ultralytics":
+            configure_weights_directory()
+            return None
+        config = (
+            self._native.model_copy(deep=True) if self._native is not None else model_preset(profile.model.selection)
+        )
+        if (config.backend, config.preset) != (profile.model.backend, profile.model.preset):
+            raise ValueError("Probe model configuration does not match its profile")
+        config.train.imgsz = profile.nominal_size[0]
+        config.train.batch = global_batch
+        config.train.workers = 0
+        config.train.device = 0
+        config, _assets = prepare_model_assets(config, training=True)
+        return config
+
     def _path(
         self,
         profile: TrainingProfile,
@@ -154,15 +199,7 @@ class NativeBatchProbe:
     ) -> tuple[list[ProbeRankResult], tuple[int, ...]]:
         output = temporary_root() / "batch-estimate" / token / optimizer
         output.mkdir(parents=True)
-        config = None
-        if profile.model.backend == "ultralytics":
-            configure_weights_directory()
-        else:
-            config = model_preset(profile.model.selection)
-            config.train.imgsz = profile.nominal_size[0]
-            config.train.batch = global_batch
-            config.train.workers = 0
-            config, _assets = prepare_model_assets(config, training=True)
+        config = self._configuration(profile, global_batch)
         request = BatchProbeRequest(
             token=token,
             profile=profile,
@@ -172,6 +209,8 @@ class NativeBatchProbe:
             optimizer=optimizer,
             output=output,
             config=config,
+            yolo=self._yolo,
+            transforms=self._transforms,
         )
         request_path = output / "request.json"
         request_path.write_text(request.model_dump_json(), encoding="utf-8")
@@ -199,6 +238,7 @@ class NativeBatchProbe:
         # Asset setup can take time and previous optimizer paths can leave driver
         # reservations behind. Recheck idle state and baseline immediately before launch.
         baseline = require_idle(devices, force=settings.force)
+        require_memory_reserve(devices, baseline, settings.minimum_free_memory_bytes)
         peaks = list(baseline)
         checked_at = 0.0
 
@@ -215,6 +255,7 @@ class NativeBatchProbe:
             if not active:
                 return
             current = monitor_devices(tuple(device for _, device in active), owned_pids, force=settings.force)
+            require_memory_reserve(tuple(device for _, device in active), current, settings.minimum_free_memory_bytes)
             for (rank, _device), used in zip(active, current, strict=True):
                 peaks[rank] = max(peaks[rank], used)
 

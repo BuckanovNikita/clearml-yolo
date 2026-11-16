@@ -1,0 +1,36 @@
+{
+  "base": "31e2733",
+  "released_to_ticket94": [
+    "src/clearml_yolo/adapters/integrations/native_trainer.py",
+    "tests/test_yolo_augmentation.py"
+  ],
+  "sha256": {
+    ".importlinter": "545d4db9fbce06bc89c6a7583193815acb7f9475efe29973248bdc29b022cf07",
+    "docs/augmentation.md": "1546f193c51fb73785f71978bf6ace6690aa14d66c99c63cb0f165f5696db13a",
+    "docs/batch-estimation.md": "78f09541ab5d60f0e70f32734d05e03cbace3deaa4b0267f823c0cadf43ffbfe",
+    "src/clearml_yolo/adapters/augmentation/probe.py": "a384c4ccbffd2d5b5bc5c1385ef43fb4b9c2c2d29b4bb4a61d3f6718ed598efd",
+    "src/clearml_yolo/adapters/deim/probe.py": "6cf29d6678f4b337f768bb176c52c408a14802a77ea6ad129bf0e1da41661542",
+    "src/clearml_yolo/adapters/integrations/batch_probe.py": "f8805b69b2b7046f69ee4e1d6fa610edbbda7a7ed36566090d2d077d509d22a7",
+    "src/clearml_yolo/adapters/integrations/batch_profiles.py": "3c60726f56d19d74753f783e64fa79fd73ca9578fe280c0f172b7e81c3fd5e4b",
+    "src/clearml_yolo/adapters/integrations/probe_worker.py": "5f8456ee4fee086c310f209bdb17907974846511bfd9e2eb442604570de463b7",
+    "src/clearml_yolo/adapters/rfdetr/probe.py": "d9177d9c893312adb84b5e30124bd158d77162870b4add04f30db2bf8dfe2cec",
+    "src/clearml_yolo/adapters/runtime/gpu_inventory.py": "b6dee89ce607b3f937214a6532f94aff92ccf02e97b6ff22c61d786da889db6e",
+    "src/clearml_yolo/adapters/runtime/gpu_memory.py": "a5e7e30eecbde5fc3f87e8b7bf97dd03a8d2300f08cd859de85470b85daa7fac",
+    "src/clearml_yolo/adapters/torchvision/probe.py": "62624a98c0990d5938dce2be621e9a5389ef26b38b79c5a4790f69a1c041f115",
+    "src/clearml_yolo/adapters/yolo/batch_probe.py": "bd62c8ebcd299fc1590a31460d352ef846ec073f77e10138fef41158cdf1bc71",
+    "src/clearml_yolo/application/training_workers.py": "dcf137da506ed47cb3f660ec269741e82805d736e4c906489331f6e5b8c7fcb4",
+    "src/clearml_yolo/core/batch_estimation.py": "58476296adfa700d8914e16436bf6b6cb36471ab83e5bdbb298a102a884da997",
+    "tests/conftest.py": "150a7d8fd3ff384b28c95e22c54816eb975492228355a33a63fa1ecfb5d8efaf",
+    "tests/severstal_batch.py": "98615fbb5a07f3e372530e27fdf18e4117fdbfbc5c5a221f14d6804f5e900f6f",
+    "tests/severstal_harness.py": "cf57290490e54e1997096ad22afbbe3c9668c290b393cf62238da34397698c7f",
+    "tests/test_batch_estimation.py": "c4f77533e73f7dc525f237fde33d741a9f601f722e214062b9bffd8b1582b7c7",
+    "tests/test_batch_probe.py": "ff10c634e777feb32bf949eb73e8dc657ea16c11d317626e3013b2ea984b7d9e",
+    "tests/test_batch_profiles.py": "fd387cc5cbcf534a319a0751e17a3d5595cefb481493b327c10325f251833c34",
+    "tests/test_deim_probe.py": "de6ac626d83016de7760601eba1ee83632ce73251810c2203c75fe03debec8f0",
+    "tests/test_gpu_memory.py": "e5df9a28f47795c7376d185d6d19db62a60e1aa2ba7930500050ca0adc3d3600",
+    "tests/test_rfdetr_probe.py": "7296f35d4c7fd03273e91817dabc280ca7540191843525f65676c7095fab85d5",
+    "tests/test_severstal.py": "8d7c756b83e906c9747aff88494c157e8f171d665ebff0228fca08a791994c1f",
+    "tests/test_nested_worker_cleanup.py": "a7c08f4a4dc2643d4932f9103d69f979ab8a67ee44440c1caed5762f8331c5b6"
+  },
+  "phase": "after nested cleanup remediation; released94paths remain excluded"
+}

@@ -162,8 +162,21 @@ remain responsible for choosing a suitable batch for the actual recipe.
 
 The opt-in [Severstal suite](../tests/integration/test_severstal_gpu.py) covers every registered model:
 YOLO26n, four DEIMv2, four RF-DETR, six Faster R-CNN and six FCOS presets, each with native,
-JSON and JSON+Mosaic variants. Each smoke scenario uses one epoch, batch one and FP32
+JSON and JSON+Mosaic variants. Each smoke scenario uses two epochs, seed zero and FP32
 on a frozen 160/40/40 training/validation/test subset of the official Kaggle data.
+Before training, it freshly measures the exact model, resolution, precision and
+augmentation recipe, then selects the largest backend-valid batch bounded by both
+the usable capacity and 160 training images. Raw capacity and selected batch are
+recorded separately. Failed estimation stops the scenario; there is no batch-one
+fallback. Fixed-recipe YOLO execution rejects native batch reductions and repeated
+epochs. Trial and scenario deadlines remain 300 and 1800 seconds respectively.
+The optional `--severstal-free-vram-mib` reserve applies to measurement and training;
+whole-device monitoring cancels a scenario that breaches it. An allocator cap reduces
+overshoot but cannot guarantee a reserve against external or non-Torch allocations.
+An explicit `--severstal-home` may reuse a prepared campaign cache; scenario artifacts
+must be inside that home. Each case retains separate outputs, while shared assets and
+preparation receipts remain available until all downstream consumers finish. Without
+this option the case owns its own home. Native catalogue preparation still executes.
 They check execution, optimization, checkpoint reload, held-out predictions and
 ClearML evidence; they do not establish model accuracy or equivalence between recipes.
 

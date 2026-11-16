@@ -2,14 +2,44 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from PIL import Image
 
 
+def test_fixed_recipe_rejects_batch_reduction_and_repeated_epochs_before_training() -> None:
+    import cloudpickle  # type: ignore[import-untyped]  # Native DDP serializer.
+
+    from clearml_yolo.adapters.integrations.native_trainer import (
+        OwnedDetectionTrainer,
+        fixed_training_recipe,
+        trainer_with_transforms,
+    )
+
+    with fixed_training_recipe(batch=16, epochs=2):
+        selected = trainer_with_transforms(None)
+    restored = cloudpickle.loads(cloudpickle.dumps(selected))
+    trainer: Any = restored.__new__(restored)
+    trainer.batch_size, trainer.epochs, trainer.epoch = 16, 2, 0
+    trainer.callbacks = {"on_train_epoch_start": []}
+    trainer.run_callbacks("on_train_epoch_start")
+    with pytest.raises(RuntimeError, match="repeated"):
+        trainer.run_callbacks("on_train_epoch_start")
+    trainer.epoch = 1
+    trainer.run_callbacks("on_train_epoch_start")
+    trainer.epoch = 2
+    with pytest.raises(RuntimeError, match="epoch"):
+        trainer.run_callbacks("on_train_epoch_start")
+    trainer.batch_size = 8
+    with pytest.raises(RuntimeError, match="batch"):
+        trainer._build_train_pipeline()
+    assert trainer_with_transforms(None) is OwnedDetectionTrainer
+
+
 def test_owned_trainer_round_trips_frozen_pipeline_without_source_file(tmp_path: Path) -> None:
-    import cloudpickle  # type: ignore[import-untyped]  # Native DDP's untyped serializer.
+    import cloudpickle
 
     from clearml_yolo.adapters.augmentation.configuration import resolve_transform_config
     from clearml_yolo.adapters.integrations import native_trainer

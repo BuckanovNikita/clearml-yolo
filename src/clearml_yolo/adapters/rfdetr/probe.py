@@ -13,6 +13,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
+from clearml_yolo.adapters.augmentation.probe import SyntheticAugmentation
 from clearml_yolo.adapters.rfdetr.backend import trainer_devices, training_configuration
 from clearml_yolo.adapters.runtime.distributed import global_batch_per_rank
 from clearml_yolo.adapters.runtime.gpu_memory import GPUMemory
@@ -27,12 +28,25 @@ class SyntheticDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
     def __init__(self, request: BatchProbeRequest, count: int) -> None:
         self.request = request
         self.count = count
+        self.augmentation = (
+            SyntheticAugmentation(
+                request.transforms,
+                request.profile.effective_size,
+                request.workload.classes,
+                request.workload.objects_per_image,
+                seed=request.config.train.seed if request.config is not None else 0,
+            )
+            if request.transforms is not None and request.transforms.mode == "albumentations"
+            else None
+        )
 
     def __len__(self) -> int:
         return self.count
 
     @override
     def __getitem__(self, index: int) -> tuple[Tensor, dict[str, Tensor]]:
+        if self.augmentation is not None:
+            return self._augmented(index)
         height, width = self.request.profile.effective_size
         generator = torch.Generator().manual_seed(index)
         image = torch.rand((3, height, width), generator=generator)
@@ -52,6 +66,29 @@ class SyntheticDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
             "size": torch.tensor([height, width]),
             "area": extent.square() * height * width,
             "iscrowd": torch.zeros(objects, dtype=torch.int64),
+        }
+
+    def _augmented(self, index: int) -> tuple[Tensor, dict[str, Tensor]]:
+        if self.augmentation is None:
+            raise ValueError("Custom input requires augmentation")
+        sample = self.augmentation.sample(index)
+        height, width = sample.image.shape[:2]
+        image = torch.from_numpy(sample.image.copy()).permute(2, 0, 1).float().div(255)
+        image.sub_(torch.tensor([0.485, 0.456, 0.406])[:, None, None])
+        image.div_(torch.tensor([0.229, 0.224, 0.225])[:, None, None])
+        boxes = torch.from_numpy(sample.boxes.copy())
+        boxes[:, 2:] -= boxes[:, :2]
+        area = boxes[:, 2] * boxes[:, 3]
+        boxes[:, :2] += boxes[:, 2:] / 2
+        boxes /= torch.tensor([width, height, width, height])
+        return image, {
+            "boxes": boxes,
+            "labels": torch.from_numpy(sample.labels),
+            "image_id": torch.tensor(index, dtype=torch.int64),
+            "orig_size": torch.tensor([height, width]),
+            "size": torch.tensor([height, width]),
+            "area": area,
+            "iscrowd": torch.from_numpy(sample.iscrowd),
         }
 
 
@@ -209,8 +246,13 @@ def _fit(request: BatchProbeRequest, config: ModelConfig, progress: _ProbeProgre
     lightning.seed_everything(config.train.seed, workers=True)
     device = f"cuda:{config.train.device}"
     names = tuple(str(index) for index in range(request.workload.classes))
-    mc, tc = training_configuration(config, names, device, request.output, request.output)
-    maximum = max(scales.compute_multi_scale_scales(mc.resolution, tc.expanded_scales, mc.patch_size, mc.num_windows))
+    custom = request.transforms is not None and request.transforms.mode == "albumentations"
+    mc, tc = training_configuration(config, names, device, request.output, request.output, custom=custom)
+    maximum = (
+        mc.resolution
+        if custom
+        else max(scales.compute_multi_scale_scales(mc.resolution, tc.expanded_scales, mc.patch_size, mc.num_windows))
+    )
     if request.profile.effective_size != (maximum, maximum):
         raise ValueError("RF-DETR probe profile disagrees with the native maximum training scale")
     if mc.compile or bool(tc.use_ema) != request.profile.ema:
@@ -223,7 +265,9 @@ def _fit(request: BatchProbeRequest, config: ModelConfig, progress: _ProbeProgre
     progress.target_steps = steps
     # The pinned DataModule has no public dataset injection hook. Preserve its
     # native loaders and packed-target transfer at this explicit SDK seam.
-    data._dataset_val = SyntheticDataset(request, request.global_batch)  # noqa: SLF001
+    data._dataset_val = SyntheticDataset(  # noqa: SLF001
+        request.model_copy(update={"transforms": None}), request.global_batch
+    )
     native_callbacks: list[Any] = []
     if tc.use_ema:
         native_callbacks.append(

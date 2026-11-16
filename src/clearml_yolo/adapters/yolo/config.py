@@ -340,6 +340,28 @@ def native_defaults() -> dict[str, Any]:
     return loaded | {"imgsz": 960, "compile": True, "nms": True, "model": "yolo11n.pt"}
 
 
+def batch_probe_settings(architecture: str, overrides: dict[str, Any] | None) -> dict[str, Any]:
+    """Reject structural recipes the synthetic probe cannot faithfully execute."""
+    defaults = native_defaults()
+    values = defaults | (overrides or {})
+    unsupported = [
+        key
+        for key in ("pretrained", "distill_model", "resume", "single_cls", "quantize", "classes", "task", "cls_pw")
+        if values[key] != defaults[key]
+    ]
+    if values["channels_last"] not in (None, True):
+        unsupported.append("channels_last")
+    if values["freeze"] not in (None, 0, []):
+        unsupported.append("freeze")
+    if values.get("augmentations") not in (None, []):
+        unsupported.append("augmentations")
+    if overrides is not None and "model" in overrides and str(overrides["model"]) != architecture:
+        unsupported.append("model")
+    if unsupported:
+        raise ValueError(f"YOLO batch measurement does not support the requested controls: {', '.join(unsupported)}")
+    return values | {"model": architecture}
+
+
 def stage_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
     """Project supplied native values onto the selected execution stage."""
     unknown = set(settings) - KNOWN_KEYS - {"save_dir"}

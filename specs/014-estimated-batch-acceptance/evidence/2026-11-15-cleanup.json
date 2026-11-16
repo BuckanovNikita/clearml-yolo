@@ -1,0 +1,51 @@
+{
+  "removed": [
+    {
+      "path": "/tmp/cy-ticket03-python-paths",
+      "bytes": 899
+    },
+    {
+      "path": "/tmp/cy-ticket03-focused.txt",
+      "bytes": 4369
+    },
+    {
+      "path": "/tmp/cy-ticket03-final-profile.txt",
+      "bytes": 99
+    },
+    {
+      "path": "/tmp/cy-ticket03-check.txt",
+      "bytes": 5048
+    },
+    {
+      "path": "/tmp/cy-ticket03-mutation.txt",
+      "bytes": 57192
+    },
+    {
+      "path": "/tmp/cy-ticket03-mutant-diffs.txt",
+      "bytes": 36099
+    },
+    {
+      "path": "/tmp/cy-ticket03-deim-followup.txt",
+      "bytes": 99
+    },
+    {
+      "path": "/tmp/cy-ticket03-mutation-followup.txt",
+      "bytes": 28686
+    },
+    {
+      "path": "/tmp/cy-ticket03-mutant-followup-diffs.txt",
+      "bytes": 14596
+    },
+    {
+      "path": "/tmp/cy-ticket03-harness-final.txt",
+      "bytes": 720
+    },
+    {
+      "path": "/tmp/cy-ticket03-mutants",
+      "bytes": 1592503
+    }
+  ],
+  "initial_mutation_workspace_absent": true,
+  "temporary_indexes_absent": true,
+  "shared_services_and_assets_preserved": true
+}

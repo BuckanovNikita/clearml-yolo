@@ -25,7 +25,8 @@ from clearml_yolo.core.batch_estimation import (
     TrialStatus,
     select_models,
 )
-from clearml_yolo.core.models import ModelConfig
+from clearml_yolo.core.models import ModelConfig, model_preset
+from clearml_yolo.core.transforms import TransformConfig, TransformSnapshot, pipeline_digest
 from test_batch_estimate_workflow import sample_profile
 from test_batch_profiles import sample_devices
 
@@ -375,6 +376,115 @@ def test_native_requests_preserve_default_recipe_while_binding_global_batch_and_
     assert config.train.use_ema
     assert config.train.pretrained
     assert config.train.backbone_weights == tmp_path / "backbone.pth"
+
+
+def test_explicit_probe_recipe_reaches_worker_without_reconstructing_defaults(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+    monkeypatch.setattr(adapter, "prepare_model_assets", lambda config, **kwargs: (config, ()))
+    monkeypatch.setattr(adapter, "training_profile", lambda *args, **kwargs: _profile("fcos/resnet50_fpn"))
+    config = model_preset("fcos/resnet50_fpn")
+    config.train.amp = False
+    config.train.lr = 0.004
+    config.train.seed = 17
+    probe = adapter.NativeBatchProbe(native=config)
+    config.train.amp = True
+    result = probe.run(_profile("fcos/resnet50_fpn"), SyntheticWorkload(), SearchSettings(), 3)
+    assert result.status == "success"
+    executed = workers.requests[0].config
+    assert executed is not None
+    assert executed.train.amp is False
+    assert (executed.train.lr, executed.train.seed, executed.train.batch) == (0.004, 17, 3)
+
+
+def test_explicit_yolo_probe_recipe_is_serialized_to_each_worker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+    monkeypatch.setattr(adapter, "training_profile", lambda *args, **kwargs: _profile())
+    values = {"amp": False, "nbs": 16, "seed": 19}
+    probe = adapter.NativeBatchProbe(yolo=values)
+    values["amp"] = True
+    assert probe.run(_profile(), SyntheticWorkload(), SearchSettings(), 2).status == "success"
+    assert all(request.yolo == {"amp": False, "nbs": 16, "seed": 19} for request in workers.requests)
+
+
+@pytest.mark.parametrize("used", [250, 950])
+def test_reserved_memory_breach_cannot_become_successful_capacity(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, used: int
+) -> None:
+    workers = _Workers()
+    _install_workers(monkeypatch, tmp_path, workers)
+    monkeypatch.setattr(adapter, "require_idle", lambda *args, **kwargs: (used,) if used == 950 else (10,))
+    monkeypatch.setattr(adapter, "monitor_devices", lambda *args, **kwargs: (950,))
+    result = adapter.NativeBatchProbe().run(
+        _profile(), SyntheticWorkload(), SearchSettings(minimum_free_memory_bytes=100), 1
+    )
+    assert result.status == "contaminated"
+    assert "reserve" in result.diagnostic
+    assert result.peak_memory_bytes == ()
+    if used == 950:
+        assert not workers.requests
+
+
+@pytest.mark.parametrize("backend", ["yolo", "torchvision", "rfdetr", "deim"])
+@pytest.mark.parametrize("mosaic", [False, True])
+def test_custom_probe_inputs_execute_pipeline_and_retain_target_envelope(
+    tmp_path: Path, backend: str, mosaic: bool
+) -> None:
+    import albumentations as alb
+    import torch
+
+    operations: list[Any] = [alb.ToGray(p=1)]
+    if mosaic:
+        operations.insert(0, alb.Mosaic(target_size=(32, 32), cell_shape=(32, 32), grid_yx=(2, 2), p=1))
+    document = alb.to_dict(alb.Compose(operations))
+    snapshot = TransformSnapshot(pipeline=document, sha256=pipeline_digest(document), source="test.json")
+    request = _request(tmp_path).model_copy(
+        update={"transforms": TransformConfig(mode="albumentations", snapshot=snapshot)}
+    )
+    expected_objects = 8 if mosaic else 2
+    if backend == "deim":
+        from clearml_yolo.adapters.augmentation.probe import SyntheticAugmentation
+        from clearml_yolo.adapters.deim.probe import synthetic_batch
+
+        augmentation = SyntheticAugmentation(TransformConfig(mode="albumentations", snapshot=snapshot), (32, 32), 3, 2)
+        mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+        images, targets = synthetic_batch(
+            1,
+            (32, 32),
+            2,
+            3,
+            torch.device("cpu"),
+            augmentation=augmentation,
+            normalization=(mean, std),
+        )
+        images = images * torch.tensor(std).view(1, 3, 1, 1) + torch.tensor(mean).view(1, 3, 1, 1)
+        image = images[0]
+        assert len(targets[0]["labels"]) == expected_objects
+    elif backend == "yolo":
+        result = yolo._batch(request, 1, torch.device("cpu"))
+        image = result["img"][0]
+        assert len(result["cls"]) == expected_objects
+    else:
+        if backend == "torchvision":
+            from clearml_yolo.adapters.torchvision.probe import SyntheticDataset
+
+            image, target = SyntheticDataset(request, 4, 1)[0]
+        else:
+            from clearml_yolo.adapters.rfdetr.probe import SyntheticDataset as RFDataset
+
+            image, target = RFDataset(request, 4)[0]
+            image = image * torch.tensor([0.229, 0.224, 0.225])[:, None, None]
+            image += torch.tensor([0.485, 0.456, 0.406])[:, None, None]
+        assert len(target["labels"]) == expected_objects
+        assert torch.isfinite(target["boxes"]).all()
+    assert tuple(image.shape) == (3, 32, 32)
+    assert torch.allclose(image[0], image[1], atol=1e-6)
+    assert torch.allclose(image[1], image[2], atol=1e-6)
 
 
 def _check_worker_failure(

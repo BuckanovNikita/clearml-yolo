@@ -10,11 +10,11 @@ from typing import Any
 
 from clearml_yolo.adapters.assets.execution import prepare_model_assets
 from clearml_yolo.adapters.runtime.gpu_inventory import GPUDevice
-from clearml_yolo.adapters.yolo.config import TRAIN_KEYS, native_defaults
+from clearml_yolo.adapters.yolo.config import TRAIN_KEYS, batch_probe_settings
 from clearml_yolo.core.assets import DEIM_REVISION
 from clearml_yolo.core.batch_estimation import GPUHardware, ModelVariant, TrainingProfile
 from clearml_yolo.core.models import ModelConfig, model_preset
-from clearml_yolo.core.transforms import TransformConfig
+from clearml_yolo.core.transforms import TransformConfig, TransformSnapshot
 
 
 def _digest(value: object) -> str:
@@ -27,6 +27,7 @@ def _implementation() -> str:
     digest = hashlib.sha256()
     for folder in (
         "core",
+        "adapters/augmentation",
         "adapters/yolo",
         "adapters/deim",
         "adapters/rfdetr",
@@ -42,7 +43,7 @@ def _implementation() -> str:
     return "batch-v1:" + digest.hexdigest()
 
 
-def _versions(backend: str) -> dict[str, str]:
+def _versions(backend: str, *, custom: bool = False) -> dict[str, str]:
     packages = ["clearml-yolo", "torch", "torchvision", "numpy"]
     if backend == "ultralytics":
         packages += ["ultralytics", "albumentations"]
@@ -52,6 +53,8 @@ def _versions(backend: str) -> dict[str, str]:
         packages += ["timm", "faster-coco-eval"]
     else:
         packages += ["timm", "pycocotools"]
+    if custom and "albumentations" not in packages:
+        packages.append("albumentations")
     versions = {name: importlib.metadata.version(name) for name in packages}
     versions["python"] = platform.python_version()
     # CUDA libraries and the compiler can change allocation and kernel behavior
@@ -66,6 +69,25 @@ def _versions(backend: str) -> dict[str, str]:
     return versions
 
 
+def _transform_snapshot(transforms: TransformConfig | None) -> TransformSnapshot | None:
+    if transforms is None or transforms.mode == "native":
+        return None
+    if transforms.snapshot is None:
+        raise ValueError("Custom augmentation requires a resolved snapshot before measurement")
+    return TransformSnapshot.model_validate(transforms.snapshot.model_dump(mode="json"))
+
+
+def _native_shape(backend: str, imgsz: int, rounded: int, *, custom: bool) -> int:
+    if custom:
+        return rounded
+    if backend == "deimv2":
+        return int(imgsz * 1.25 / 32) * 32
+    if backend == "rfdetr":
+        # Pinned presets use patch_size=16, num_windows=2, expanded offset +5.
+        return (imgsz // 32 + 5) * 32
+    return rounded
+
+
 def training_profile(
     model: ModelVariant,
     imgsz: int,
@@ -77,13 +99,12 @@ def training_profile(
 ) -> TrainingProfile:
     if not devices:
         raise ValueError("Saved batch estimates require explicitly resolved CUDA devices")
-    if transforms is not None and transforms.mode != "native":
-        raise ValueError("Custom augmentation requires an explicit batch; no standard estimate fits")
+    snapshot = _transform_snapshot(transforms)
     nominal = (imgsz, imgsz)
     stride = 64 if model.architecture.endswith("6u.pt") else 32
     rounded = math.ceil(imgsz / stride) * stride
     if model.backend == "ultralytics":
-        values = native_defaults() | (yolo or {})
+        values = batch_probe_settings(model.architecture, yolo)
         scale = float(values["multi_scale"])
         effective = (int(rounded * (1 + scale) + stride) - 1) // stride * stride if scale > 0 else rounded
         effective = max(effective, rounded)
@@ -136,20 +157,15 @@ def training_profile(
         compilation = False
         accumulation = f"fixed:{selected.train.grad_accum_steps}"
         ema = selected.train.use_ema
-        if model.backend == "deimv2":
-            effective = int(imgsz * 1.25 / 32) * 32
-        elif model.backend == "rfdetr":
-            # All four pinned detection presets use patch_size=16 and num_windows=2;
-            # expanded native per-batch scales include offset +5.
-            effective = (imgsz // 32 + 5) * 32
-        else:
-            effective = rounded
+        effective = _native_shape(model.backend, imgsz, rounded, custom=snapshot is not None)
+    if snapshot is not None:
+        recipe["custom_pipeline_sha256"] = snapshot.sha256
     return TrainingProfile(
         model=model,
         nominal_size=nominal,
         effective_size=(effective, effective),
         gpus=tuple(GPUHardware(name=d.name, total_memory_bytes=d.total_memory_bytes, uuid=d.uuid) for d in devices),
-        dependencies=_versions(model.backend),
+        dependencies=_versions(model.backend, custom=snapshot is not None),
         precision=precision,
         compilation=compilation,
         optimizers=optimizers,

@@ -270,6 +270,7 @@ ignore_imports =
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.storage.filesystem
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.runtime.distributed
     clearml_yolo.adapters.deim.probe -> clearml_yolo.adapters.runtime.gpu_memory
+    clearml_yolo.adapters.deim.probe -> clearml_yolo.adapters.augmentation.probe
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.storage.filesystem
     clearml_yolo.adapters.deim.backend -> clearml_yolo.adapters.assets.sources
     clearml_yolo.adapters.deim.source -> clearml_yolo.adapters.assets.archive
@@ -283,6 +284,7 @@ ignore_imports =
     clearml_yolo.adapters.rfdetr.backend -> clearml_yolo.adapters.runtime.distributed
     clearml_yolo.adapters.rfdetr.probe -> clearml_yolo.adapters.runtime.distributed
     clearml_yolo.adapters.rfdetr.probe -> clearml_yolo.adapters.runtime.gpu_memory
+    clearml_yolo.adapters.rfdetr.probe -> clearml_yolo.adapters.augmentation.probe
     clearml_yolo.adapters.fasterrcnn.assets -> clearml_yolo.adapters.torchvision.assets
     clearml_yolo.adapters.fasterrcnn.configuration -> clearml_yolo.adapters.torchvision.configuration
     clearml_yolo.adapters.fasterrcnn.data -> clearml_yolo.adapters.torchvision.data
@@ -308,6 +310,7 @@ ignore_imports =
     clearml_yolo.adapters.torchvision.training -> clearml_yolo.adapters.storage.filesystem
     clearml_yolo.adapters.torchvision.inference -> clearml_yolo.adapters.observability.progress
     clearml_yolo.adapters.torchvision.probe -> clearml_yolo.adapters.runtime.gpu_memory
+    clearml_yolo.adapters.torchvision.probe -> clearml_yolo.adapters.augmentation.probe
 
 [importlinter:contract:adapter-peer-ownership-isolated]
 name = Adapter peer ownership (isolated)
@@ -366,6 +369,7 @@ allow_indirect_imports = true
 ignore_imports =
     clearml_yolo.adapters.yolo.augmentation -> clearml_yolo.adapters.augmentation.pipeline
     clearml_yolo.adapters.yolo.batch_probe -> clearml_yolo.adapters.runtime.gpu_memory
+    clearml_yolo.adapters.yolo.batch_probe -> clearml_yolo.adapters.augmentation.probe
     clearml_yolo.adapters.clearml.models -> clearml_yolo.adapters.reporting.workbook_identity
     clearml_yolo.adapters.integrations.native_trainer -> clearml_yolo.adapters.yolo.augmentation
     clearml_yolo.adapters.integrations.detectors -> clearml_yolo.adapters.clearml.detectors
@@ -404,6 +408,7 @@ ignore_imports =
     clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.fasterrcnn.backend
     clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.fcos.backend
     clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.yolo.batch_probe
+    clearml_yolo.adapters.integrations.probe_worker -> clearml_yolo.adapters.runtime.gpu_memory
     clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.assets.execution
     clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.yolo.assets
     clearml_yolo.adapters.integrations.batch_probe -> clearml_yolo.adapters.runtime.gpu_inventory
@@ -527,6 +532,7 @@ forbidden_modules =
     coverage
     workflow_dependencies
     severstal_harness
+    severstal_batch
     severstal_helpers
     env_isolation
     ddp_cpu_recording

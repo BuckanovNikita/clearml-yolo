@@ -8,6 +8,7 @@ from torch import Tensor
 from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
 from torch.utils.data import DataLoader, Dataset
 
+from clearml_yolo.adapters.augmentation.probe import SyntheticAugmentation
 from clearml_yolo.adapters.runtime.gpu_memory import GPUMemory
 from clearml_yolo.adapters.torchvision.checkpoint import checkpoint_state
 from clearml_yolo.adapters.torchvision.configuration import DetectorBuilder
@@ -32,12 +33,33 @@ class SyntheticDataset(Dataset[tuple[Tensor, dict[str, Tensor]]]):
         self.request = request
         self.count = count
         self.label_offset = label_offset
+        self.augmentation = (
+            SyntheticAugmentation(
+                request.transforms,
+                request.profile.effective_size,
+                request.workload.classes,
+                request.workload.objects_per_image,
+                seed=request.config.train.seed if request.config is not None else 0,
+            )
+            if request.transforms is not None and request.transforms.mode == "albumentations"
+            else None
+        )
 
     def __len__(self) -> int:
         return self.count
 
     @override
     def __getitem__(self, index: int) -> tuple[Tensor, dict[str, Tensor]]:
+        if self.augmentation is not None:
+            sample = self.augmentation.sample(index)
+            boxes = torch.from_numpy(sample.boxes)
+            return torch.from_numpy(sample.image.copy()).permute(2, 0, 1).float().div(255), {
+                "boxes": boxes,
+                "labels": torch.from_numpy(sample.labels) + self.label_offset,
+                "image_id": torch.tensor(index, dtype=torch.int64),
+                "area": (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]),
+                "iscrowd": torch.from_numpy(sample.iscrowd),
+            }
         height, width = self.request.profile.effective_size
         objects = self.request.workload.objects_per_image
         generator = torch.Generator().manual_seed(index)
@@ -140,7 +162,9 @@ class _ProbeRun:
         )
 
     def validate(self) -> int:
-        dataset = SyntheticDataset(self.request, self.context.per_rank_batch, self.label_offset)
+        dataset = SyntheticDataset(
+            self.request.model_copy(update={"transforms": None}), self.context.per_rank_batch, self.label_offset
+        )
         images, _ = collate_detection([dataset[index] for index in range(len(dataset))])
         model = self.ema.module if self.ema is not None else unwrap_model(self.model)
         synchronize_buffers(model)

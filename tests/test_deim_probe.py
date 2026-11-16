@@ -9,6 +9,7 @@ from typing import Any, override
 from uuid import uuid4
 
 import pytest
+from pydantic import JsonValue
 
 from clearml_yolo.adapters.deim.probe import (
     _coco_annotations,
@@ -21,6 +22,43 @@ from clearml_yolo.application.training_workers import BatchProbeRequest
 from clearml_yolo.core.batch_estimation import SearchSettings, SyntheticWorkload, select_models
 from clearml_yolo.core.models import ModelConfig, TrainSettings
 from test_batch_estimate_workflow import sample_profile
+
+
+def test_custom_batch_preserves_pixels_geometry_and_native_target_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    import numpy as np
+    import torch
+
+    from clearml_yolo.adapters.augmentation.pipeline import DetectionSample
+    from clearml_yolo.adapters.augmentation.probe import SyntheticAugmentation
+    from clearml_yolo.core.transforms import TransformConfig, TransformSnapshot, pipeline_digest
+
+    document: dict[str, JsonValue] = {"transform": {"__class_fullname__": "Compose", "transforms": []}}
+    config = TransformConfig(
+        mode="albumentations",
+        snapshot=TransformSnapshot(pipeline=document, sha256=pipeline_digest(document), source="test.json"),
+    )
+    augmentation = SyntheticAugmentation(config, (16, 32), 2, 2)
+    boxes = np.array([[2, 4, 10, 12], [16, 2, 24, 6]], dtype=np.float32)
+    sample = DetectionSample(
+        np.full((16, 32, 3), 255, dtype=np.uint8), boxes, np.array([1, 0]), np.array([0, 1]), np.array([0, 1])
+    )
+    monkeypatch.setattr(augmentation, "sample", lambda index: sample)
+    mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+    images, targets = synthetic_batch(
+        2, (16, 32), 2, 2, torch.device("cpu"), rank=3, augmentation=augmentation, normalization=(mean, std)
+    )
+    expected_pixels = (1 - torch.tensor(mean)) / torch.tensor(std)
+    torch.testing.assert_close(images, expected_pixels.view(1, 3, 1, 1).expand(2, 3, 16, 32))
+    expected_boxes = torch.tensor([[0.1875, 0.5, 0.25, 0.5], [0.625, 0.25, 0.25, 0.25]])
+    for index, target in enumerate(targets):
+        torch.testing.assert_close(target["boxes"], expected_boxes)
+        torch.testing.assert_close(target["area"], torch.tensor([64.0, 32.0]))
+        assert target["labels"].tolist() == [1, 0]
+        assert target["iscrowd"].tolist() == [0, 1]
+        assert target["image_id"].tolist() == [6 + index]
+        assert target["orig_size"].tolist() == target["size"].tolist() == [32, 16]
+        torch.testing.assert_close(target["mixup"], torch.ones(2))
+    np.testing.assert_array_equal(sample.boxes, [[2, 4, 10, 12], [16, 2, 24, 6]])
 
 
 def _request(tmp_path: Path) -> BatchProbeRequest:

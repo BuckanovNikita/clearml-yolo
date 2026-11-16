@@ -297,7 +297,7 @@ def test_fit_counts_real_amp_updates_before_stopping_and_validating(
 
     monkeypatch.setattr(native, "RFDETRModelModule", module_type)
     monkeypatch.setattr(native, "build_trainer", build_cpu_trainer)
-    monkeypatch.setattr("clearml_yolo.adapters.rfdetr.probe.training_configuration", lambda *_: (mc, tc))
+    monkeypatch.setattr("clearml_yolo.adapters.rfdetr.probe.training_configuration", lambda *_, **kwargs: (mc, tc))
     monkeypatch.setattr(
         "clearml_yolo.adapters.rfdetr.probe.trainer_devices",
         lambda *_: {"accelerator": "cpu", "devices": 1},
