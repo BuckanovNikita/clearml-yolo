@@ -1,5 +1,6 @@
 """CUDA telemetry uses contemporaneous reservations and survives native teardown."""
 
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -80,12 +81,19 @@ def test_worker_receipt_rejects_negative_non_allocator_measurement() -> None:
 def test_optional_allocator_reserve_leaves_driver_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
     import torch
 
+    from clearml_yolo.adapters.runtime import gpu_inventory
     from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
 
     gib = 1024**3
     limits: list[tuple[float, int]] = []
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (12 * gib, 24 * gib))
     monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: gib)
+    monkeypatch.setattr(
+        torch.cuda, "get_device_properties", lambda device: SimpleNamespace(uuid="selected", total_memory=24 * gib)
+    )
+    monkeypatch.setattr(
+        gpu_inventory, "gpu_states", lambda: {"GPU-selected": gpu_inventory.GPUState(12 * gib, 0, frozenset())}
+    )
     monkeypatch.setattr(
         torch.cuda, "set_per_process_memory_fraction", lambda fraction, device: limits.append((fraction, device))
     )
@@ -96,3 +104,81 @@ def test_optional_allocator_reserve_leaves_driver_headroom(monkeypatch: pytest.M
     assert limits == [(fraction, 0)]
     with pytest.raises(RuntimeError, match="reserve"):
         reserve_cuda_memory(13 * gib, 0)
+
+
+@pytest.mark.parametrize(("cuda_free_gib", "whole_used_gib", "expected_budget_gib"), [(20, 10, 5.75), (12, 4, 3.75)])
+def test_allocator_reserve_uses_lower_free_reading_for_visible_device(
+    monkeypatch: pytest.MonkeyPatch, cuda_free_gib: int, whole_used_gib: int, expected_budget_gib: float
+) -> None:
+    import torch
+
+    from clearml_yolo.adapters.runtime import gpu_inventory
+    from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
+
+    gib = 1024**3
+    limits: list[tuple[float, int]] = []
+
+    def properties(device: int) -> SimpleNamespace:
+        assert device == 1
+        return SimpleNamespace(uuid="visible-selected", total_memory=24 * gib)
+
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (cuda_free_gib * gib, 24 * gib))
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 0)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", properties)
+    monkeypatch.setattr(
+        gpu_inventory,
+        "gpu_states",
+        lambda: {
+            "GPU-other": gpu_inventory.GPUState(23 * gib, 0, frozenset()),
+            "GPU-visible-selected": gpu_inventory.GPUState(whole_used_gib * gib, 0, frozenset()),
+        },
+    )
+    monkeypatch.setattr(
+        torch.cuda, "set_per_process_memory_fraction", lambda fraction, device: limits.append((fraction, device))
+    )
+    fraction = reserve_cuda_memory(8 * gib, 1)
+    assert fraction == pytest.approx(expected_budget_gib / 24)
+    assert limits == [(fraction, 1)]
+
+
+@pytest.mark.parametrize("whole_used_gib", [None, 23])
+def test_allocator_reserve_refuses_missing_or_insufficient_whole_device_memory(
+    monkeypatch: pytest.MonkeyPatch, whole_used_gib: int | None
+) -> None:
+    import torch
+
+    from clearml_yolo.adapters.runtime import gpu_inventory
+    from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
+
+    gib = 1024**3
+    limits: list[float] = []
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (20 * gib, 24 * gib))
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 0)
+    monkeypatch.setattr(
+        torch.cuda, "get_device_properties", lambda device: SimpleNamespace(uuid="selected", total_memory=24 * gib)
+    )
+    states = (
+        {} if whole_used_gib is None else {"GPU-selected": gpu_inventory.GPUState(whole_used_gib * gib, 0, frozenset())}
+    )
+    monkeypatch.setattr(gpu_inventory, "gpu_states", lambda: states)
+    monkeypatch.setattr(torch.cuda, "set_per_process_memory_fraction", lambda fraction, device: limits.append(fraction))
+    with pytest.raises(RuntimeError, match="reserve"):
+        reserve_cuda_memory(8 * gib, 0)
+    assert not limits
+
+
+def test_disabled_or_invalid_allocator_reserve_never_queries_hardware(monkeypatch: pytest.MonkeyPatch) -> None:
+    import torch
+
+    from clearml_yolo.adapters.runtime import gpu_inventory
+    from clearml_yolo.adapters.runtime.gpu_memory import reserve_cuda_memory
+
+    def unexpected(*args: object) -> Any:
+        pytest.fail("Disabled or invalid reserve queried hardware")
+
+    monkeypatch.setattr(torch.cuda, "mem_get_info", unexpected)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", unexpected)
+    monkeypatch.setattr(gpu_inventory, "gpu_states", unexpected)
+    assert reserve_cuda_memory(0, 0) is None
+    with pytest.raises(ValueError, match="negative"):
+        reserve_cuda_memory(-1, 0)

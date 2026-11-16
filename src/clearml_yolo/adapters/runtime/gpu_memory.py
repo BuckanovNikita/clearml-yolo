@@ -6,8 +6,10 @@ from dataclasses import dataclass
 def reserve_cuda_memory(minimum_free_bytes: int, device: int = 0) -> float | None:
     """Bound this process's allocator before model load; external telemetry still monitors.
 
-    Keep an additional 256 MiB for driver/non-allocator growth. This guard cannot
-    constrain foreign processes or native libraries, so it complements monitoring.
+    Use the lower CUDA/whole-device free reading, retaining 256 MiB for growth.
+    CUDA can omit memory visible to whole-device telemetry, notably under WSL.
+    This guard cannot constrain foreign processes or native libraries, so it
+    complements monitoring.
     Zero retains the ordinary full-device allocator policy without CUDA discovery.
     """
     if minimum_free_bytes == 0:
@@ -16,8 +18,15 @@ def reserve_cuda_memory(minimum_free_bytes: int, device: int = 0) -> float | Non
         raise ValueError("GPU memory reserve must not be negative")
     import torch
 
+    from clearml_yolo.adapters.runtime.gpu_inventory import gpu_states
+
     free, total = torch.cuda.mem_get_info(device)
     current = torch.cuda.memory_reserved(device)
+    properties = torch.cuda.get_device_properties(device)
+    state = gpu_states().get(f"GPU-{properties.uuid}")
+    if state is None:
+        raise RuntimeError("Selected CUDA device lacks whole-GPU telemetry for the requested reserve")
+    free = min(free, properties.total_memory - state.used)
     budget = free + current - minimum_free_bytes - 256 * 1024**2
     if budget <= current:
         raise RuntimeError("GPU has insufficient free memory for the requested reserve and driver headroom")
