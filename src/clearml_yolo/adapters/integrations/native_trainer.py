@@ -56,6 +56,12 @@ class OwnedDetectionTrainer(DetectionTrainer):
 
     @override
     def run_callbacks(self, event: str) -> None:
+        if event == "on_train_batch_start":
+            # Installed Ultralytics exhausts OOM recovery at three retries. Arm
+            # that gate after initial AutoBatch/setup so its catch re-raises the
+            # original error before halving the selected batch or rebuilding.
+            # Successful epoch completion resets the native counter normally.
+            self._oom_retries = 3
         if self.required_recipe is not None and event == "on_train_epoch_start":
             self._check_fixed_recipe()
             if not 0 <= self.epoch < self.required_recipe[1]:
