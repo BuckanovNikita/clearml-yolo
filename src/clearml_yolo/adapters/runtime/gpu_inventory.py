@@ -130,7 +130,8 @@ def discover_gpus() -> tuple[GPUDevice, ...]:
             raise RuntimeError("Visible CUDA device lacks whole-GPU telemetry (MIG unsupported)")
         devices.append(
             GPUDevice.model_validate(
-                record | {"used_memory_bytes": state.used_for(record["total_memory_bytes"]), "utilization": state.utilization}
+                record
+                | {"used_memory_bytes": state.used_for(record["total_memory_bytes"]), "utilization": state.utilization}
             )
         )
     if not devices:

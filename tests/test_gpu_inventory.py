@@ -1,8 +1,8 @@
 """Foreign GPU workloads remain protected even when a trial has native children."""
 
+import json
 import subprocess
 import time
-import json
 from pathlib import Path
 
 import pytest
@@ -308,10 +308,16 @@ def test_discovery_admission_and_monitoring_use_coherent_free_memory(
     record = {"index": 0, "uuid": "GPU-test", "name": "test", "total_memory_bytes": int(cuda_total_mib * mib)}
 
     def query(selector: str) -> list[list[str]]:
-        return [] if selector.startswith("--query-compute-apps=") else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
+        return (
+            []
+            if selector.startswith("--query-compute-apps=")
+            else [["GPU-test", str(nvml_total_mib), str(free_mib), "0"]]
+        )
 
     monkeypatch.setattr(gpu, "_query", query)
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record])))
+    monkeypatch.setattr(
+        subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, json.dumps([record]))
+    )
     state = gpu.gpu_states()["GPU-test"]
     assert state.used == raw_used_mib * mib
     assert state.free_bytes == free_mib * mib
@@ -338,9 +344,11 @@ def test_normalized_memory_saturates_at_cuda_capacity_in_caller_order(monkeypatc
     )
 
     def query(selector: str) -> list[list[str]]:
-        return [] if selector.startswith("--query-compute-apps=") else [
-            ["GPU-test", "150", "70", "0"], ["GPU-peer", "200", "150", "0"]
-        ]
+        return (
+            []
+            if selector.startswith("--query-compute-apps=")
+            else [["GPU-test", "150", "70", "0"], ["GPU-peer", "200", "150", "0"]]
+        )
 
     monkeypatch.setattr(gpu, "_query", query)
     for unavailable in (gpu.require_idle(devices), gpu.monitor_devices(devices, lambda: ())):
