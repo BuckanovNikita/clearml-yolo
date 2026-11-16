@@ -1,0 +1,654 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "status": "revision3_combined_failed_native_passed_revision4_combined_failed_native_cancelled",
+  "source_commit": "50c32e78f5278df07b59f5e123832666ba9f1eb1",
+  "worktree_state": "Managed detached HEAD aligned with local master; remote references not fetched",
+  "campaign_tickets": [
+    15,
+    101
+  ],
+  "scope": "Windows-local output diagnostic following WSL restart; no full backend training acceptance",
+  "native_contracts": [
+    "specs/000-baseline/spec.md",
+    "specs/012-own-test-infra/contracts/test-environment.md",
+    "docs/development.md#acceptance-tiers",
+    ".agents/skills/running-integration-tests/SKILL.md"
+  ],
+  "boot_id": "5e9f68d1-63db-4188-9995-e686745fda8c",
+  "preparation": {
+    "status": "passed_for_bounded_diagnostic",
+    "revision": 3,
+    "resolved_review_findings": [
+      {
+        "id": "R1",
+        "status": "resolved",
+        "evidence": "All source reads, writes and destination hashing in copy_inventory run in a separate owned Linux process. Supervisor process.wait has independent60s timeout, ScopedProcessTree cleanup uses native10s bound, direct reap allows3s and enclosing native scope can allow additional10s. Any worker exception/nonzero/deadline or cleanup failure prevents retention approval and local-directory removal. Recorded PID/birth/boot retained if unresolved. Native cleanup primitives checked directly.",
+        "proof": "CPU normal copy passed; blocked FIFO open timed out at1s and returned after1.053649s with exit-15 and cleanup_complete; hash mismatch failed. Failed cases emitted no completion. Worker does not delete sources. Harmless real Windows proof used live60s worker limit and retained14matching files before exactowned removal.",
+        "limitations": "FIFO sleep is not an unkillable D-state kernel task; source review establishes conservative unresolved branch, not actual unkillable-task recovery."
+      },
+      {
+        "id": "R2",
+        "status": "resolved",
+        "evidence": "Auxiliary cancellation nonzero or BaseException sets auxiliary_cancellation_resolved=False. Primary identity inspection still follows. windows_clean is set only from that flag after inspection; unresolved flag adds cleanup error and prevents retain_and_remove. Final cleanup_complete remainsFalse and windows_cleanup_state unresolved. Inspection failure independently leaves windows_cleanFalse.",
+        "proof": "Source control-flow review only; no auxiliary-error fault injection claimed."
+      }
+    ],
+    "review_checks": {
+      "preparation_bindings_rehashed": 14,
+      "execution_bindings_rehashed": 384,
+      "original_bindings_rehashed": 10,
+      "archived_candidate_files_rehashed": 20,
+      "unchanged_AST_blocks": 15,
+      "harmless_retained_files_rehashed": 14,
+      "check_logs_rehashed": 3,
+      "mismatches": []
+    },
+    "preserved_controls": {
+      "reserve_bytes": 10737418240,
+      "original_linux_guards": "All3 original guards and frozen native single-batch helper unchanged",
+      "windows_query_deadline_seconds": 5,
+      "oldest_sample_bound_seconds": 7,
+      "initial_sample_bound_seconds": 12,
+      "combined_observation_bound_seconds": 75,
+      "windows_helper": "Original C#/PS Job Object process ownership/timer hashes unchanged",
+      "storage": "Private nonce NTFS staging, fixed reviewedadapter and exact hash-verified post-window deletion unchanged"
+    },
+    "CPU_check_disposition": "passed: Ruff F, formatting, source compilation and check-only; harmless transfer and Windows ownership proofs passed",
+    "GPU_preparation_queries": 0,
+    "auxiliary_failure_validation": "Source control-flow review only; not a live failure injection"
+  },
+  "admission": {
+    "utc": "2026-11-16T19:58:28.390326+00:00",
+    "boot_id": "5e9f68d1-63db-4188-9995-e686745fda8c",
+    "ram_available_bytes": 95630569472,
+    "scope": "Fresh admission for one reviewed bounded batch8 diagnostic; no model allocation during this check",
+    "queries": [
+      {
+        "argv": [
+          "nvidia-smi",
+          "--query-gpu=uuid,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        "stdout": "GPU-7459c4c9-b94d-ca31-17b0-fc63140c4dc1, 32607, 3083, 29105, 7\n",
+        "stderr": "",
+        "elapsed_seconds": 0.10844083599999976,
+        "exit": 0
+      },
+      {
+        "argv": [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid",
+          "--format=csv,noheader,nounits"
+        ],
+        "stdout": "",
+        "stderr": "",
+        "elapsed_seconds": 0.07151279699996849,
+        "exit": 0
+      }
+    ],
+    "free_mib": 29105,
+    "reserve_mib": 10240
+  },
+  "live": {
+    "combined": {
+      "status": "failed",
+      "diagnostic": "PermissionError: [Errno 13] Permission denied: '/mnt/c/Users/bucka/AppData/Local/Temp/cy-ticket101-windows-local-44329b2729354de0a7c2e144ca442f72/observer/receipt.json'",
+      "started": {
+        "utc": "2026-11-16T20:00:05.640926+00:00",
+        "monotonic": 1781.221150425,
+        "boottime": 1781.221152104
+      },
+      "finished": {
+        "utc": "2026-11-16T20:01:03.775392+00:00",
+        "monotonic": 1839.355618386,
+        "boottime": 1839.355618946
+      },
+      "cleanup_complete": true,
+      "native_finished_observed": {
+        "utc": "2026-11-16T20:00:42.804670+00:00",
+        "monotonic": 1818.384890141,
+        "boottime": 1818.384890631
+      },
+      "last_admitted_host_sample_observed": {
+        "utc": "2026-11-16T20:00:47.315973+00:00",
+        "monotonic": 1822.896206662,
+        "boottime": 1822.896208382
+      },
+      "failure_time_bound": "After last successful host receipt consumption20:00:47.315973Z and before cancelled observer wait completed20:00:48.639917Z; exact exception timestamp not recorded.",
+      "native_sigterm_sent": false,
+      "manifest_sha256": "8bb404b6243c48a21fffb5be0e0e1fce8f653132836a0fc77c20e53722439464"
+    },
+    "native": {
+      "status": "passed_single_probe_only",
+      "exit_code": 0,
+      "cleanup_complete": true,
+      "started": {
+        "utc": "2026-11-16T20:00:08.025844+00:00",
+        "monotonic": 1783.606070287,
+        "boottime": 1783.606071347
+      },
+      "finished": {
+        "utc": "2026-11-16T20:00:42.098442+00:00",
+        "monotonic": 1817.678671385,
+        "boottime": 1817.678672175
+      },
+      "worker_elapsed_seconds": 30.749189259000104,
+      "trial": {
+        "global_batch": 8,
+        "status": "success",
+        "trial_id": "40b87969b8fd45adb21f9b6dab839af1",
+        "actual_global_batch": 8,
+        "peak_memory_bytes": [
+          15226109952
+        ],
+        "warmup_steps": 5,
+        "measured_steps": 10,
+        "validation_steps": 1,
+        "optimizer_paths": [
+          "AdamW"
+        ],
+        "diagnostic": "",
+        "duration_seconds": 25.715604084999995
+      },
+      "observer_errors": [],
+      "observed_survivors": [],
+      "signals_received": []
+    },
+    "telemetry": {
+      "host_admitted_samples": 38,
+      "host_min_free_mib": 18059.0,
+      "host_max_process_and_supervision_elapsed_seconds": 0.07456529999999617,
+      "host_max_oldest_sample_age_at_consumption_seconds": 0.8761348724365234,
+      "retained_host_records": 39,
+      "retained_host_record_statuses": {
+        "completed": 39
+      },
+      "retained_supervisor_status": "running",
+      "retrospective_extra_record": "case38 completed but was not admitted before failed receipt read; not counted as a live accepted sample",
+      "linux_outer_samples": 30,
+      "linux_min_free_mib": 18059,
+      "linux_max_completed_sample_gap_seconds": 1.0949109470000167,
+      "slow_or_deadline_adjacent_smi_observations": 0,
+      "scope": "Completed-sample gaps and sparse process observations are not internalNVML duration or continuousreserve proof."
+    },
+    "cleanup": {
+      "windows_exact_identities_absent": 40,
+      "linux_owned_slot_cleanup_confirmed": 3,
+      "auxiliary_cancellation_resolved": true,
+      "retained_files_rehashed": 86,
+      "transfer": {
+        "status": "worker_passed",
+        "timeout_seconds": 60,
+        "cleanup_complete": true,
+        "wsl_boot_id": "5e9f68d1-63db-4188-9995-e686745fda8c",
+        "pid": 646363,
+        "birth_ticks": 183774,
+        "exit_code": 0,
+        "cleanup_errors": [],
+        "elapsed_seconds": 0.6171402620000208
+      },
+      "local_directory_absent_recorded": true,
+      "root_postcheck": {
+        "utc": "2026-11-16T20:02:21.169364+00:00",
+        "retained_files_verified": 86,
+        "known_coordinator_wrapper_transfer_pids_absent": [
+          618366,
+          619301,
+          645495,
+          616937,
+          646363
+        ],
+        "compute_list_empty": true,
+        "combined_status": "failed",
+        "native_status": "passed_single_probe_only",
+        "limitation": "Native inner identities and Windows absence are established by their bound native receipts; this root check independently verifies listed outer Linux processes and retained copies."
+      }
+    },
+    "additional_native_pid_postcheck": {
+      "status": "passed",
+      "observed_native_pids_absent": 139,
+      "utc": "2026-11-16T20:04:22.234790+00:00"
+    }
+  },
+  "cause_assessment": {
+    "proven": "Python PermissionError errno13 opening observer/receipt.json in the host-finishing loop after completed native diagnostic. Later cleanup successfully read/inventoried/copied the same directory.",
+    "plausible_inference": "Transient sharing/access conflict during original PowerShell in-place Set-Content receipt publication is consistent with the observation.",
+    "not_proven": "No Win32 sharing-violation code, handle trace or exact failing syscall correlation was captured; ACL denial, filesystem translation or another OS cause is not isolated. WSL restart and NTFSplacement both changed versus priorfailure."
+  },
+  "next_optional_receipt_correction": {
+    "status": "Reviewed and executed as revision4; writer publication conflict still caused combined failure. Initial narrow-reader assessment retained below.",
+    "assessment": {
+      "disposition": "reasonable narrow correction subject to frozen-source review",
+      "change": "Treat PermissionError in optional partial receipt polling as unavailable, returningNone like missing/partialJSON; do not replace strict finalreads or genericOSError handling.",
+      "requirements": [
+        "Unavailable reads must not add samples or refresh timestamps.",
+        "Run require_freshest against last accepted completion in every loop; expire at original7s.",
+        "Keep initial12s and overall75s deadlines unchanged.",
+        "Persistent startup unreadability must fail readiness, persistent poststartup unreadability must fail freshness, and strictfinalreceipt/readback must stillfail.",
+        "Keepall3Linuxguards10GiBreserveandnativeownershipunchanged.",
+        "Retain this failedattempt; a futurepass is a newoutcome."
+      ],
+      "validation": "CPU manual deny/recover and deny-until-stale proof plus fresh independent source/hash review before newliveattempt."
+    }
+  },
+  "verification": {
+    "preparation_review": "passed",
+    "CPU_ownership_and_transfer_proofs": "passed",
+    "native_single_batch_probe": "passed",
+    "combined_Windows_local_observation": "failed",
+    "owned_cleanup_and_retained_hashes": "passed",
+    "native_documentation_consistency": "passed: dated claims compared with immutable archived preparation, review, run receipts and independent analysis",
+    "underlying_cause": "deferred",
+    "full_GPU_matrix_and_ticket15_acceptance": "deferred",
+    "canonical_repository_gate": "deferred to coordinator after commit; not established by this record",
+    "revision4_preparation_review": "passed: onlypartialAST changed;20prep/388execution/10original/29archive hashes matched; simulateddenial/recovery/stale7.1s rejection supported",
+    "revision4_live": "failed: confirmedWindows receiptpublication IOException; nativeprobe cancelled",
+    "revision4_cleanup": "passed:17Windowsidentities,72recordedLinuxPIDs absent;40filesretainedandverified",
+    "next_GPU_retry": "deferred until representative concurrentpublication CPUproof and independentreview"
+  },
+  "reuse": {
+    "CY_product_tests": "Applicable historical product/source checks remain reusable because this record and ignored diagnostic corrections do not change product code/dependencies. No unit or paired suite rerun establishes the live result.",
+    "preparation_provenance": "Revision3 mutable helper/preparation paths have immutable snapshots in windows-local-pre-r4; this evidence binds snapshots rather than later revisions."
+  },
+  "limitations": [
+    "No full training/backend ticket accepted by single batchprobe.",
+    "Combined60s hostobserver did not finish and remainsfailed even though nativeprobe passed.",
+    "No recurrence of prior5s telemetrytimeout was recorded in this attempt; this is not rootcause or mitigationproof.",
+    "No settings/driver/WSL intervention warranted by this result.",
+    "Restart and Windows-local storage relocation both changed relative to the preceding UNC comparison.",
+    "Sampling cannot establish continuous reserve or playback smoothness.",
+    "No physical multi-GPU, export/runtime parity, queue parity, release or deployment claim."
+  ],
+  "independent_analysis_bound_files": 121,
+  "source_references": [
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/archive.json",
+      "sha256": "01737e3417c8771b89e64f98cd5be7b3636ed42d63629ae7d9a4d196c6364bc2"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-preparation-receipt.json",
+      "sha256": "af327a0f26ddaa72bca0dd0730542469060b0a5844d24122d6ee08d5938989f5"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-combined-manifest.json",
+      "sha256": "8bb404b6243c48a21fffb5be0e0e1fce8f653132836a0fc77c20e53722439464"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-comparison.py",
+      "sha256": "6153c07e692ad9d7b610ac421c3ab4940bbca922ab6c24697e3f93dd89a570bb"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-io.py",
+      "sha256": "a471292ea48c69e04c530ab64aa200e6685b48167a53774b00a2b9b694aa8f60"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-invocation.md",
+      "sha256": "ee87e0adacfdb9483c681129992ac1bdd0004cc2ab9a3059689860ea10c5c8ad"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-r1-r2-independent-review.json",
+      "sha256": "3f05894540364a4f47a176f284cd3a1fa68afc5f228cccd44164e02c1384c87c"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r4/windows-local-fresh-admission.json",
+      "sha256": "4ab6e662bd73781d9208247c16e043896282f040c187a7a6fce853f3ce0df462"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r1-r2/archive.json",
+      "sha256": "a19114a1fb92f8aab18581d95ee7efe1cf8dd6518de815fef74dc54f07777433"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-transfer-proof-20261116T195508Z-d7f58b9f/result.json",
+      "sha256": "0a28322554ca2cdeb8b89c13ad3703c6b5ea23a0e4b2eb7949d368ef6e80bcf7"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-proof-20261116T195523Z-c73f3918/windows-local-result.json",
+      "sha256": "cec8425fc0be8c80460105acfbd79dd48363678411a2ce5fe9825c742d1b0cd0"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-proof-20261116T195523Z-c73f3918/windows-local-retention.json",
+      "sha256": "385e625eac034ccf62480321ddb7a49c71a292e08af5a0f5df7808399d34ce64"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/independent-analysis.json",
+      "sha256": "82be0a9cee62bf4d36899fffe4cf67111722e350f471640aaee33d3da8f5e031"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/independent-analysis.md",
+      "sha256": "31c3f1185b9b15bb5644f7ae4a3524f382a68ccca1d91fae14b6b630ed06fe17"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/result.json",
+      "sha256": "52a43c8e013e6b4f7969375dfc3ab58aad3d1f2b04136d380de652435cbacfc0"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/manifest.json",
+      "sha256": "8bb404b6243c48a21fffb5be0e0e1fce8f653132836a0fc77c20e53722439464"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/host-samples.json",
+      "sha256": "088e95919cc2f350d21932d6119fc0feadacb0e8fcb1a5773cbde564d82745a6"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/windows-local-retention.json",
+      "sha256": "538f063adef18551eeae4145664d61df865a3db4a16cc9b30d454dc449af380e"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/windows-local-transfer.json",
+      "sha256": "60ed60aeb7501d560d6c1a423b4b0ef4028b800f3c98200051413374be061416"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/windows-local-cleanup.json",
+      "sha256": "a88cd21f8d9b7cb6034a84169669167867106231887085c7256bec81e69c6e3c"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/root-postcheck.json",
+      "sha256": "de508790c30d0e7eb1b2bb4cb7f03a0d5fd41a31cb6c9edc3257820f512ef708"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200005Z-90ad1405/root-native-postcheck.json",
+      "sha256": "c9a053db615b06f4a3423fdb3879750fa279caebc80d8d1b6f979b9bfdcb3e5f"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T200008Z-8965c3ae/diagnostic.json",
+      "sha256": "f399bbd2bdc73cfeb6ad88c92fc9b34f3e138581581534d18dc9d097dfbedaf6"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T200008Z-8965c3ae/trial-result.json",
+      "sha256": "2958cf2a341047cf59dd9beea3fea384801aa003e6a17660e1abdd8ba8130665"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T200008Z-8965c3ae/gpu-telemetry.jsonl",
+      "sha256": "3c8b820d7c471a6a80adecae2ae18467158562e856e938828009e97f192dea73"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": "runs/verification-gap-closure/assets-v1/diagnostics/ticket101-20261116T200008Z-8965c3ae/observed-processes.json",
+      "sha256": "3148f10208848a0c385ee72f8bb128792697e989a334c60652396adca7e5694c"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r5/archive.json",
+      "sha256": "51c983eeadda999420b2209d40d378a94c2bf1d9a927d3efa901252fcf0aaffe"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r5/windows-local-preparation-receipt.json",
+      "sha256": "e02970aaa1fcfea4b6cb7ae9a2b3625511f32eae04f4b5b8605bdcbdb52b264f"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r5/windows-local-comparison.py",
+      "sha256": "7d85ceb7ab658bc3ef3b2c46879e07e027cd3a75e90087c913a61fb362ed6312"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r5/windows-local-combined-manifest.json",
+      "sha256": "8ef700ee156775fcf78639f4dae45f9746409ac36cdc03db6150b26b1d94c590"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-pre-r5/windows-local-r4-independent-review.json",
+      "sha256": "b170804995f33ab5187105880d100056f2588f8871fafb50f3239a6561ddb28d"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-partial-proof-20261116T200324Z-add20761/result.json",
+      "sha256": "f1039811208c6c5902a23f9a56b25a3075c2e7da946e132f00e8f5a4f07e0fc8"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/independent-analysis.json",
+      "sha256": "57e60492cd86e04a73aefc4c74b6e92001d33131a8910e4a6d504b16a0a38b6b"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/independent-analysis.md",
+      "sha256": "2c6f43b90457dea91fd685b7395bd5b54dc21e29ab617a034015e0539770dfcf"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/result.json",
+      "sha256": "db9fe0c8f068772b71f4298f3298849dc62e169ce6f48aef2564e4df32d7c834"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/manifest.json",
+      "sha256": "8ef700ee156775fcf78639f4dae45f9746409ac36cdc03db6150b26b1d94c590"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/windows-local-retained/observer/receipt.json",
+      "sha256": "515034305b1b0fbd4bee6078af83267974d3b8ab054adf30002b45ea7910e81f"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/windows-local-retention.json",
+      "sha256": "f21e45d1cc1fee276f83481c0accf36994d1a0d4dac6f4392c624ddd161641bd"
+    },
+    {
+      "root": "/mnt/wsl/data/nkt/clearml-yolo",
+      "path": ".tmp/verification-gap-closure/ticket101-telemetry-diagnosis/windows-local-comparison-20261116T200707Z-172b9729/root-postcheck.json",
+      "sha256": "bc96f77df432cd4a1821fd57f269f8c8437ec1f4cb22450ee710316a20bdb2d6"
+    }
+  ],
+  "revision4_followup": {
+    "status": "analysis_complete_combined_failed_native_cancelled",
+    "reviewer": "/root/local_diag_final_review",
+    "reviewed_utc": "2026-11-16T20:10:32.534434+00:00",
+    "scope": "Read-only retained fileanalysis; noGPU,NVIDIAorWindowscommands",
+    "combined": {
+      "status": "failed",
+      "diagnostic": "RuntimeError: Host observer failed",
+      "started": {
+        "utc": "2026-11-16T20:07:07.355978+00:00",
+        "monotonic": 2202.936203822,
+        "boottime": 2202.936205502
+      },
+      "finished": {
+        "utc": "2026-11-16T20:07:33.711896+00:00",
+        "monotonic": 2229.292120766,
+        "boottime": 2229.292121646
+      },
+      "manifest_sha256": "8ef700ee156775fcf78639f4dae45f9746409ac36cdc03db6150b26b1d94c590",
+      "native_SIGTERM_sent": {
+        "utc": "2026-11-16T20:07:25.008623+00:00",
+        "monotonic": 2220.588852986,
+        "boottime": 2220.588853806
+      },
+      "cleanup_complete": true
+    },
+    "native": {
+      "status": "failed",
+      "diagnostic": "Interrupted: Signal 15",
+      "signals_received": [
+        15
+      ],
+      "elapsed_seconds": 15.745074395999836,
+      "finished": {
+        "utc": "2026-11-16T20:07:26.389390+00:00",
+        "monotonic": 2221.969613901,
+        "boottime": 2221.969614531
+      },
+      "cleanup_complete": true,
+      "trial_result_exists": false,
+      "observer_errors": [],
+      "observed_survivors": []
+    },
+    "host_publication_error": {
+      "status": "failed",
+      "error": "System.IO.IOException: The process cannot access the file 'C:\\Users\\bucka\\AppData\\Local\\Temp\\cy-ticket101-windows-local-b44e73f4f1da4b7ea50d2d2cdaf59053\\observer\\receipt.json' because it is being used by another process.\r\n   at System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)\r\n   at System.IO.FileStream.Init(String path, FileMode mode, FileAccess access, Int32 rights, Boolean useRights, FileShare share, Int32 bufferSize, FileOptions options, SECURITY_ATTRIBUTES secAttrs, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)\r\n   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share)\r\n   at Microsoft.PowerShell.Commands.FileSystemProvider.ClearContent(String path)",
+      "finished_utc": "2026-11-16T20:07:24.9114662Z",
+      "elapsed_seconds": 16.051209399999998,
+      "record_statuses": {
+        "completed": 15,
+        "incomplete": 1
+      },
+      "last_record": {
+        "case": 15,
+        "app": "C:\\WINDOWS\\system32\\nvidia-smi.exe",
+        "arguments": "--query-gpu=uuid,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits",
+        "started_utc": "2026-11-16T20:07:24.8974481Z",
+        "start_elapsed_seconds": 16.037233,
+        "stdout": "C:\\Users\\bucka\\AppData\\Local\\Temp\\cy-ticket101-windows-local-b44e73f4f1da4b7ea50d2d2cdaf59053\\observer\\15.stdout",
+        "stderr": "C:\\Users\\bucka\\AppData\\Local\\Temp\\cy-ticket101-windows-local-b44e73f4f1da4b7ea50d2d2cdaf59053\\observer\\15.stderr",
+        "cleanup_complete": false,
+        "pid": 48584,
+        "creation_filetime": 134393332448990916
+      },
+      "host_final_cleanup_complete": true
+    },
+    "timing": {
+      "clock_offset_bounds_seconds": [
+        -0.039788007736206055,
+        0.4951508045196533
+      ],
+      "host_finished_linux_earliest": "2026-11-16T20:07:24.416315+00:00",
+      "host_finished_linux_latest": "2026-11-16T20:07:24.951254+00:00",
+      "native_SIGTERM_after_host_finished_minimum_seconds": 0.05736899375915527,
+      "interpretation": "Hostpublicationfailure and finalcleanup precede nativecancellation across retainedclockbracket; errorwasnotcausedbylaternativeSIGTERM. Exact sharingholder is notlogged."
+    },
+    "telemetry": {
+      "host_admitted_samples": 15,
+      "host_min_free_mib": 28280.0,
+      "host_max_process_and_supervision_elapsed_seconds": 0.07195689999999999,
+      "host_max_oldest_sample_age_at_consumption_seconds": 0.6023118495941162,
+      "linux_samples": 14,
+      "linux_min_free_mib": 28278,
+      "linux_max_completed_sample_gap_seconds": 1.0785515779998605,
+      "slow_or_deadline_adjacent_smi_observations": 0,
+      "timeout_interpretation": "No5second querytimeout is recorded; case15 has no completedsample/timerresult and is not counted as successful."
+    },
+    "cleanup": {
+      "Windows_identities_absent": 17,
+      "retained_files_rehashed": 40,
+      "local_directory_absent_recorded": true,
+      "root_recorded_Linux_PIDs_absent": 72,
+      "root_compute_list_empty": true,
+      "root_postcheck": {
+        "utc": "2026-11-16T20:08:53.494683+00:00",
+        "retained_files_verified": 40,
+        "all_recorded_linux_pids_absent": true,
+        "linux_pids": [
+          757703,
+          757796,
+          757856,
+          757912,
+          757955,
+          757958,
+          757961,
+          757965,
+          758047,
+          758106,
+          758157,
+          758167,
+          758170,
+          758174,
+          758178,
+          758183,
+          758186,
+          758190,
+          758195,
+          758198,
+          758215,
+          758224,
+          758225,
+          758237,
+          758244,
+          758247,
+          758252,
+          758255,
+          758258,
+          758264,
+          758274,
+          758283,
+          758303,
+          758314,
+          758342,
+          758390,
+          758397,
+          758405,
+          758417,
+          758419,
+          758420,
+          758430,
+          758435,
+          758437,
+          758460,
+          758461,
+          758471,
+          758476,
+          758479,
+          758567,
+          758596,
+          758598,
+          758611,
+          758628,
+          758632,
+          758637,
+          758638,
+          758646,
+          758709,
+          758858,
+          759041,
+          759044,
+          759105,
+          759462,
+          759526,
+          759661,
+          759714,
+          759740,
+          759841,
+          759901,
+          760050,
+          763949
+        ],
+        "compute_list_empty": true,
+        "combined_status": "failed",
+        "native_status": "cancelled_failed",
+        "windows_cleanup_evidence": "17 exact Windows identities absent in bound combined receipt; no independent new Windows calls"
+      }
+    },
+    "cause_assessment": {
+      "proven": "Windowsreceiptpublisher failedopeningreceipt.jsonforClearContent because filewasinusebyanotherprocess; originalSave-Receipt usesin-placeSet-Content.",
+      "not_proven": "Exact competinghandle/process isnotidentified. ConcurrentLinuxpolling isplausible, notdemonstrated asholder. Earlierrevision3readPermissionError hasnotbeenproven tohaveidenticalcause. No historical5secondtelemetrystall cause determined.",
+      "consequence": "Optionalreader PermissionError handling alone is insufficient; thewriter fails its publication protocol and appropriately cancelsnativework."
+    },
+    "next_work": {
+      "status": "GPU_retry_deferred",
+      "scope": "Prepare receipt publication that tolerates concurrentreaders, with representative simultaneous Windowswriter/Linuxreader CPUproof and ownership/retention/failurechecks; independentlyreviewfrozencandidate before anynewGPUrun. Preservealltime/reserveguards and originalfailure."
+    },
+    "limitations": [
+      "Nativeprobe wascancelled and isnotaccepted; earlierR3nativepass remainsseparate.",
+      "No continuousreserve,fullmatrix,queueparity,exportparity,driverfix orWSLrootcauseclaim.",
+      "Thisanalysis didnotexecute anyexternalprocess beyondlocalPythonfileanalysis."
+    ],
+    "analysis_bound_files": 72
+  }
+}
