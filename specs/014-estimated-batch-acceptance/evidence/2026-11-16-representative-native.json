@@ -870,5 +870,39 @@
       "sha256": "0e94976c56ada8b82e5b728ace5ae199b1330ccaabde9e7afd55ac17baf1f72c",
       "size": 110
     }
+  },
+  "acceptance": {
+    "status": "accepted",
+    "tickets": [
+      3,
+      5,
+      98
+    ],
+    "independent_review": "approved, no blocking findings",
+    "canonical_gate_commit": "872fe25",
+    "affected_tests_passed": 39,
+    "cleanup": {
+      "status": "passed",
+      "removed": [
+        {
+          "path": "dataset-cache",
+          "removed_bytes": 24465822,
+          "absent": true
+        },
+        {
+          "path": "readback/20261116T142920Z-f1e26b43/cache",
+          "removed_bytes": 22357809,
+          "absent": true
+        },
+        {
+          "path": "readback/20261116T142920Z-f1e26b43/cpu-validation",
+          "removed_bytes": 3602937,
+          "absent": true
+        }
+      ],
+      "removed_bytes": 50426568,
+      "protected_files_reverified": 22,
+      "preserved": "all handoff files, checkpoints, source inputs, shared assets and services"
+    }
   }
 }

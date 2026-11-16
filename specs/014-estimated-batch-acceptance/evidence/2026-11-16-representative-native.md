@@ -1,8 +1,8 @@
 # Representative native acceptance — 2026-11-16
 
-**Execution passed; final acceptance review and ledger reconciliation pending.**
+**Accepted for the scoped representative recipe (tickets 03/05) and reserve correction (98).**
 The fourth representative case, `ultralytics-default-2e66fec4f0`, completed in
-273.38 seconds. It supports the same recipe required by tickets03 and05; no
+273.38 seconds. It supports the same recipe required by tickets 03 and 05; no
 duplicate training is needed. Earlier failed attempts remain failed evidence.
 
 ## Source, inputs and capacity
@@ -71,3 +71,33 @@ The source fixes passed focused checks, independent product review and canonical
 automatic verification. Mutation follow-up strengthened device/boundary/PID tests;
 their final test-only commit and final evidence reconciliation remain coordinator
 work. No blanket campaign completion, push, deployment or release is claimed.
+
+## Final independent review and cleanup
+
+Fresh read-only review approved scoped acceptance after independently matching all
+459 source inputs, all 22 handoff files, all 8 downloaded artifact hashes, recipe and
+epoch/update evidence, native checkpoint identity, remote scientific/configuration
+checks and telemetry. The maximum sampled telemetry gap was 1.079 seconds. No
+blocking finding remained. The final canonical gate passed on `872fe25`; explicit
+native `task test` passed 39 affected checks in 3.05s, so documentation-only routing
+did not hide the final inventory tests. Product content remained unchanged from
+the successful GPU launch; later changes strengthened tests and recorded evidence.
+
+Mutation disposition completed for both reserve boundaries: allocator guard 44 killed
+and 9 justified advisory survivors; inventory 66 killed and 7 justified advisory
+survivors; neither final report had timeouts, unreached or unrun mutants. The full
+CPU baseline and earlier mutation limits remain recorded separately; no new global
+coverage percentage is inferred from affected tests.
+
+After review, the coordinator removed exactly the case-owned dataset cache and the
+successful readback's cache/copied CPU validation dataset, freeing 50,426,568 bytes.
+All 22 protected handoff files were rehashed afterwards and matched. `cleanup.json`
+records exact paths/absence; `handoff.json` now records accepted status. The native
+checkpoint, fresh downloaded checkpoint, original inputs, all reports/receipts and
+shared services remain available to downstream consumers. GPU and CPU readback
+processes exited. Earlier failed-attempt logs remain retained.
+
+Feature014 T013/T014 and tickets03/05/94/96/97/98 are reconciled with their scoped
+evidence. Ticket91's independently reviewed filesystem result is also accepted.
+Final reconciliation93 and the remaining campaign tickets remain open. This dated
+acceptance update receives the canonical documentation route before local integration.

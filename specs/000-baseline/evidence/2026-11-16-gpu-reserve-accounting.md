@@ -98,3 +98,10 @@ new behavior automatically.
 - `src/clearml_yolo/adapters/runtime/gpu_inventory.py`: `b97a7b58b2fd2951a3a77b4a142d8e8554fafa8581b1486c4c07dab8f3900384`
 - `tests/test_gpu_inventory.py`: `b50e8691a12089b93d27718fbdd149901c7c8c9ca36ee7807d24481ee7877e80`
 - `tests/test_batch_probe.py`: `cc27bd3392bc83989e061dd58d5259141350dcdab76cbc5717825ec9309fedfe`
+
+## Final disposition
+
+**Accepted** after both accounting corrections, final mutation review and the
+independently reviewed representative run. See the linked feature014 representative
+evidence for final source identities, monitored reserve, full readback, verification
+and cleanup. Earlier failed attempts are not reused as passes.

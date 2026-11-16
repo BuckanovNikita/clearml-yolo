@@ -31,8 +31,8 @@
 ## Phase 6: Acceptance and review
 
 - [x] T012 Run focused product checks, typing/lint/architecture and scoped mutation review; record dated evidence under this feature (FR-001–006,008).
-- [ ] T013 Run coordinator-admitted representative native GPU scenario through checkpoint reload and publication readback; record timing and cleanup (FR-007,008).
-- [ ] T014 Obtain independent review after integration/checks, reconcile ticket03 and commit via coordinator (FR-001–008).
+- [x] T013 Run coordinator-admitted representative native GPU scenario through checkpoint reload and publication readback; record timing and cleanup (FR-007,008).
+- [x] T014 Obtain independent review after integration/checks, reconcile ticket03 and commit via coordinator (FR-001–008).
 
 ## Dependencies and execution order
 
