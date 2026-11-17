@@ -191,7 +191,7 @@ need a bigger `export.workspace_gib`.
   target).
 - Raw pre-NMS outputs are not exposed, so verification compares final detections only.
 - The standalone runner needs Python `>=3.12.13,<3.14`, the project installed with
-  `--no-deps`, NumPy, Pydantic 2, TensorRT 10.13.0 bindings and libraries, and a
+  `--no-deps`, NumPy, Pydantic 2, Loguru, TensorRT 10.13.0 bindings and libraries, and a
   compatible CUDA runtime library (`libcudart`). TensorRT is provisioned separately and
   is not a project dependency; `cy-export verify` additionally needs the native model and
   evaluation dependencies. Torch, Torchvision, timm, ONNX, ClearML and cuda-python are
@@ -200,7 +200,7 @@ need a bigger `export.workspace_gib`.
 
   ```bash
   python -m pip install --no-deps .
-  python -m pip install numpy 'pydantic>=2,<3' 'tensorrt-cu12==10.13.0.35'
+  python -m pip install numpy 'pydantic>=2,<3' 'loguru>=0.7.0' 'tensorrt-cu12==10.13.0.35'
   ```
 
   plus the matching NVIDIA CUDA runtime library. Choose TensorRT bindings that support

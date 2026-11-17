@@ -7,8 +7,8 @@ description: Use when preparing a PR for merge, inspecting the automatic release
 
 Paths start at the repository root. `docs/development.md#releases` describes the release
 workflow and what it publishes; `docs/development.md#paired-cy-and-queue-check` describes
-pairing; model-weight releases follow `docs/development.md#model-weight-releases` only
-when the user asks for one.
+pairing; model-weight releases follow `docs/development.md#model-weight-releases` under
+the authorization rule in `AGENTS.md`.
 
 ## Before merge
 

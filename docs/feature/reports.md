@@ -84,8 +84,8 @@ counts for eligibility. Report input dashboards that already carry valid counts 
 as declared.
 
 When a class has no valid count, evaluation dashboards and reports keep its metrics in an
-`Unknown training count` sheet, excludes it from count-dependent aggregates and deltas,
-lists it in a `Report issues` sheet (model, class, field, reason, impact) and opens on
+`Unknown training count` sheet, exclude it from count-dependent aggregates and deltas,
+list it in a `Report issues` sheet (model, class, field, reason, impact) and open on
 that sheet; other sheets get a warning comment on their first cell. An entirely unknown
 population produces unavailable summaries. The `report` stage of a pipeline then ends
 with a warning outcome.

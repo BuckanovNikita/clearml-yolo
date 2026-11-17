@@ -322,8 +322,10 @@ have their own cadence; reuse the current snapshot until its catalogue changes.
      --output ./weight-release --tag weights-YYYY-MM-DD --notices ./weight-notices
    ```
 
-   The output directory must be empty. The script writes one independent `.tar` per
-   bundle, `manifest.json` and `SHA256SUMS`; any unresolved catalogue entry fails
+   The output directory must be empty. The script writes independently downloadable
+   `weights-NNN.tar` and `deim-noncommercial-NNN.tar` archives (layout in
+   [model assets](feature/model-assets.md#weight-bundles-and-the-pin)), `manifest.json` and
+   `SHA256SUMS`; any unresolved catalogue entry fails
    packaging. Each archive, including tar overhead and notices, stays under
    `--max-archive-bytes` (default 1,900,000,000 bytes), below the hosting size limit. It uploads
    nothing and changes no pin.

@@ -34,7 +34,7 @@ The package is not published on PyPI. `pyproject.toml` declares `digital-metrics
 
 Installing from a Git URL of the repository ignores the committed `uv.lock` and the local
 wheelhouse: the installer's own package index must provide `digital-metrics` and
-`report-generator` at the declared versions.
+`report-generator` at versions satisfying the declared lower bounds.
 
 The source-checkout route, which the repository's own setup and the README quick start
 use, builds both packages locally. Copy the approved source trees of
