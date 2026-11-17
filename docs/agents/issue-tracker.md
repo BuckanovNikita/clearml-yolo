@@ -1,62 +1,70 @@
 # Issue tracker: Linear and GitHub PRs
 
-Use Linear team `SIP`, project `clearml-yolo`, for active requirements, implementation
-plans, acceptance criteria, dependencies, ownership, discussion and status. Resolve an
-issue by its Linear identifier or URL. GitHub PRs in `BuckanovNikita/clearml-yolo` own
-implementation review and delivery. Link issues, PRs and evidence in both directions.
+Linear team `SIP` hosts several projects; create every issue for this repository in
+project `clearml-yolo`. Linear owns requirements, plans, acceptance criteria, dependencies,
+ownership, discussion and status; resolve an issue by its identifier or URL. GitHub PRs in
+`BuckanovNikita/clearml-yolo` own review and delivery. Link issues and PRs both ways.
 
-## Planning and acceptance
+## Issues
 
-Each issue records the outcome, scope, implementation plan where needed, blockers,
-compatibility constraints, acceptance criteria and selected verification. Discover
-current source and configuration before relying on historical claims. Transfer needed
-requirements from archived sources into Linear with provenance; Spec Kit remains archived.
+Start each new issue from the [issue template](issue-template.md). An issue records the
+outcome, scope, plan where needed, blockers, compatibility constraints, acceptance
+criteria, selected verification and evidence, plus the assumptions made and deviations
+from the plan. Inspect current source and configuration before relying on claims in older
+issues.
 
-Use the team's lifecycle states: Backlog, Todo, In Progress, In Review, Done, Canceled,
-and Duplicate. Readiness labels follow [triage guidance](triage-labels.md). A ready label
-does not override dependencies. Start dependent implementation only when its prerequisite
-is implemented and verified on the branch used as its base; merge dependencies remain.
-Move to In Review when implementation and required verification are ready for review.
+Lifecycle states:
 
-Record evidence with source/environment identities, actual checks and outcomes, exclusions,
-reuse reasons and remaining limitations. Link dated repository evidence when needed.
-Mark an issue Done only after its changes reach `master` and its acceptance criteria are
-satisfied. Verification-only work completes on its recorded acceptance outcome.
+| State | When |
+| --- | --- |
+| Backlog | Captured, not yet planned |
+| Todo | Planned and ready to start |
+| In Progress | Work started on a task branch |
+| In Review | PR open, implementation and required verification ready for review |
+| Done | Changes reached `master` and acceptance criteria are met; verification-only work completes on its recorded outcome |
+| Canceled | Will not be done |
+| Duplicate | Merged into another issue, which is linked |
 
-## PR grouping and authorization
+Readiness labels are separate from state: see [triage labels](triage-labels.md).
 
-Default to one branch and PR for a cohesive feature, including multiple tickets when
-appropriate. Link every included issue and map its acceptance criteria to implementation
-and evidence. Keep those issues open until the shared PR merges and criteria are met.
-Use stacked PRs when separate review units or dependency sequencing benefit delivery;
-record the grouping in Linear before implementation. Routine grouping needs no approval.
+## Dependencies
 
-Agents may push task branches and create PRs. Humans merge PRs. Use Conventional Commits,
-the existing SSH remote, and task-owned branches; never deliver by merging locally into
-`master` or pushing `master` from an agent session. Explicit session restrictions take
-precedence. Human merges to `master` authorize automatic version commits and annotated
-tags through the [release workflow](../development.md#local-releases). Complete selected
-verification and pairing before merge; record the workflow result and remote tag identity
-in the linked issue when a release is produced.
+Record blocking relations explicitly. Start dependent implementation only when its
+prerequisite is implemented and verified on the branch used as its base; merge order
+still follows the dependency. A canceled prerequisite requires replanning or removing the
+dependent work, never bypassing it.
 
-For stacks, the first PR targets `master`; descendants target their parent branches.
-Link parent PRs and merge order. Review incremental diffs and verify the cumulative
-feature delta against `master`, recording base/head SHAs. Draft PRs may contain incomplete
-work; required deferred verification blocks merge readiness. Independent review follows
-integrated verification for behavior, interface, dependency, security and policy changes.
+## Parent and sub-issues
 
-Humans merge stacks bottom-up. Retarget or restack remaining branches after each merge,
-inspect the resulting diffs, reassess evidence applicability, and repeat affected checks
-and independent review. Use force-with-lease only for task-owned branch rewrites. A canceled
-prerequisite requires replanning or removing dependent work, never silently bypassing it.
-Do not assume GitHub checks, branch protection or Linear automation is configured.
+Similar work is one parent issue per family with one sub-issue per model or unit; variants
+are checkboxes inside the sub-issue. The parent holds the shared checklist once. A parent
+is Done when every sub-issue is Done or waived by the user. Parenthood is not a blocker,
+so blocking relations stay explicit. A ticket merged into another is marked Duplicate of
+the kept one.
 
-## Migration and archive
+## Evidence
 
-Local `.scratch/*/issues/*.md` tickets are superseded by Linear. Reconcile their status
-against acceptance evidence; migrate active work with requirements, relevant discussion
-and blocking edges. Record the original path as migration identity, check for an existing
-issue before creation, and maintain a dated mapping. Preserve completed historical tickets
-and historical prerequisite context without inventing active blockers. Preserve original
-files; stop updating their ticket status after migration. Archived Spec Kit artifacts are
-read-only historical sources, never a parallel active tracker.
+Evidence lives only in the issue and its PR: source and environment identities, commands,
+checks and outcomes, exclusions, reuse reasons and remaining limitations. The repository
+holds no evidence files.
+
+## PR grouping and delivery
+
+Default to one branch and PR per cohesive feature, including several issues when
+appropriate. Link every included issue, map its acceptance criteria to implementation and
+evidence, and keep it open until the PR merges. Use stacked PRs when separate review units
+or dependency sequencing help delivery; record the grouping in the issue before
+implementation. Routine grouping needs no approval.
+
+Push task-owned branches to the existing SSH remote. PRs are squash-merged; write the PR
+title as a Conventional Commit header, because it becomes the squash commit's header
+(see [releases](../development.md#releases) for how the release is decided). There is no
+CI check job; do not assume branch protection or Linear automation.
+
+For stacks, the first PR targets `master` and each descendant targets its parent branch.
+Link parent PRs and the merge order. Review incremental diffs and verify the cumulative
+delta against `master`, recording base and head SHAs. Draft PRs may hold incomplete work.
+
+Humans merge stacks bottom-up. After each merge, retarget or restack the remaining
+branches, inspect the resulting diffs, reassess evidence applicability, and repeat
+affected checks and review. Use `--force-with-lease` only to rewrite task-owned branches.

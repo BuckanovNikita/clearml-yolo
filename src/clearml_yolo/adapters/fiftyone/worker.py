@@ -1,4 +1,11 @@
-"""Fresh optional-publication interpreter; owner metadata never enters this process."""
+"""Fresh optional-publication interpreter; owner metadata never enters this process.
+
+Arguments are the request, result and phase paths written by ``bounded``. The worker waits
+for the supervisor's start gate, records its phase (``bootstrap``, ``import``, then publisher
+phases, then ``shutdown``) for timeout diagnostics, and writes its result to a ``.pending``
+sibling before an atomic replace, so the supervisor never reads a partial receipt. Failures
+exit 1 with a redacted summary on stderr.
+"""
 
 import os
 import sys

@@ -1,4 +1,17 @@
-"""Real CPU distributed YOLO training and invocation-owner telemetry."""
+"""Real CPU distributed YOLO training and invocation-owner telemetry.
+
+Two- and four-rank CPU/Gloo process groups run native YOLO training, validation and
+checkpointing on synthetic images with a randomly initialized model built from the installed
+YOLOv8 architecture YAML: no download, network, GPU or ClearML service. A local recording
+task stands in at the tracking boundary while the production owner relay runs; the test-only
+trainer and launcher keep the installed native loops. Success establishes real rank
+processes, parameter updates, cross-rank synchronization, sampler partitions, ordered
+owner-only telemetry and one loadable best checkpoint, also with a custom augmentation
+pipeline. Worker and owner-callback failures must publish no model and must clean up owned
+processes, relay threads, callbacks and environment changes. Only a non-Linux platform or
+missing Gloo skips. Not established here: accelerator launch, NCCL, AMP or real ClearML
+transfers.
+"""
 
 import math
 import sys

@@ -1,23 +1,26 @@
 # clearml-yolo
 
-Обучает модели детекции по CSV с разметкой и сохраняет веса, метрики и отчёты
-в ClearML. Можно запустить только обучение, а можно весь эксперимент: обучение,
-предсказания, подбор порогов, оценку и сравнение с прежней моделью.
+Обучает детекторы по CSV с разметкой. Веса, метрики и отчёты сохраняются в ClearML.
+Можно запустить только обучение или весь эксперимент: обучение, инференс, подбор порогов,
+оценку и сравнение с прежней моделью.
 
 Поддерживаются YOLO (Ultralytics), DEIMv2, RF-DETR, Faster R-CNN и FCOS.
 
 ## Установка
 
-Нужны:
+Что нужно:
 
 - Linux с поддержкой pidfd, Python `>=3.12.13,<3.14` и установленный `uv`;
-- настроенный доступ к ClearML с хранилищем артефактов — без ClearML команды
+- настроенный доступ к ClearML с хранилищем артефактов: без ClearML команды
   обучения и оценки не работают;
-- исходники `digital-metrics` и `report-generator` утверждённых ревизий; ревизии
-  перечислены в [руководстве по разработке](docs/development.md#external-dependencies).
+- для установки из исходников — исходники `digital-metrics` и `report-generator`
+  утверждённых ревизий. Ревизии перечислены
+  в [руководстве по разработке](docs/development.md#external-dependencies).
 
-Пакет ставится из исходников, в PyPI его нет. Скопируйте обе зависимости
-в `external/digital-metrics` и `external/report-generator`, затем из корня репозитория:
+В PyPI пакета нет. Ниже — установка из исходников. Про установку по Git-ссылке см.
+[docs/feature/installation.md](docs/feature/installation.md). Скопируйте обе зависимости
+в `external/digital-metrics` и `external/report-generator`. Затем выполните в корне
+репозитория:
 
 ```bash
 uvx --from go-task-bin task local-deps   # собирает external/wheelhouse и создаёт uv.toml
@@ -27,12 +30,12 @@ source .venv/bin/activate
 ```
 
 Зависимости всех моделей и ONNX-экспорта ставятся сразу, extras нет. Очередь заданий —
-отдельный пакет [cy-queue](https://github.com/BuckanovNikita/cy-queue). Требования
-к окружению подробнее описаны в [техническом справочнике](TECH_DETAILS.md#setup).
+отдельный пакет `cy-queue` (см. раздел «Очередь»). Требования к окружению — в разделе
+«Совместимость и зависимости».
 
 ## Первое обучение
 
-Подготовьте CSV с разметкой: одна строка — один объект, координаты углов рамки
+Подготовьте CSV с разметкой: одна строка — один объект, координаты углов bbox
 в пикселях.
 
 ```csv
@@ -42,7 +45,7 @@ val.jpg,images/val.jpg,helmet,10,20,100,120,val
 test.jpg,images/test.jpg,helmet,10,20,100,120,test
 ```
 
-Запустите обучение. Проект, имя задачи и теги ClearML указываются явно:
+Запустите обучение. Проект, имя Task и теги ClearML укажите явно:
 
 ```bash
 cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt ultralytics.device=0 \
@@ -57,30 +60,90 @@ cy-train model=rfdetr/small ground_truth=./ground_truth.csv model.train.device=0
   clearml.project_name=detection clearml.task_name=rfdetr-small-train 'clearml.tags=[rfdetr,training]'
 ```
 
-Команда стартует сразу и не ждёт, пока GPU освободится. Для CPU замените `0` на `cpu`:
+Команда стартует сразу и не ждёт, пока освободится GPU. Для CPU замените `0` на `cpu`:
 `ultralytics.device=cpu` или `model.train.device=cpu`.
 
-Ход обучения виден в задаче ClearML на вкладках `Console`, `Scalars` и `Plots`,
-лучшие веса — в `Output Models`. Локальные файлы лежат
-в `runs/<проект>/<задача>-<task-id>/`; точный путь к весам есть в журнале.
+Ход обучения смотрите в ClearML Task на вкладках `Console`, `Scalars` и `Plots`.
+Лучшие веса — в `Output Models`. Локальные файлы лежат
+в `runs/<проект>/<задача>-<task-id>/`. Имя файла лучших весов зависит от семейства.
+Для YOLO это `weights/best.pt`, и его точный путь пишется в лог.
 
-## Данные
+## Команды и конфигурация
 
-Правила для CSV:
+`cy` запускает весь pipeline:
 
-- Несколько объектов на изображении — несколько строк с одним и тем же изображением.
-  Изображение без объектов — одна строка с пустыми классом и координатами.
-- `image_name` совпадает с именем файла. Относительный `image_path` считается
-  от каталога, где лежит CSV.
-- Выборки `train`, `val` и `test` назначаете вы. `cy-train` нужны `train` и `val`,
-  полному `cy` — ещё и `test`.
-- Имена классов читаются буквально: `NA`, `None`, `nan` и числа остаются именами
-  классов, а не пропусками.
-- Некорректные рамки отбрасываются с сообщением. Если в `train` не осталось ни одной
-  рамки, обучение не начнётся.
+- обучение;
+- инференс;
+- подбор порогов на `val`;
+- метрики;
+- сравнение с baseline на `test`;
+- отчёты и публикацию в FiftyOne.
 
-Вместо локального файла можно сослаться на финализированный ClearML Dataset, по ID
-либо по проекту и имени:
+Отдельные шаги запускают `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare`,
+`cy-report`, `cy-ground-truth` и `cy-export`. Каждая команда собирает конфиг из
+встроенных значений, необязательного каталога с YAML и параметров командной строки.
+Конфиг проверяется до начала работы и записывается в ClearML Task команды. По нему
+ClearML Agent может повторить запуск.
+
+```bash
+cy ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
+  ultralytics.epochs=50 ultralytics.device=0 ultralytics_predict.device=0 \
+  run_dir=./runs/experiment-01 clearml.project_name=detection \
+  clearml.task_name=yolo11n-experiment 'clearml.tags=[yolo,experiment]'
+```
+
+Устройства для обучения и инференса задаются отдельно. У остальных семейств это
+`model.train.device` и `model.predict.device`. Отдельный шаг `cy` можно выключить
+параметром `skip_<шаг>=true`, например `skip_compare=true`.
+
+Для каждого эксперимента берите новый `run_dir`. Существующий каталог не очищается,
+и файлы прошлого запуска остаются рядом с новыми.
+
+Когда параметров много, сохраните их в файлы: `cy-init-config cy-config`. Команда
+создаст:
+
+- `cy-config/cy.yaml` с общими настройками (список `defaults` в нём не трогайте);
+- файлы с параметрами обучения и инференса, например
+  `cy-config/ultralytics/default.yaml` — без обёртки `ultralytics:`.
+
+Впишите в `cy-config/cy.yaml` путь `ground_truth`, а также проект, имя Task и теги
+ClearML (пример — в разделе «Публикация в ClearML»). Без `ground_truth` команда
+не запустится.
+
+Запуск: `cy --config-dir cy-config --config-name cy`. Параметры командной строки
+переопределяют файлы. `--cfg job --resolve` показывает итоговый конфиг. Для другой
+команды или семейства добавьте `--command` и `--model` (пример — в разделе «Семейства
+моделей»). `cy-init-config` не перезаписывает существующие файлы, если не указан
+`--force`.
+
+Sweep — запуск нескольких вариантов параметров — включается флагом `-m`, например
+`cy --config-dir cy-config --config-name cy -m ultralytics.epochs=10,20`. Варианты
+выполняются по очереди. Каждый Task из одного sweep получает общий тег с датой
+и случайной фразой — по нему их легко найти в ClearML.
+
+Task можно выполнить через ClearML Agent. Настройки берутся из конфига `run`,
+сохранённого в Task, так что повторять аргументы командной строки не нужно. Зависимости
+ставит ваше окружение Agent, GPU он выбирает через `CUDA_VISIBLE_DEVICES`.
+
+Запускайте команды из Git-репозитория. Вне репозитория команда работает,
+но предупреждает об этом.
+
+Если команда пишет про неизвестный параметр, проверьте префикс группы
+(`ultralytics.`, `model.train.`) и сверьтесь со свежим YAML из `cy-init-config`.
+
+Подробнее:
+[docs/feature/commands-and-configuration.md](docs/feature/commands-and-configuration.md).
+
+## Данные и разметка
+
+Разметка для всех команд — один CSV. В нём строка на каждый объект. Изображение без
+объектов — одна строка с пустыми классом и координатами. В каждой строке есть имя и путь
+изображения, класс, углы bbox в пикселях и split.
+
+`ground_truth` принимает путь к CSV или ссылку на финализированный ClearML Dataset.
+`cy-ground-truth` переводит в такой CSV разметку YOLO. Перед обучением CSV проверяется.
+Подготовленная копия данных кэшируется и переиспользуется, пока не меняются CSV и пути
+к изображениям.
 
 ```bash
 cy-train 'ground_truth={dataset_id:DATASET_ID}' ultralytics.model=yolo11n.pt ultralytics.device=0 \
@@ -91,91 +154,101 @@ cy-train 'ground_truth={project_name:annotations,name:ground-truth,version:"1.2.
   clearml.project_name=detection clearml.task_name=versioned-train 'clearml.tags=[training]'
 ```
 
-В наборе должен лежать один файл `dataset.csv`. Изображения в набор не входят:
+В ClearML Dataset должен лежать один файл `dataset.csv`. Изображения в Dataset не входят:
 пути из CSV должны быть доступны на машине, где идёт обучение. Без `version` каждый
 новый запуск берёт версию, которую выберет ClearML, и она может оказаться другой.
 
-Формат и все проверки описаны в [контракте входных данных](docs/input-provenance.md).
-Если разметка в формате YOLO, её переводит в CSV [`cy-ground-truth`](#другие-команды).
+Правила для CSV:
 
-## Модели и параметры
+- Несколько объектов на изображении — несколько строк с одним и тем же изображением.
+  Изображение без объектов — одна строка с пустыми классом и координатами.
+- `image_name` совпадает с именем файла. Относительный `image_path` считается
+  от каталога, где лежит CSV.
+- Какой split у каждого изображения — `train`, `val` или `test`, — решаете вы.
+  `cy-train` нужны `train` и `val`, полному `cy` — ещё и `test`.
+- Имена классов читаются буквально: `NA`, `None`, `nan` и числа остаются именами
+  классов, а не пропусками.
+- Некорректные bbox отбрасываются с сообщением. Если в `train` не осталось ни одного
+  bbox, обучение не начнётся.
 
-| Семейство | Значения `model=` |
-| --- | --- |
-| YOLO | `ultralytics` (по умолчанию); `ultralytics.model` обязателен — файл весов или архитектуры |
-| DEIMv2 | `deimv2/s`, `deimv2/m`, `deimv2/l`, `deimv2/x` |
-| RF-DETR | `rfdetr/nano`, `rfdetr/small`, `rfdetr/medium`, `rfdetr/large` |
-| Faster R-CNN | `fasterrcnn/resnet50_fpn`, `fasterrcnn/resnet101_fpn`, `fasterrcnn/convnext_tiny`, `fasterrcnn/swin_tiny`, `fasterrcnn/dinov2_small`, `fasterrcnn/dinov3_small` |
-| FCOS | `fcos/resnet50_fpn`, `fcos/resnet101_fpn`, `fcos/convnext_tiny`, `fcos/swin_tiny`, `fcos/dinov2_small`, `fcos/dinov3_small` |
+Разметку YOLO (`data.yaml` и изображения) переводит в CSV `cy-ground-truth`, например
+`cy-ground-truth data_yaml=./dataset/data.yaml output=./converted/ground_truth.csv
+test_fraction=0.5 seed=0 clearml.project_name=detection
+clearml.task_name=convert-ground-truth 'clearml.tags=[conversion]'`. Если в исходной
+разметке нет `test`, под него уходит часть `val` (`test_fraction`, `seed`). Проверьте,
+как разбились данные, перед обучением.
 
-| Что изменить | YOLO | Остальные семейства |
-| --- | --- | --- |
-| Число эпох | `ultralytics.epochs=50` | `model.train.epochs=50` |
-| Размер пакета | `ultralytics.batch=8` | `model.train.batch=8` |
-| Размер изображения | `ultralytics.imgsz=640` | `model.train.imgsz=640` |
-| Устройство | `ultralytics.device=0` | `model.train.device=0` |
-| Начальные веса | `ultralytics.model=./best.pt` | `model.train.weights=./best.pth` |
+Если не найдены изображения или split, проверьте пути относительно CSV и наличие
+`train` и `val`, а для `cy` — ещё и `test`.
 
-Для YOLO модель нужно указать всегда, у остальных семейств её задаёт пресет. По
-умолчанию обучение начинается с предобученных весов. Если их не удалось получить или
-они не подходят модели, команда завершится с ошибкой, а не возьмёт случайные.
-Указанные вами веса — это начало нового обучения: продолжить прерванное (`resume`)
-нельзя. Для RF-DETR и DEIMv2 размер изображения должен быть квадратным и кратным 32,
-для DEIMv2 — ещё и не меньше 128.
+Подробнее:
+[docs/feature/datasets-and-ground-truth.md](docs/feature/datasets-and-ground-truth.md).
 
-Исходники и веса DEIMv2 скачиваются при первом запуске. Что делать в сети без
-доступа к GitHub, описано в разделе [Веса без доступа к сети](#веса-без-доступа-к-сети).
-Остальные особенности семейств — в [руководстве по моделям](docs/multi-model-backends.md).
+## Обучение
 
-### Размер пакета из таблицы
+Обучение превращает проверенный CSV в лучший чекпойнт выбранного семейства. `cy-train`
+запускает только обучение, `cy` — обучение как первый шаг pipeline. Команда сама:
 
-Если не хочется подбирать размер пакета вручную, задайте `ultralytics.batch=null`
-или `model.train.batch=null`. Значение возьмётся из таблицы `CY_HOME/.config/clearml-yolo/batch-sizes.yaml`, где для GPU,
-размера изображения и модели записан размер пакета на одну GPU:
-
-```yaml
-"NVIDIA GeForce RTX 4090 [24 GiB]":
-  960:
-    ultralytics/yolo11n: 32
-    rfdetr/small: 3
-```
-
-Таблицу можно заполнить вручную или измерением на свободных GPU:
+- готовит данные;
+- при необходимости берёт batch size из таблицы;
+- запускает процессы обучения на указанных устройствах и следит за ними;
+- сохраняет лучший чекпойнт для инференса и публикации.
 
 ```bash
-cy-batch-estimate --imgsz 960
-cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1
-cy-batch-estimate --list
+cy --config-dir cy-config --config-name cy 'ultralytics.device=[0,1]' ultralytics_predict.device=0
 ```
+
+Параметры YOLO начинаются с `ultralytics.`, остальных семейств — с `model.train.`.
+Например, `ultralytics.epochs=50` или `model.train.epochs=50`. Так же задаются `batch`,
+`imgsz` и `device`. Начальные веса: `ultralytics.model=./best.pt`
+или `model.train.weights=./best.pth`. Это всегда начало нового обучения: продолжить
+прерванное (`resume`) нельзя.
+
+Для multi-GPU обучения перечислите устройства, как в примере. Инференс идёт на одной GPU.
+У остальных семейств это `'model.train.device=[0,1]'`, и `model.train.batch` должен
+делиться на число GPU.
+
+Подробнее: [docs/feature/training.md](docs/feature/training.md).
+
+## Семейства моделей
+
+Все пять семейств — Ultralytics YOLO, DEIMv2, RF-DETR, Faster R-CNN и FCOS — работают
+с одним форматом CSV, метрик и публикации. Семейство и пресет выбирает `model=` в `cy`,
+`cy-train`, `cy-predict`, `cy-val` и `cy-compare`. `cy-export` принимает только
+Faster R-CNN.
+
+У каждого семейства свой формат чекпойнтов и свои правила обучения. В каждый чекпойнт
+не-YOLO моделей, обученный CY, встроено описание модели. По нему чекпойнт можно
+опознать после любого копирования.
 
 ```bash
-cy-train ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
-  ultralytics.imgsz=960 ultralytics.device=0 ultralytics.batch=null \
-  clearml.project_name=detection clearml.task_name=yolo-estimated 'clearml.tags=[training]'
+cy-init-config train-config --command cy-train --model rfdetr/small
+cy-train --config-dir train-config --config-name cy-train ground_truth=./ground_truth.csv
 ```
 
-Если для вашей GPU записи нет, берётся запись GPU с памятью не больше вашей, и команда
-об этом предупреждает. При обучении на нескольких GPU общий размер пакета равен числу
-GPU, умноженному на наименьшее значение среди них. Значение из таблицы — рекомендация:
-при нехватке памяти обучение упадёт и само с меньшим пакетом не перезапустится.
-Для CPU и неквадратных изображений размер пакета задаётся числом. Подробности —
-в [руководстве по оценке batch](docs/batch-estimation.md).
+Для YOLO оставьте `model=ultralytics` (по умолчанию) и задайте модель через
+`ultralytics.model`. Для остальных семейств укажите пресет, например `deimv2/s`,
+`rfdetr/small`, `fasterrcnn/resnet50_fpn` или `fcos/resnet50_fpn`. Полный список
+пресетов — в файле ниже.
 
-### Свои аугментации
+По умолчанию обучение стартует с предобученных весов. Если их не удалось получить или
+они не подходят модели, команда падает с ошибкой и не берёт случайные веса. Для
+RF-DETR и DEIMv2 размер изображения должен быть квадратным и кратным 32, для DEIMv2 —
+ещё и не меньше 128. Исходники и веса DEIMv2 скачиваются при первом запуске. Что делать
+без доступа к GitHub — в разделе «Веса моделей».
 
-Все модели принимают набор аугментаций Albumentations, сохранённый в JSON:
+Подробнее: [docs/feature/detector-families.md](docs/feature/detector-families.md).
 
-```python
-from pathlib import Path
+## Аугментации
 
-import albumentations as A
+Аугментации для обучения выбирает группа `transforms` в `cy-train` и `cy`. По умолчанию
+каждое семейство использует свои встроенные аугментации. `transforms=albumentations`
+заменяет их одним pipeline Albumentations из JSON, и он одинаково работает для всех
+семейств.
 
-pipeline = A.Compose(
-    [A.HorizontalFlip(p=0.5), A.RandomBrightnessContrast(p=0.2)],
-    bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]),
-)
-A.save(pipeline, Path("augmentation.json"))
-```
+Pipeline проверяется до начала обучения и сохраняется в конфиге запуска, поэтому для
+повтора исходный файл не нужен. Инференс, валидация и экспорт аугментации
+не используют.
 
 ```bash
 cy-train model=rfdetr/nano ground_truth=./ground_truth.csv \
@@ -185,92 +258,68 @@ cy-train model=rfdetr/nano ground_truth=./ground_truth.csv \
   'clearml.tags=[rfdetr,custom-augmentation]'
 ```
 
-Свой набор заменяет встроенные случайные аугментации модели. Приведение к размеру
-и нормализацию модель делает сама, поэтому `Normalize`, `ToFloat` и `ToTensorV2`
-в JSON не нужны. Для Mosaic поставьте `A.Mosaic(...)` первым в `A.Compose`.
-Готовые примеры: [flip.json](examples/augmentation/flip.json),
-[mosaic.json](examples/augmentation/mosaic.json). Остальное —
-в [руководстве по аугментациям](docs/augmentation.md).
+Что стоит знать:
 
-## Полный эксперимент
+- JSON сохраняется из Python вызовом `A.save(pipeline, path)`. Корнем должен быть
+  `A.Compose`.
+- Без `bbox_params` bbox считаются в формате `pascal_voc` с полем `class_labels`.
+- Свой pipeline заменяет встроенные случайные аугментации модели.
+- Resize и нормализацию модель делает сама, поэтому `Normalize`, `ToFloat`
+  и `ToTensorV2` в JSON отклоняются.
+- Для Mosaic поставьте `A.Mosaic(...)` первым в `A.Compose`.
+- Готовые примеры: `examples/augmentation/flip.json`
+  и `examples/augmentation/mosaic.json`.
 
-`cy` обучает модель, получает предсказания, подбирает пороги на `val`, считает метрики
-и, если есть базовая модель, сравнивает с ней новую на текущей выборке `test`.
+Подробнее: [docs/feature/augmentation.md](docs/feature/augmentation.md).
 
-```bash
-cy ground_truth=./ground_truth.csv ultralytics.model=yolo11n.pt \
-  ultralytics.epochs=50 ultralytics.device=0 ultralytics_predict.device=0 \
-  run_dir=./runs/experiment-01 clearml.project_name=detection \
-  clearml.task_name=yolo11n-experiment 'clearml.tags=[yolo,experiment]'
-```
+## Предсказания и валидация
 
-Устройства для обучения и предсказаний задаются отдельно. У остальных семейств это
-`model.train.device` и `model.predict.device`.
-
-```mermaid
-flowchart TD
-    A["CSV и изображения"] --> B["Обучение"]
-    B --> C["Предсказания"]
-    C --> D["Пороги на val и метрики"]
-    D --> E{"Есть базовая модель?"}
-    E -->|Да| F["Сравнение на test"]
-    F --> G["Технический и бизнес-отчёты"]
-    E -->|Нет| H["Метрики новой модели"]
-    G --> I["Локальные файлы и ClearML"]
-    H --> I
-```
-
-Базовая модель — последняя завершённая задача с тегом `prod` в том же проекте ClearML.
-Её можно указать явно: `compare.baseline_model.task_id=BASELINE_TASK_ID`. Если базовой
-модели нет, сравнение и отчёты пропускаются. Обе модели оцениваются на одних и тех же
-текущих изображениях: старая заново предсказывает на `test`, прошлые метрики
-не переиспользуются.
-
-| Результат | Где искать |
-| --- | --- |
-| Настройки, журнал, ход обучения | `Configuration`, `Console`, `Scalars`, `Plots` задачи ClearML |
-| Лучшие веса | `Output Models`; локальный путь указан в журнале |
-| Разметка и предсказания | артефакты `gt_csv` и `predicts_csv` |
-| Пороги, метрики, графики | артефакты и `Plots` |
-| Сравнение и отчёты | XLSX-файлы, если сравнение состоялось |
-| Файлы запуска | `run_dir` или `runs/<проект>/<задача>-<task-id>/` |
-
-Для нового эксперимента берите новый каталог. Выходные каталоги (`run_dir`,
-`output_dir`), кэш и журналы должны находиться внутри `CY_HOME` — по умолчанию это
-каталог запуска. Входные данные могут лежать где угодно.
-
-Если обучение прошло успешно и проверенные веса сохранены, а что-то после него не удалось, в том числе загрузка
-в ClearML, `cy` завершается с предупреждением и записывает случившееся
-в `pipeline_outcome.json`. В отдельных командах сбой загрузки — это ошибка. Локальные
-файлы остаются в обоих случаях. Прерывание запуска, ошибка обучения и ошибки при
-`skip_train=true` завершают команду с ненулевым кодом возврата.
-
-Запускайте команды из Git-репозитория, чтобы сохранялась история конфигурации.
-Вне репозитория команда работает, но предупреждает об этом.
-
-## Отдельные шаги
-
-Любой шаг эксперимента запускается и сам по себе. Каждая команда создаёт свою задачу
-ClearML. В примерах используется чекпойнт YOLO; для других семейств добавьте `model=...`
-и замените `ultralytics_predict.device` на `model.predict.device`.
-
-Предсказания по готовым весам:
+`cy-predict` прогоняет обученный чекпойнт по изображениям из CSV и сохраняет CSV
+с предсказаниями для последующей оценки. `cy-val` делает инференс на каждом выбранном
+split и на `val` и сразу считает метрики так же, как `cy-metrics`. Каждый CSV
+с предсказаниями привязан к чекпойнту, который его создал. Поэтому его нельзя по ошибке
+оценить как результат другой модели.
 
 ```bash
 cy-predict weights=./best.pt ground_truth=./ground_truth.csv 'splits=[val,test]' \
   model_label=local-yolo ultralytics_predict.device=0 output=./predictions/predictions.csv \
   clearml.project_name=detection clearml.task_name=yolo-predict 'clearml.tags=[prediction]'
-```
 
-Предсказания, пороги и метрики за один запуск:
-
-```bash
 cy-val weights=./best.pt ground_truth=./ground_truth.csv 'splits=[val,test]' \
   model_label=local-yolo ultralytics_predict.device=0 output_dir=./validation \
   clearml.project_name=detection clearml.task_name=yolo-val 'clearml.tags=[validation]'
 ```
 
-Метрики по уже готовой таблице предсказаний, без запуска модели:
+Каждая команда создаёт свой ClearML Task. В примерах — чекпойнт YOLO. Для других
+семейств добавьте `model=...` и замените `ultralytics_predict.device`
+на `model.predict.device`.
+
+Что стоит знать:
+
+- `conf` и `iou` в параметрах инференса фильтруют сами предсказания. Пороги
+  для итоговой оценки подбираются отдельно.
+- `model_label` — подпись модели в таблицах и отчётах. Она нужна, когда у весов или
+  предсказаний нет сведений о том, откуда они взялись.
+- Эти сведения лежат рядом с файлами: `<checkpoint>.identity.json` у весов
+  и `<predictions.csv>.provenance.json` у предсказаний. Переносите их вместе с файлами.
+
+Если команда требует подпись модели, передайте `model_label` или положите файлы
+`.identity.json` и `.provenance.json` рядом с весами и предсказаниями.
+
+Подробнее:
+[docs/feature/prediction-and-validation.md](docs/feature/prediction-and-validation.md).
+
+## Метрики
+
+Предсказания сравниваются с разметкой при порогах confidence. Пороги один раз
+подбираются на `val` и дальше не меняются.
+
+- `cy-metrics` оценивает готовый CSV с предсказаниями, без запуска модели.
+- `cy-val` и `cy` делают ту же оценку после своего инференса.
+- `cy-compare` оценивает так обе модели, каждую при её собственных порогах.
+
+Для каждого split получаются метрики по классам, таблицы XLSX и построчные результаты.
+В них каждый объект и каждое предсказание можно найти в исходной строке.
 
 ```bash
 cy-metrics ground_truth=./ground_truth.csv predictions=./predictions/predictions.csv \
@@ -278,44 +327,72 @@ cy-metrics ground_truth=./ground_truth.csv predictions=./predictions/predictions
   clearml.project_name=detection clearml.task_name=yolo-metrics 'clearml.tags=[metrics]'
 ```
 
-Сравнение двух моделей на текущей разметке и отчёты по нему:
+`cy-val` и `cy-metrics` подбирают пороги на `val`, даже если оценивается только `test`.
+
+Подробнее: [docs/feature/evaluation-metrics.md](docs/feature/evaluation-metrics.md).
+
+## Сравнение с baseline
+
+Сравнение показывает, лучше ли новая модель, чем baseline. Обе модели заново делают
+инференс на одних и тех же текущих изображениях. Каждая оценивается при своих порогах
+с `val`.
+
+`cy-compare` сравнивает две модели на одном split (по умолчанию `test`). `cy` сравнивает
+свою модель с baseline — по умолчанию с последней моделью с тегом `prod`
+(`compare.baseline_model`). Прошлые метрики и предсказания не переиспользуются.
+Результат — таблица со статистическим сравнением, из которой `cy-report` делает отчёты.
 
 ```bash
 cy-compare ground_truth=./ground_truth.csv baseline_model.task_id=BASELINE_TASK_ID \
   candidate_model.task_id=CANDIDATE_TASK_ID ultralytics_predict.device=0 \
   output_dir=./comparison clearml.project_name=detection \
   clearml.task_name=paired-comparison 'clearml.tags=[comparison]'
-
-cy-report comparison_dir=./comparison output_dir=./reports \
-  clearml.project_name=detection clearml.task_name=paired-reports 'clearml.tags=[reports]'
 ```
 
 Что стоит знать:
 
-- `cy-val` и `cy-metrics` подбирают пороги на `val`, даже если оценивается только
-  `test`. `cy-compare` пороги не подбирает, а берёт сохранённые у каждой модели.
-- `model_label` — подпись модели в таблицах и отчётах. Она нужна, когда у весов или
-  предсказаний нет сведений о том, откуда они взялись.
-- Эти сведения хранятся рядом с файлами: `<checkpoint>.identity.json` у весов
-  и `<predictions.csv>.provenance.json` у предсказаний. Переносите их вместе с файлами.
+- Baseline — последний завершённый Task с тегом `prod` в том же проекте ClearML.
+  В `cy` его можно указать явно: `compare.baseline_model.task_id=BASELINE_TASK_ID`.
+  Если baseline нет, новая модель всё равно оценивается на `test`, но парного
+  сравнения и отчётов не будет.
+- `cy-compare` пороги не подбирает, а берёт сохранённые у каждой модели.
 - `cy-compare` может взять модели не из ClearML, а из локальных весов: `source=local`,
-  `weights` и `thresholds` у каждой ссылки. Пороги нужны по всем классам и из
-  собственной калибровки модели;
-  см. [правила ModelRef](docs/multi-model-backends.md#data-checkpoints-and-comparison).
-- `cy-report` работает только с каталогом, который создал `cy-compare`.
+  `weights` и `thresholds` у каждой ссылки. Пороги нужны по всем классам.
 
-Форматы таблиц и правила оценки — в [техническом справочнике](TECH_DETAILS.md#inputs-and-evaluation).
+Если нет сравнения и отчётов, проверьте, есть ли завершённый Task с тегом `prod`
+и верна ли явная ссылка на baseline.
 
-## Конфигурация в YAML
+Подробнее: [docs/feature/comparison.md](docs/feature/comparison.md).
 
-Когда параметров становится много, сохраните их в файлы:
+## Отчёты
+
+`cy-report` делает из результата `cy-compare` два отчёта Excel: для разработчиков
+и для бизнеса. `cy` делает этот шаг сам после успешного сравнения. Отчёты не меняют
+ни одного значения метрик.
+
+Внизу каждого листа указано, какая модель оценивалась и в каком Task она обучалась.
+Если число обучающих примеров неизвестно, это отмечено явным предупреждением.
 
 ```bash
-cy-init-config cy-config
+cy-report comparison_dir=./comparison output_dir=./reports \
+  clearml.project_name=detection clearml.task_name=paired-reports 'clearml.tags=[reports]'
 ```
 
-Появятся `cy-config/cy.yaml` и файлы с параметрами обучения и предсказаний. Общие
-настройки правятся в `cy.yaml`, список `defaults` в нём трогать не нужно:
+`cy-report` работает только с каталогом, который создал `cy-compare`.
+
+Подробнее: [docs/feature/reports.md](docs/feature/reports.md).
+
+## Публикация в ClearML
+
+Каждая команда эксперимента записывает запуск в один ClearML Task: конфиг, параметры,
+версию кода, результаты и, если команда обучает модель, лучшие веса. Без ClearML эти
+команды не работают. Команда завершается успешно, только если все обязательные загрузки
+подтверждены.
+
+Если в `cy` обучение уже прошло успешно, сбой следующего шага записывается как
+предупреждение. Обученная модель при этом не теряется.
+
+Проект, имя Task и теги можно задать в `cy-config/cy.yaml`:
 
 ```yaml
 ground_truth: ./ground_truth.csv
@@ -325,61 +402,59 @@ clearml:
   tags: [configured, experiment]
 ```
 
-Параметры обучения — в `cy-config/ultralytics/default.yaml`, без обёртки `ultralytics:`:
+Где искать результаты:
 
-```yaml
-model: yolo11n.pt
-epochs: 50
-imgsz: 640
-batch: 8
-device: 0
-```
+- настройки, лог и ход обучения — вкладки `Configuration`, `Console`, `Scalars`
+  и `Plots` в Task;
+- лучшие веса — `Output Models`; для YOLO локальный путь также есть в логе;
+- разметка и предсказания — Artifacts `gt_csv` и `predicts_csv`;
+- пороги, метрики и графики — Artifacts и `Plots`;
+- сравнение и отчёты — XLSX-файлы, если сравнение состоялось;
+- файлы запуска — `run_dir` или `runs/<проект>/<задача>-<task-id>/`.
 
-Параметры предсказаний (`batch`, `conf`, `iou`, `device`) лежат так же
-в `cy-config/ultralytics_predict/default.yaml`. Здесь `conf` и `iou` управляют самими
-предсказаниями; пороги итоговой оценки подбираются отдельно.
+Что бывает при сбоях:
 
-```bash
-cy --config-dir cy-config --config-name cy
-cy --config-dir cy-config --config-name cy ultralytics.epochs=20   # переопределить один параметр
-cy --config-dir cy-config --config-name cy --cfg job --resolve     # показать итоговую конфигурацию
-```
+- Обучение прошло, проверенные веса сохранены, а один из следующих шагов упал
+  (в том числе загрузка в ClearML). Тогда `cy` завершается с предупреждением
+  и записывает, что случилось, в `pipeline_outcome.json` и итоговую сводку.
+- Успешный код возврата с предупреждениями не значит, что готовы все отчёты.
+- В отдельных командах сбой загрузки — это ошибка.
+- Локальные файлы остаются в обоих случаях: и при предупреждении в `cy`, и при
+  ошибке в отдельной команде.
+- Прерывание запуска, ошибка обучения и ошибки при `skip_train=true` завершают команду
+  с ненулевым кодом возврата.
 
-Конфигурация для другой команды или семейства создаётся так:
+При ошибке ClearML или загрузки проверьте доступ к серверу и хранилищу, локальный лог
+и `pipeline_outcome.json`.
 
-```bash
-cy-init-config train-config --command cy-train --model rfdetr/small
-cy-train --config-dir train-config --config-name cy-train
-```
+Подробнее: [docs/feature/clearml-publication.md](docs/feature/clearml-publication.md).
 
-`cy-init-config` не перезаписывает существующие файлы без `--force`. Как перенести
-настройки из старой версии, описано в [разделе о миграции](TECH_DETAILS.md#configuration-and-migration).
+## Просмотр в FiftyOne
 
-### Перебор параметров и несколько GPU
-
-Перебор запускается флагом `-m`, варианты выполняются по очереди:
-
-```bash
-cy --config-dir cy-config --config-name cy -m ultralytics.epochs=10,20
-```
-
-Все задачи одного перебора получают общий тег с датой и случайной фразой, по которому
-их легко найти в ClearML.
-
-Для обучения на нескольких GPU перечислите устройства; предсказания идут на одной:
+После `cy`, `cy-predict` и `cy-metrics` изображения, разметка, предсказания и результаты
+оценки публикуются в постоянный датасет FiftyOne. В нём удобно искать пропуски
+и ложные срабатывания (FN и FP). Публикация включена по умолчанию и идёт в отдельном
+процессе с ограничением по времени. Если она упадёт, будет только предупреждение:
+результат и ClearML Task не пострадают.
 
 ```bash
-cy --config-dir cy-config --config-name cy 'ultralytics.device=[0,1]' ultralytics_predict.device=0
+cy --config-dir cy-config --config-name cy fiftyone.publish_timeout_seconds=1800
+cy --config-dir cy-config --config-name cy fiftyone.enabled=false   # без FiftyOne
 ```
 
-У остальных семейств это `'model.train.device=[0,1]'`, а `model.train.batch` должен
-делиться на число GPU. Для них обучение на нескольких GPU пока не проверено на
-реальном оборудовании; подробнее —
-в [руководстве по моделям](docs/multi-model-backends.md#devices-scheduling-and-replay).
+Первая команда даёт публикации больше времени, вторая выключает её. Имя датасета
+записано в `fiftyone_publication.json` в выходном каталоге команды. Как открыть датасет
+в FiftyOne App, описано в файле ниже.
 
-## Веса без доступа к сети
+Подробнее: [docs/feature/fiftyone-publication.md](docs/feature/fiftyone-publication.md).
 
-Все нужные веса можно скачать заранее:
+## Веса моделей
+
+Перед обучением семействам нужны предобученные веса, а DEIMv2 — ещё и исходники
+утверждённой ревизии. `cy-download-weights` заранее кладёт их в кэши, которые читают
+сами библиотеки. `cy` пытается сделать то же автоматически. Отдельные команды
+скачивают только то, что нужно выбранной модели. Подготовка ничего не устанавливает,
+не обучает модели и не создаёт ClearML Task.
 
 ```bash
 cy-download-weights
@@ -390,31 +465,27 @@ cy-download-weights
 и проверяются по контрольным суммам. Повторный запуск докачивает только недостающее.
 Если что-то скачать не удалось, код возврата ненулевой.
 
-DEIMv2 `l` и `x` в общую подготовку не входят и скачиваются при выборе этой модели:
-исходники — с GitHub, backbone DINOv3 — с Hugging Face, где нужно принять лицензию
-и задать `HF_TOKEN`. Прокси для этого пути задают переменные `GH` и `HF_ENDPOINT`;
-см. [описание источников](docs/model-assets.md#ordinary-selected-model-source-routes).
+DEIMv2 `l` и `x` в общую подготовку не входят. Они скачиваются, когда вы выбираете эту
+модель: исходники — с GitHub, backbone DINOv3 — с Hugging Face. Для этого примите
+лицензию на Hugging Face и задайте переменную `HF_TOKEN`. Прокси для этих загрузок
+задают переменные `GH` и `HF_ENDPOINT`.
 
 При первом запуске `cy` та же подготовка выполняется сама. Если она прошла не
 полностью, `cy` предупредит и продолжит работу с выбранной моделью. Отдельные команды
 вроде `cy-train` общую подготовку не запускают.
 
-Если GitHub недоступен напрямую, укажите прокси. `GHR` — корень Generic-репозитория
-Artifactory, который проксирует `https://github.com`:
+Если GitHub недоступен напрямую, задайте `GHR` — корень Generic-репозитория
+Artifactory, который проксирует `https://github.com`, например
+`export GHR="https://artifactory.example/artifactory/github-files"`.
 
-```bash
-export GHR="https://artifactory.example/artifactory/github-files"
-export CY_WEIGHTS_DOWNLOAD_TIMEOUT=3600   # необязательно: секунд на один архив, по умолчанию 1800
-cy-download-weights
-```
+Ещё о загрузке:
 
-Авторизация настраивается через `.netrc`, собственный сертификат — через
-`SSL_CERT_FILE` или `REQUESTS_CA_BUNDLE`. Ответ 401 означает, что не прошла авторизация,
-403 — что нет прав, 404 — что неверен путь или файл недоступен в источнике.
-Если нет ни сети, ни прокси, файлы можно разложить вручную: когда команде обучения
-не удаётся загрузить модель, сообщение об ошибке перечисляет недостающие файлы,
-их исходные адреса и пути, куда их положить. Всё это подробно разобрано
-в [руководстве по весам](docs/model-assets.md).
+- необязательная переменная `CY_WEIGHTS_DOWNLOAD_TIMEOUT` задаёт число секунд на один
+  архив, по умолчанию 1800;
+- авторизация настраивается через `.netrc`, свой сертификат — через
+  `SSL_CERT_FILE` или `REQUESTS_CA_BUNDLE`;
+- ответ 401 значит, что не прошла авторизация, 403 — нет прав, 404 — неверен путь или
+  файла нет в источнике.
 
 Лицензии у весов разные: YOLO — AGPL-3.0, DEIMv2 — только некоммерческое использование,
 DINOv3 — отдельное соглашение Meta с ограничениями. Тексты лицензий лежат в архивах.
@@ -422,41 +493,58 @@ DINOv3 — отдельное соглашение Meta с ограничени�
 **Built with DINOv3.** Backbone DINOv3 распространяется в неизменённом формате
 конвертации timm, с исходной конфигурацией и метаданными ревизии.
 
-## Запуск через ClearML Agent и очередь
+Если модель не загружается:
 
-Задачу можно выполнить через ClearML Agent: настройки берутся из сохранённой в задаче
-конфигурации `run`, повторять аргументы командной строки не нужно. Зависимости
-ставит ваше окружение Agent, а GPU он выбирает через `CUDA_VISIBLE_DEVICES`.
-Подробности — в [описании запуска через Agent](docs/runtime-isolation.md#clearml-agent-execution).
+- проверьте семейство, пресет и совместимость весов;
+- если нет ни сети, ни прокси, разложите файлы вручную: сообщение об ошибке перечисляет
+  недостающие файлы, их исходные адреса и пути, куда их положить.
 
-Если одну машину с GPU делят несколько запусков или людей, пригодится
-[cy-queue](https://github.com/BuckanovNikita/cy-queue). Это отдельный пакет: он хранит
-задания, ждёт свободные GPU и запускает `cy` или `cy-train`.
+Подробнее: [docs/feature/model-assets.md](docs/feature/model-assets.md).
 
-```bash
-cy-queue submit --gpus 1 -- --config-dir cy-config --config-name cy
-cy-queue worker
-```
+## Подбор batch size
 
-Перед отправкой уберите устройства из YAML (`device: null`): GPU назначает очередь.
-Установка, настройка и команды описаны в README `cy-queue`, правила для администратора
-общей очереди — в [руководстве оператора](docs/queue.md).
-
-## Другие команды
-
-Разметку YOLO (`data.yaml` и изображения) переводит в CSV `cy-ground-truth`. Если
-в источнике нет `test`, под него выделяется часть `val`; проверьте разбиение перед
-обучением.
+`cy-batch-estimate` измеряет, какой batch size на одну GPU помещается при обучении
+на вашем железе. Результат пишется в редактируемую таблицу
+`CY_HOME/.config/clearml-yolo/batch-sizes.yaml`. Обучение читает её, только если batch
+size явно не задан: `ultralytics.batch=null` или `model.train.batch=null`. Измерение идёт
+локально на синтетических данных и не создаёт ClearML Task.
 
 ```bash
-cy-ground-truth data_yaml=./dataset/data.yaml output=./converted/ground_truth.csv \
-  test_fraction=0.5 seed=0 clearml.project_name=detection \
-  clearml.task_name=convert-ground-truth 'clearml.tags=[conversion]'
+cy-batch-estimate --imgsz 960
+cy-batch-estimate --imgsz 960 --models rfdetr/small,fcos/resnet50_fpn --devices 0,1
+cy-batch-estimate --list
 ```
 
-Чекпойнт Faster R-CNN экспортируется в ONNX командой `cy-export`. Экспорт других
-семейств не поддерживается. Сборка и проверка TensorRT описаны
-в [руководстве по TensorRT](docs/tensorrt-deployment.md).
+Что стоит знать:
+
+- В таблице для каждой GPU, размера изображения и модели записан batch size на одну GPU,
+  например `rfdetr/small: 3` под `"NVIDIA GeForce RTX 4090 [24 GiB]"` и размером
+  `960`. Таблицу можно заполнить и вручную.
+- Измеряйте на свободных GPU: GPU, занятая чужим процессом, не измеряется.
+- Если для вашей GPU записи нет, берётся запись GPU с памятью не больше вашей.
+  Команда об этом предупреждает.
+- При multi-GPU общий batch size равен числу GPU, умноженному на наименьшее значение
+  среди них.
+- Значение из таблицы — рекомендация. При нехватке памяти обучение упадёт и само
+  с меньшим batch size не перезапустится.
+- Для CPU и неквадратных изображений batch size задаётся числом.
+
+Если записи нет, добавьте её в `batch-sizes.yaml`, запустите `cy-batch-estimate` или
+задайте batch size числом.
+
+Подробнее: [docs/feature/batch-estimation.md](docs/feature/batch-estimation.md).
+
+## Экспорт в ONNX и TensorRT
+
+`cy-export` превращает обученный чекпойнт Faster R-CNN в TensorRT engine и проверяет,
+что engine детектирует не хуже исходной модели. За один запуск выполняется одна
+операция:
+
+- `onnx` — пишет ONNX-граф на CPU;
+- `build` — собирает из него TensorRT engine для одной GPU в FP32 или FP16;
+- `verify` — сравнивает engine с исходным чекпойнтом на размеченном датасете.
+
+Экспорт других семейств не поддерживается.
 
 ```bash
 cy-export model=fasterrcnn/resnet50_fpn weights=./best.pth \
@@ -464,74 +552,113 @@ cy-export model=fasterrcnn/resnet50_fpn weights=./best.pth \
   clearml.project_name=detection clearml.task_name=fasterrcnn-onnx 'clearml.tags=[export]'
 ```
 
-`cy-dedup` освобождает место в кэше изображений (`$CY_HOME/.cache`): на файловой
-системе с reflink одинаковые файлы начинают занимать место один раз. Сначала остановите
-запись в кэш и посмотрите, что будет сделано:
+TensorRT ставится отдельно и в зависимости проекта не входит. Engine привязан к GPU,
+версиям TensorRT и CUDA, на которых собран. Для другой машины соберите и проверьте его
+заново.
+
+Подробнее: [docs/feature/export.md](docs/feature/export.md).
+
+## Процессы команды
+
+Каждая команда отвечает за процессы, которые запускает. Устройства она использует как
+есть: без очереди, резервирования GPU и ожидания. Перед выходом — успешным, с ошибкой
+или после прерывания — команда завершает все свои процессы, включая процессы
+multi-GPU обучения и загрузчики данных. Затем проверяет, что они действительно
+закрылись. Чужие процессы она не трогает. Для заданий из очереди это делает
+`cy-queue`.
+
+Чтобы остановить запуск, нажмите `Ctrl+C` и дождитесь, пока завершатся процессы,
+которые запустила команда.
+
+Подробнее: [docs/feature/process-ownership.md](docs/feature/process-ownership.md).
+
+## Очередь
+
+`cy-queue` пригодится, если одну машину с GPU делят несколько запусков или людей. Это
+отдельный пакет. Он хранит задания, ждёт свободные GPU, запускает `cy` или `cy-train`
+от имени владельца задания и следит за каждым запуском. Прямым командам и ClearML Agent
+очередь не нужна.
+
+```bash
+cy-queue submit --gpus 1 -- --config-dir cy-config --config-name cy
+cy-queue worker
+```
+
+Перед отправкой уберите устройства из YAML (`device: null`): GPU назначает очередь.
+Установка, настройка и команды описаны в документации `cy-queue`. Правила для
+администратора общей очереди — в файле ниже.
+
+Если очередь не запускает задание, проверьте, запущен ли ваш worker и хватает ли
+свободных GPU. Прямая команда GPU не ждёт.
+
+Подробнее: [docs/feature/queue.md](docs/feature/queue.md).
+
+## Диагностика
+
+Каждая команда эксперимента сохраняет весь вывод консоли в локальные логи, показывает
+его в терминале и публикует в ClearML Task. Ошибки выводятся кратко, пароли и токены
+в них скрываются. С `LOGURU_LEVEL=TRACE` в лог добавляются начало и конец каждой
+операции и периодические сообщения о том, на что уходит время. Это помогает разобрать
+зависание.
+
+Подробность лога задаёт `LOGURU_LEVEL`:
+
+- `INFO` — коротко;
+- `DEBUG` — с местом каждой ошибки в коде (по умолчанию);
+- `TRACE` — для разбора зависаний.
+
+Подробнее: [docs/feature/diagnostics.md](docs/feature/diagnostics.md).
+
+## Дедупликация кэша
+
+`cy-dedup` освобождает место в кэше изображений (`$CY_HOME/.cache`). На файловой системе
+Linux с поддержкой reflink одинаковые файлы с одинаковым именем начинают занимать место
+один раз. Пути и содержимое файлов не меняются. ClearML Task команда не создаёт.
+
+Сначала остановите запись в кэш и посмотрите, что будет сделано:
 
 ```bash
 cy-dedup --dry-run
 cy-dedup
 ```
 
-Изображения, разметку и предсказания можно просматривать в FiftyOne — искать пропуски
-и ложные срабатывания. Как открыть опубликованный набор, описано
-в [техническом справочнике](TECH_DETAILS.md#open-a-published-fiftyone-dataset).
+Подробнее: [docs/feature/cache-deduplication.md](docs/feature/cache-deduplication.md).
 
-## Если запуск не удался
+## Рабочий каталог
 
-| Проблема | Что проверить |
-| --- | --- |
-| Не найдены изображения или выборка | Пути относительно CSV; наличие `train` и `val`, а для `cy` — ещё и `test` |
-| Нет записи batch | Добавьте запись в `batch-sizes.yaml`, запустите `cy-batch-estimate` или задайте размер пакета числом |
-| Неизвестный параметр | Префикс группы (`ultralytics.`, `model.train.`); сверьтесь со свежим YAML из `cy-init-config` |
-| Не загружается модель | Семейство, пресет и совместимость весов; сообщение об ошибке называет [недостающие файлы и пути для них](docs/model-assets.md#offline-placement-and-access) |
-| Требуется подпись модели | Передайте `model_label`; сохраните файлы `.identity.json` и `.provenance.json` |
-| Нет сравнения и отчётов | Есть ли завершённая задача с тегом `prod` или верна ли явная ссылка на базовую модель |
-| Очередь не запускает задание | Запущен ли ваш worker и хватает ли свободных GPU; прямая команда GPU не ждёт |
-| Ошибка ClearML или загрузки | Доступ к серверу и хранилищу, локальный журнал и `pipeline_outcome.json`; в `cy` после успешного обучения это предупреждение, в отдельных командах — ошибка |
+Всё, что пишет CY, лежит в одном рабочем каталоге `CY_HOME`. По умолчанию это каталог
+запуска. Там хранятся результаты запусков, логи, кэш подготовленных данных, таблица
+batch size и временные файлы. Входные данные — CSV, изображения, чекпойнты — могут
+лежать где угодно. Библиотеки вроде ClearML, Ultralytics, FiftyOne и Torch хранят свои
+настройки и кэши в собственных каталогах.
 
-Подробность журнала задаёт `LOGURU_LEVEL`: `INFO` — коротко, `DEBUG` — со стеком ошибок
-(по умолчанию), `TRACE` — для разбора зависаний. Чтобы остановить запуск, нажмите
-`Ctrl+C` и дождитесь, пока завершатся дочерние процессы.
+Выходные каталоги (`run_dir`, `output_dir`), кэш и логи должны быть внутри `CY_HOME`.
+Путь снаружи отклоняется до начала работы.
 
-Если обучение закончилось и веса сохранены, ошибка на следующем шаге результат обучения
-не отменяет. Что именно не выполнилось, написано в `pipeline_outcome.json` и в итоговой
-сводке. Успешный код возврата с предупреждениями не значит, что готовы все отчёты.
-Прерывание запуска, ошибка обучения и ошибки при `skip_train=true` остаются
-ошибками с ненулевым кодом возврата.
+Подробнее: [docs/feature/filesystem.md](docs/feature/filesystem.md).
 
-Больше приёмов — в [руководстве по диагностике](docs/diagnostics.md).
+## Совместимость и зависимости
+
+CY ставится в окружение uv на Linux — по Git-ссылке на репозиторий или из исходников.
+Одна установка даёт всё: все семейства моделей, экспорт в ONNX, ClearML и FiftyOne.
+`digital-metrics` и `report-generator` берутся:
+
+- при установке по Git-ссылке — из вашего индекса пакетов;
+- при установке из исходников — из локальных копий утверждённых ревизий.
+
+Драйверы GPU, TensorRT, доступ к ClearML и отдельный пакет `cy-queue` вы ставите
+и настраиваете сами. Во время работы CY ничего не устанавливает.
+
+Подробнее: [docs/feature/installation.md](docs/feature/installation.md).
 
 ## Разработка
 
-Окружение ставится так же, как в разделе [Установка](#установка), для каждого рабочего
-дерева отдельно. После этого установите Git-хуки:
+Окружение для разработки ставится так же, как в разделе «Установка», для каждого
+рабочего дерева отдельно. Потом установите Git-хуки:
 
 ```bash
 bash scripts/install-hooks.sh
 ```
 
-Проверки запускаются через Task:
-
-```bash
-uv run --locked task --exit-code fix         # автоисправления Ruff и форматирование
-uv run --locked task --exit-code verify      # статические проверки и затронутые тесты
-uv run --locked task --exit-code acceptance  # полная приёмка чистого коммита
-```
-
-Хук перед коммитом запускает `verify` и не пропускает коммит, если в рабочем дереве
-есть изменения или новые файлы вне индекса. Сообщения коммитов — в формате
-Conventional Commits. Остальное — в [руководстве по разработке](docs/development.md).
-
-## Документация
-
-Вся подробная документация написана на английском.
-
-- [TECH_DETAILS.md](TECH_DETAILS.md) — технический справочник.
-- [docs/current-contracts.md](docs/current-contracts.md) — указатель по всем описаниям поведения.
-- [docs/multi-model-backends.md](docs/multi-model-backends.md) — семейства моделей.
-- [docs/input-provenance.md](docs/input-provenance.md) — входные данные и происхождение результатов.
-- [docs/model-assets.md](docs/model-assets.md) — веса, кэши, прокси.
-- [docs/queue.md](docs/queue.md) — очередь.
-- [docs/diagnostics.md](docs/diagnostics.md) — диагностика.
-- [docs/development.md](docs/development.md) — разработка и релизы.
+Проверки, коммиты и релизы описаны в [docs/development.md](docs/development.md).
+Устройство кода и правила для него — в [docs/architecture.md](docs/architecture.md).

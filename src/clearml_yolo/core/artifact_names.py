@@ -1,16 +1,17 @@
 """Every ClearML artifact name this project writes or reads back.
 
-The names had drifted into three unsynchronised spellings of one stem — the on-disk
-workbook ``full_dashboard_test.xlsx``, the artifact ``dashboard_full_test``, and a
-user-overridable ``artifact_prefix`` default carrying a fourth copy — and two of them are
-read back off *previous* tasks, where a mismatch surfaces only as a silently missing
-baseline. Naming them once here is what keeps writer and reader in step.
+Some names are read back off previous tasks, where a mismatch surfaces only as a silently
+missing baseline. Naming them once here is what keeps writer and reader in step; existing
+names are a compatibility boundary and must not be renamed.
 
 Every name is prefixed with the stage that produced it. The ClearML artifacts tab has four
 fixed sections (input model, output models, data audit, other) and no grouping of its own,
 so a stage prefix is the only thing that makes one run's artifacts read as related. Genuine
 collapsible sections exist in the plots and scalars tabs, keyed by title — see
 :mod:`clearml_yolo.adapters.clearml.report`.
+
+Split suffixes are percent-encoded UTF-8 with ``.`` escaped, so distinct split names stay
+distinct and never introduce a path component.
 """
 
 from urllib.parse import quote

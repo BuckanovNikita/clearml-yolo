@@ -36,6 +36,14 @@ carry ``app.kubernetes.io/part-of=clearml-yolo-tests``. The platform sweeper may
 environment 48 hours after its creation or after a Docker Desktop or PC restart; a vanished
 namespace only makes the record stale.
 
+``env`` prints ``export`` lines for ``INTEGRATION_RUN_TAG``, the ClearML hosts and the test
+user's key pair, and ``FIFTYONE_DATABASE_URI`` and ``FIFTYONE_DATABASE_DIR`` (a nonempty
+inherited value is kept, otherwise ``~/.cache/clearml-yolo/fiftyone``); it refuses a terminal
+because the exports hold credentials. An adopting session refuses with exit 1 when a component
+it needs has no running recorded port-forward. ``stop --dry-run`` applies the guard and
+changes nothing; ``up --identifier-only`` prints only the created identifier on stdout.
+``stop`` removes the namespace, its port-forwards and the record, never local run outputs.
+
 Exit statuses: 0 success, 3 unavailable (cluster not answering, not ready within the start-up
 budget: live verification is deferred), 1 error or refusal, 130 interrupted. ``check`` is
 bounded by ``CY_INFRA_CHECK_TIMEOUT`` (60 s), start-up by ``CY_TEST_ENV_START_TIMEOUT``

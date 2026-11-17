@@ -1,4 +1,22 @@
-"""Pure, immutable trust records for independently versioned weight archives."""
+"""Pure, immutable trust records for independently versioned weight archives.
+
+The manifest is a stored wire format (``schema_version`` 1, unknown fields rejected); the
+runtime reads it only from the packaged ``weights-manifest.json``.
+- ``repository`` is fixed to this project; ``release_tag`` is an immutable ``weights-*``
+  release name.
+- ``archives``: ``name`` (one ``.tar`` filename), ``size`` (positive, below 2 GiB) and
+  lowercase ``sha256``. Names are unique.
+- ``assets``: ``identity`` (24 lowercase hex digits), backend, preset, requested
+  ``filename``, ``source_url`` and ``source_revision``, ``kind``, owning ``archive``,
+  ``member``, ``size``, ``sha256`` and optional ``hub``. Identities are unique.
+- ``member`` is ``assets/<identity>/<filename>`` (the Hub filename for Hub assets); a Hub
+  config is ``assets/<identity>/config.json`` in the same archive. Members are safe relative
+  POSIX paths and unique per archive.
+- Hub ``commit`` and ``etag`` come from the native Hub cache and must match a verified
+  real blob there; never invent them.
+- ``BundleManifest.identity`` hashes the whole record and participates in preparation
+  fingerprints, so changing the pin reopens automatic preparation.
+"""
 
 import hashlib
 import re

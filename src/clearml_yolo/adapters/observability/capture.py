@@ -2,6 +2,19 @@
 
 File descriptors point directly at append-only files. Neither a stopped mirror nor
 a blocked network publisher can backpressure training or destroy captured bytes.
+- One capture per process: nested callers reuse the active one, and a forked child never
+  sees it as its own.
+- Captured bytes stay original; readers such as the mirror render readable text and track
+  offsets against the original files.
+- Mirror diagnostics go to their own file, never to fd 1 or 2, so they cannot feed back into
+  the capture.
+- Scalars are appended as complete JSON lines with one write; non-finite values fail before
+  writing.
+- ``CY_PROGRESS_FILE`` is an optional, caller-chosen JSON object merged by key and replaced
+  atomically. Its ``progress``, ``iteration`` and ``task_url`` keys are an interface for the
+  caller that set it; keep them stable.
+- Stopping writes final offsets, restores descriptors, then waits at most two seconds before
+  killing the mirror.
 """
 
 import io

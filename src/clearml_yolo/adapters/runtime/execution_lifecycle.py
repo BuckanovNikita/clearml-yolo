@@ -1,4 +1,19 @@
-"""An opaque stage handoff to the process that supervises this invocation."""
+"""An opaque stage handoff to the process that supervises this invocation.
+
+Wire contract with the external supervisor:
+- The supervisor passes one end of an AF_UNIX SOCK_SEQPACKET socketpair through
+  ``CY_EXECUTION_CHANNEL_FD`` and sets ``CY_EXECUTION_OWNER_PID`` to the PID that execs the
+  CY entrypoint. Both variables or neither must be present.
+- Only that PID owns the channel. On entry it removes both variables and marks the descriptor
+  non-inheritable, so forked model workers and later execs can neither notify nor inherit the
+  selectors.
+- After training returns and unused memory is released, the owner sends exactly
+  ``TRAINING_FINISHED`` and waits up to ``_HANDOFF_TIMEOUT_SECONDS`` for ``ACKNOWLEDGED``.
+  Any other reply, closure or timeout is a failed handoff and raises before inference starts.
+- A supervised invocation leaves descendant cleanup to its supervisor; direct invocations
+  have no channel and keep their own descendant supervision.
+Changing the token bytes, socket type or variable names breaks installed supervisors.
+"""
 
 import os
 import socket

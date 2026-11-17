@@ -1,4 +1,15 @@
-"""Resolve configuration files against detached effective command inputs."""
+"""Resolve configuration files against detached effective command inputs.
+
+A file's top-level keys replace the corresponding command roots as whole values, and only
+the file's own fields are returned or published. Scalar and collection types, explicit empty
+and null values are preserved. Provenance is traced through the OmegaConf grammar without
+executing registered resolvers; a computed target such as ``${${key}}`` is rejected because
+it cannot be traced without reevaluation. Credential provenance follows references to the
+values actually consumed so sanitization can redact them, and the environment is scanned
+only for redaction. Every resolution failure is reported as
+``Configuration values could not be resolved`` with at most the exception type and field
+name: resolver messages and values may be private and are never included.
+"""
 
 import os
 import re

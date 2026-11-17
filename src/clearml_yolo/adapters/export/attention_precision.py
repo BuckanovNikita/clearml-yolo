@@ -1,4 +1,12 @@
-"""Recognize exported combined QKV projections that require Float arithmetic."""
+"""Recognize exported combined QKV projections that require Float arithmetic.
+
+Rounding QKV products amplifies through score multiplication and softmax, so these
+projections stay FP32. Selection follows the exported value branch from
+``MatMul(Softmax(...), V)`` back through squeeze, the third QKV split output, transpose and
+reshape to the weighted ``[C, 3*C]`` projection, with an optional Float bias. It never
+depends on backbone, node or parameter names. Ambiguous producers or an unsupported layout
+at this boundary fail before conversion.
+"""
 
 from typing import Any
 

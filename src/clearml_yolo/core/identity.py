@@ -1,4 +1,17 @@
-"""Tracking-neutral identity of the model whose checkpoint was evaluated."""
+"""Tracking-neutral identity of the model whose checkpoint was evaluated.
+
+``ModelIdentity`` (display name plus optional training task, checkpoint SHA-256 and model
+ID) is persisted in checkpoint identity sidecars, comparison manifests and workbook identity
+metadata, so its fields and JSON shape are a stored format. In a pipeline the training task
+is also the reporting task, so ``training_task_id`` may name the invocation's own task;
+``adapters/clearml/links.py``, not this record, keeps reports from linking their own task.
+``label`` and ``caption`` are the only visible forms and never print identifiers.
+
+``IdentityLinks`` are render-time presentation: absolute http(s) URLs derived from the
+invocation's ClearML session, never stored as identity. ``require_model_identity`` prefers
+recorded provenance; a custom label is accepted only when provenance is missing and never
+invents a training task.
+"""
 
 from collections.abc import Mapping
 from typing import Self
@@ -10,7 +23,7 @@ from clearml_yolo.core.presentation import human_text
 
 
 class ModelIdentity(BaseModel):
-    """A display name and known source identifiers, never the reporting task's ID."""
+    """A display name and known source identifiers, including the training task's ID."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

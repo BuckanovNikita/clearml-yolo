@@ -1,7 +1,11 @@
 """Export validated detection records into local Ultralytics datasets.
 
-NDJSON preserves original per-split filenames. Preparation builds one native YAML
-layout directly so consumers never repeat Ultralytics' NDJSON conversion.
+NDJSON preserves each image's original basename under ``images/<split>/``; label stems must
+stay unique case-insensitively within a split. Flat YOLO and COCO exports use numbered
+``<index:08d><suffix>`` names (lowercase suffix) in the validated image order, and COCO uses
+the ``valid`` folder for ``val``. Source images are copied, never modified. Preparation
+builds one native YAML layout directly so consumers never repeat Ultralytics' NDJSON
+conversion.
 """
 
 import json

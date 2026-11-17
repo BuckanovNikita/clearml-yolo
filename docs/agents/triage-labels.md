@@ -10,4 +10,4 @@ Use these Linear readiness labels separately from lifecycle state:
 
 Keep one current readiness classification. Readiness does not override dependencies,
 verification or human merge requirements. Completion evidence belongs in the issue and
-linked PR/evidence, not in a readiness label.
+its PR, not in a readiness label.

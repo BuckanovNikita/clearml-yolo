@@ -1,4 +1,19 @@
-"""The shared CLI ownership boundary; stage entrypoints remain independent."""
+"""The shared CLI ownership boundary; stage entrypoints remain independent.
+
+``launch`` records the launch cwd, opens retained scratch and console capture and emits the
+Git workspace advisory once before Hydra composes; every sweep member is validated before
+the first job, and one multirun tag is created per launch. ``execute_owned`` keeps this
+order: initialize the filesystem, read one detached Agent replay snapshot and apply its
+canonical ``run`` before mandatory-input validation and backend selection, initialize the
+matching native runtime before ClearML starts package detection, then join the same task
+through ``invocation``. A replay must not switch the initialized runtime family. Remote
+``General`` parameters apply only to YOLO training, never to detector ``model`` settings, and
+``project``, ``name`` and ``save_dir`` always come from the current request. Remote YOLO
+replay passes ``legacy_native_general``, so a task whose ``run`` lacks an ``ultralytics``
+group keeps the ``device``, ``data`` and ``exist_ok`` recorded in ``General``. ``run`` is
+published before naming, and implicit ``output``/``output_dir`` routes are derived only
+after the task exists.
+"""
 
 import inspect
 import sys

@@ -2,6 +2,15 @@
 
 The cache must be idle. Stat checks detect ordinary intervening writes, but this
 utility does not provide synchronization against adversarial filesystem races.
+- A replacement requires equal basename, size, SHA-256 and full byte comparison; digest
+  equality alone never replaces a file.
+- Replacement clones into a temporary sibling, verifies the clone, copies owner, mode, the
+  exact xattr set and atime/mtime, fsyncs, rechecks both stat identities and only then
+  renames; the temporary is always removed.
+- Unsupported FICLONE, other platforms, cross-device pairs and hardlinked destinations are
+  skips, never failures, and never fall back to copies or hardlinks.
+- Dry runs read and compare but create nothing and never probe clone support.
+- Writable roots must pass project containment; symlinked roots are rejected.
 """
 
 import errno

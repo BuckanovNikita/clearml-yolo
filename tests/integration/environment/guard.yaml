@@ -1,5 +1,5 @@
 # Applied right after the namespace and before any workload. The values are derived from
-# the use measured on 2026-11-10 (specs/012-own-test-infra/data-model.md): with every
+# the measured use of the complete environment: with every
 # component pods 5, requests 550m / 1184Mi, limits 6500m / 3840Mi. No claim and no GPU
 # request is admitted: data lives in emptyDir and the GPU belongs to host processes.
 # The limit range gives init containers and debug pods requests and limits, which the

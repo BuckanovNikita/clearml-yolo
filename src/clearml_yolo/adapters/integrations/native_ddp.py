@@ -1,4 +1,19 @@
-"""Relay native ClearML events from DDP rank zero to the invocation owner."""
+"""Relay native ClearML events from DDP rank zero to the invocation owner.
+
+Only the invocation owner may call SDK callbacks, and only on its own thread. Rank zero
+writes validated callback records (copying the plots they reference) and journals epoch
+scalars as local bytes; it never contacts the SDK. A live consumer thread reads and
+validates records while training runs; after native training returns, ``replay`` dispatches
+them synchronously through the installed native ClearML callbacks, each under an SDK
+deadline, without reporting scalars that rank zero already journaled.
+
+Records must arrive complete and in order: one leading pretrain event, at least one epoch and
+validation event, and nothing after the single final record, which must name an existing best
+checkpoint and existing plots. Anything incomplete or corrupt fails the relay, and a DDP run
+whose events were never replayed fails on exit. Callback uploads can continue through model
+finalization and flush, so callers keep the relay open until then, and its directory is
+retained rather than inferring that every consumer has finished.
+"""
 
 import json
 import os

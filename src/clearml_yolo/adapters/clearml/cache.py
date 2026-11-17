@@ -1,8 +1,24 @@
 """Pure opt-in projection for ClearML's controller-side task hashing callback.
 
-The returned document is only cache identity, never executable configuration. Importing
-this module does not register a callback or import the ClearML SDK. Controllers that
-already have a callback must explicitly compose it with ``normalize_task_hash``.
+The returned document is only cache identity, never executable configuration. Importing this
+module does not register a callback or import the ClearML SDK. Controllers that already have
+a callback must explicitly compose it with ``normalize_task_hash``. ClearML hashes
+configuration objects in the controller before any worker starts, so registration in a
+worker is too late. Invariants:
+- Only canonical ``-m clearml_yolo.entrypoints.<command>`` scripts are projected; unknown
+  scripts and unknown fields stay untouched.
+- ``run_overrides`` is always dropped for recognized scripts, even on fallback.
+- Only enumerated routing fields are removed; ``project_name`` stays when it selects an
+  unresolved comparison model, and ``run_dir``/``run_id`` stay when skipped pipeline stages
+  read existing files.
+- Device selectors reduce to device type and count using each consumer's own grammar.
+- Dataset paths normalize only beneath the recorded ``run.prepared_dataset`` root, keyed by
+  its ``cache_identity``.
+- Unparseable, duplicate-key or HOCON documents keep their bytes; other fields such as
+  ``General`` still normalize. JSON whose active escapes the SDK parser would keep literal
+  aborts the whole projection and returns the unprojected copy.
+- ``_clearml_yolo_cache_policy`` marks the policy version, and a marked document is never
+  projected again; bump the version when the projection changes.
 """
 
 import json

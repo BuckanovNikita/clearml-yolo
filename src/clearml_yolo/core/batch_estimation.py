@@ -1,4 +1,23 @@
-"""Pure batch capacity search, reproducibility records and strict reuse policy."""
+"""Pure batch capacity search, reproducibility records and strict reuse policy.
+
+Strategies are versioned because estimate keys and saved trials replay against the strategy
+that produced them: never change an existing strategy in place; add a new one.
+``memory_guided_small_batches_v1`` starts at eight images per rank (or a lower ceiling),
+searches in steps of one below eight and keeps an eight-image grid above it; the other
+strategies keep their own grids. ``exponential_binary_v1`` keys omit the strategy field, and
+a persisted case without a strategy reads as ``exponential_binary_v1``.
+
+Only an observed OOM or memory-budget excess bounds capacity; memory predictions only pick
+candidates. Every winner needs a fresh confirmation trial, and a failed confirmation is
+never retried. A non-finite step after a success confirms the last good batch as
+``numerically_limited`` without claiming a maximum.
+
+Catalogue schema 3 requires explicit strategies; schemas 1 and 2 stay readable without
+rewriting. Schema 1 cannot hold ``numerically_limited`` and schemas 1-2 cannot hold guided
+strategies. Saved cases are revalidated by replaying their trials, so a record cannot be
+edited into confirmation. Serialized settings omit ``force`` when false and a zero
+``minimum_free_memory_bytes``, which keeps existing keys and stricter readers valid.
+"""
 
 import hashlib
 import json

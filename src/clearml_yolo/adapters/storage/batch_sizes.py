@@ -1,4 +1,18 @@
-"""Comment-preserving atomic storage of editable batches and internal provenance."""
+"""Comment-preserving atomic storage of editable batches and internal provenance.
+
+Internal metadata (precise capacities, measured values, forced flags, sources and
+``no_capacity`` failures) is one reserved ``# clearml-yolo-batch-metadata:`` JSON comment in
+the same file, so one atomic replacement updates the public table and its metadata together;
+a separate metadata file could tear. An entry counts as measured only while its value equals
+the recorded measurement, so a hand edit becomes manual.
+
+``publish`` receives only cases the caller has already accepted; worker exit and cleanup
+evidence belong to the caller. Updates hold a native file lock and replace the file
+atomically, preserving comments and unrelated entries. Within one publication the smallest
+confirmed batch wins. Only a ``no_capacity`` case whose last trial ran at one image per GPU
+becomes a failure marker; a search that stopped above one cannot prove that one image does
+not fit. Malformed or duplicate metadata fails without overwriting the file.
+"""
 
 import hashlib
 import json

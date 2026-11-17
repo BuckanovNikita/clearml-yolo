@@ -1,4 +1,9 @@
-"""Bounded generated checks with independent semantic and durable-state oracles."""
+"""Bounded generated checks with independent semantic and durable-state oracles.
+
+Hypothesis cases cover lexical label and image identity and exact confidence values through
+the real prediction cache, and fixed-threshold counts against an independent reference. They
+are derandomized, keep no example database and run in the ordinary unit suite.
+"""
 
 import os
 from pathlib import Path

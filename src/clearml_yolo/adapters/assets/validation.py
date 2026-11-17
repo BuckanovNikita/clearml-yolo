@@ -1,4 +1,12 @@
-"""Content validation shared by URL and native Hub cache publication."""
+"""Content validation shared by URL and native Hub cache publication.
+
+Every rejection is a ``ValueError`` (or an archive or zip error), so callers can treat an
+invalid cache entry as a miss and continue normal resolution. Safetensors are opened with
+``safe_open(framework="numpy")``, which checks the header, dtypes, shapes and payload offsets;
+at least one tensor is required. Torch checkpoints must be a valid zip with ``data.pkl`` or
+start with the pickle magic of Torch's non-zip format; loading stays with the backend.
+Checksums may be prefixes, compared case-insensitively.
+"""
 
 import hashlib
 import zipfile

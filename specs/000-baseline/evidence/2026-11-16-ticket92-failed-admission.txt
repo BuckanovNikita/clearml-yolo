@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/mnt/wsl/data/nkt/clearml-yolo/.tmp/verification-gap-closure/ticket92-plan-20261116/admit_batch72.py", line 116, in <module>
-    raise SystemExit(main())
-                     ^^^^^^
-  File "/mnt/wsl/data/nkt/clearml-yolo/.tmp/verification-gap-closure/ticket92-plan-20261116/admit_batch72.py", line 111, in main
-    raise RuntimeError("Fresh batch72 admission failed; no queued job may be submitted")
-RuntimeError: Fresh batch72 admission failed; no queued job may be submitted

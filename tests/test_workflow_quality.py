@@ -1,4 +1,9 @@
-"""Saved Hydra configuration through real local datasets, evaluation and reports."""
+"""Saved Hydra configuration through real local datasets, evaluation and reports.
+
+Composed tests join saved configuration, real storage, evaluation and report boundaries:
+frozen validation thresholds survive CSV, payload and workbook; comparison caches keep the
+source pair across checkpoint replacement; only statistically eligible classes are counted.
+"""
 
 import os
 from functools import partial

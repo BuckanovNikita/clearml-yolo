@@ -1,4 +1,16 @@
-"""Bind estimator compatibility to installed recipes and concrete execution settings."""
+"""Bind estimator compatibility to installed recipes and concrete execution settings.
+
+A profile identifies everything that changes memory use: architecture, nominal and largest
+effective input shape (native multiscale included), precision, compilation, optimizer paths
+(YOLO ``optimizer=auto`` measures both ``AdamW`` and ``MuSGD``), accumulation, EMA, a digest
+of the training recipe plus any custom augmentation snapshot, installed dependency, CUDA
+library and compiler versions, and a digest of the editable implementation sources. Settings
+that do not change memory use (routing, epochs, workers, logging) and resolved default asset
+paths are left out so they do not split measurements.
+
+YOLO recipes come from ``batch_probe_settings``, which rejects controls a probe cannot
+reproduce; custom augmentation requires a resolved snapshot before measurement.
+"""
 
 import hashlib
 import importlib.metadata

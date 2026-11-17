@@ -1,4 +1,4 @@
-# Native Ruff configuration; detailed tradeoffs live in docs/static-analysis.md.
+# Native Ruff configuration; the policy is in docs/architecture.md (Static analysis).
 line-length = 120
 target-version = "py312"
 src = ["src", "tests"]

@@ -1,4 +1,11 @@
-"""Resolve finalized annotation datasets without modifying their CSV or media paths."""
+"""Resolve finalized annotation datasets without modifying their CSV or media paths.
+
+Lookup uses ``only_completed=True`` and ``auto_create=False`` and requires a finalized
+dataset whose file list is exactly the root ``dataset.csv``; any other file fails before
+download. The CSV is fetched without soft links because a link would move the CSV's parent
+into the SDK archive cache and change how relative image paths resolve. The returned digest
+hashes the bytes actually downloaded. Archive transfer and caching belong to the ClearML SDK.
+"""
 
 import hashlib
 from pathlib import Path

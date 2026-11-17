@@ -1,4 +1,13 @@
-"""Export current command defaults as editable Hydra configuration examples."""
+"""Export current command defaults as editable Hydra configuration examples.
+
+Public YAML names (the command wrapper such as ``cy.yaml`` and its base such as
+``pipeline.yaml``) are distinct from the private ``_cy_schemas`` ConfigStore group, so Hydra
+never matches a user file to a schema automatically. An export writes only the selected
+wrapper, its command base and the groups that selection needs. All destinations and their
+parents are preflighted before the first write; ``--force`` may replace regular files only,
+and without it files are opened with exclusive creation, so a file created after preflight
+is never overwritten. Export creates no ClearML task and imports no model runtime.
+"""
 
 import shlex
 from pathlib import Path

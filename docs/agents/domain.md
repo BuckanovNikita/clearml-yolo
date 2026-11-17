@@ -1,11 +1,10 @@
 # Domain documentation
 
-This repository uses one root `GLOSSARY.md` and `docs/adr/`.
+This repository has a single context. Its glossary is the root `GLOSSARY.md`; use its
+vocabulary in issues, tests and explanations.
 
-Before exploring a domain, read its glossary terms and relevant ADRs.
-Use the glossary's vocabulary in tickets, tests, and explanations.
-Surface conflicts with ADRs explicitly.
+Product behavior is documented in `docs/feature/`, one file per feature. Before exploring
+a domain, read its glossary terms and the affected feature files.
 
-If a referenced document is absent, continue without creating a
-placeholder. Follow the Linear/GitHub workflow and current product contracts.
-Spec Kit artifacts are read-only historical context.
+Decisions are recorded in the feature file they change and in the Linear issue that made
+them. There is no ADR directory; do not create one.

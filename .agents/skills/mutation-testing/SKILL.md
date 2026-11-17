@@ -1,25 +1,30 @@
 ---
 name: mutation-testing
-description: Use when reviewing mutation survivors or unreached behavior, or changing mutation selection.
+description: Use when reviewing mutation survivors or unreached functions, or changing mutation selection or settings.
 ---
 
-# Triage mutation evidence
+# Triage mutation results
 
-Read `docs/development.md` (Mutation report). The Task and `[tool.mutmut]` configuration
-own invocation, selection, budgets and exit meanings; paths start at the repository root.
+Paths start at the repository root. Read `docs/development.md#mutation-report` for the
+command, budget and exit meanings, `[tool.mutmut]` in `pyproject.toml` for the settings,
+and the module docstring of `scripts/mutation.py` for how functions and tests are selected.
 
-1. Select the whole product change against its recorded base; staged reports cover
-   only staged inputs.
-2. Compare survivors with the caller's observable contract, boundaries and effects.
-   Strengthen product tests for unprotected behavior, stage them and rerun affected
-   mutations. Preserve correct code for equivalent or presentation-only mutants and
-   record the reasoning; there is no survivor allowlist.
-3. Separate survivors from unreached functions, unrun mutants and budget exclusions.
-   Identify coverage requiring live/hardware execution. Diagnose failed clean baselines
-   and tool errors rather than interpreting report production as successful coverage.
-4. Record selected functions/tests, selection source, outcomes, dispositions and reruns
-   in verification evidence linked from Linear and the PR. Use `verification-workflow` to assess reuse and remaining gaps.
+1. Run the report over the whole product change: `--base master` for a task branch;
+   without it the report covers only staged inputs.
+2. Sort every reported function into one of: killed, survived, not reached by tests,
+   not run (budget), skipped (function budget). Exit 2 is a tool, configuration or
+   clean-test failure: diagnose it; it is never a result.
+3. For each survivor, compare the mutant with the caller's observable contract,
+   boundaries and effects:
+   - unprotected behavior: strengthen a product test, stage it and rerun the affected
+     functions;
+   - equivalent or presentation-only mutant: keep the code and write the reasoning down.
+   There is no survivor allowlist.
+4. For unreached functions, decide whether a unit test can reach them or the behavior
+   needs live or hardware execution, and name that check.
+5. Record the base, selected functions and tests, outcomes, dispositions and reruns in
+   the Linear issue. Done when every survivor and unreached function has a disposition.
 
-Changes to mutation tooling preserve product-only mutation, isolated staged inputs,
-bounded selectors, heavy/live exclusions and owned-process cleanup. Exercise tooling
-with disposable command scenarios; repository tests exercise product behavior.
+Changes to the mutation tooling keep mutation product-only, staged inputs isolated,
+selectors bounded, heavy and live tests excluded and owned processes cleaned up. Exercise
+such changes with disposable command scenarios.

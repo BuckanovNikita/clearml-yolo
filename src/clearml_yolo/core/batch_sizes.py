@@ -1,4 +1,16 @@
-"""Pure selection of editable per-device training batches."""
+"""Pure selection of editable per-device training batches.
+
+Selection per model, image size and target GPU: an exact name+capacity entry (smallest batch
+if several); otherwise a recorded ``no_capacity`` failure blocks fallback; otherwise the
+entry with the largest capacity not above the target, ties broken by smallest batch, then
+GPU name. Exact entries win over failure markers, so a manual exact entry overrides a
+confirmed failure.
+
+Table selection deliberately ignores workload, recipe, augmentation and dependency
+identity; strict measurement compatibility lives in ``batch_estimation``. GPU labels
+(``Name [N GiB]``) are display identifiers; precise byte capacities come from metadata when
+present, and labels without metadata are read literally.
+"""
 
 import re
 from decimal import Decimal

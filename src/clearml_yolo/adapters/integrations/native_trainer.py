@@ -1,4 +1,17 @@
-"""Native trainer with process-local callback ownership in spawned DDP workers."""
+"""Native trainer with process-local callback ownership in spawned DDP workers.
+
+Ultralytics serializes the trainer class into fresh DDP interpreters, so frozen inputs (the
+custom transform snapshot and an optional fixed batch/epoch recipe) travel as class
+attributes of a task-local subclass, never as unknown native arguments or global state.
+Construction and training both run inside ``native_runtime`` because workers may load native
+settings that enable ClearML; no SDK settings file is written. A fixed recipe fails training
+when native code changes the batch, or exceeds or repeats an epoch.
+
+Native OOM recovery is exhausted at every training-batch start, so an OOM re-raises the
+original error instead of halving the batch; initial AutoBatch selection is unaffected.
+Output directories are validated after native save-dir resolution and before any weights or
+``args.yaml`` are written.
+"""
 
 from collections.abc import Iterator
 from contextlib import contextmanager
