@@ -54,8 +54,8 @@ for every task. Read guidance instead of copying shared skills into the reposito
   criteria, checks and independent review before acceptance.
 - Task classifies staged inputs in hooks and the latest commit after committing.
   Use the [automatic route](docs/development.md#automatic-routing); explicit test,
-  acceptance commands retain their requested scope. Code releases use a human-merged
-  release PR and separately authorized tag publication.
+  acceptance commands retain their requested scope. Human merges to `master` authorize
+  automatic code releases through the [release workflow](docs/development.md#local-releases).
 - Mocked tests do not establish native/GPU/upload outcomes.
 - Report each required check as passed, failed, deferred, waived or error. Deferred
   verification blocks acceptance, integration and release; waived checks never block.
@@ -75,11 +75,12 @@ for every task. Read guidance instead of copying shared skills into the reposito
   general cleanup or dependency maintenance does not authorize this. Adapt this project's
   integration; report upstream issues rather than patching or monkeypatching the dependency.
 - Select verification and pairing through the reviewed verification checklist in
-  [development procedures](docs/development.md#acceptance-tiers). Release consumes that
-  evidence with an explicit pairing decision; it does not replay blanket acceptance.
+  [development procedures](docs/development.md#acceptance-tiers). Complete selected checks and record the pairing decision before human merge;
+  release automation does not replay acceptance.
 - Use Conventional Commits. Agents may commit task-owned changes, push task branches and
   open GitHub PRs; humans merge. Explicit no-commit/no-push limits and the active host
-  mode take precedence. Code releases follow the PR-based release procedure. Preserve unrelated changes and stage only task-owned hunks;
+  mode take precedence. Release automation alone publishes version commits to `master`.
+  Preserve unrelated changes and stage only task-owned hunks;
   do not stash, reset or revert unrelated work, or bypass hooks to hide failures.
 - Follow the [commit procedure](docs/development.md#commit-procedure) for coherent split
   commits, targeted intermediate skips and final verification of committed inputs.

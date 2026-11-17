@@ -48,7 +48,7 @@ checkouts and files remain authoritative. Dependency installation is always exte
 ## Verification
 
 [Taskfile.yml](../Taskfile.yml) owns verification commands, ordering and change routing;
-[Taskfile.ops.yml](../Taskfile.ops.yml) owns infrastructure and release stages. prek is a
+[Taskfile.ops.yml](../Taskfile.ops.yml) owns infrastructure and explicit acceptance stages. prek is a
 serial dispatcher with Conventional Commits validation. Invoke explicit stages with
 `uv run --locked task --exit-code <stage>` after preparing the
 [local external packages](#external-dependencies). Clear inherited
@@ -111,7 +111,7 @@ without first running an equivalent `verify`. No separate documentation checker 
 | `acceptance` | Explicit complete change acceptance on a clean committed tip |
 | `release-acceptance` | Explicit release automated gates and paired check |
 | `paired-check` | [Final CY/queue source compatibility](#paired-cy-and-queue-release-check) |
-| `release-prepare` / `release-publish` | [Release PR preparation / authorized tag publication](#local-releases) |
+| GitHub release workflow | [Automatic versions, changelog and tags after merges](#local-releases) |
 
 Inspect current host load before heavy stages and select the configured worker count
 accordingly. Verification never builds CY distributions. `local-deps` builds only
@@ -436,7 +436,7 @@ Change acceptance needs a clean committed tip. Each worktree uses its own prepar
 environment ([setup](#external-dependencies)): Task pins each stage to the worktree's
 `.venv`, so worktrees never share an environment. Do not resolve or update dependencies
 during verification; dependency changes land as ordinary reviewed commits that update
-`pyproject.toml` and `uv.lock` together. Releases run from a clean prepared checkout.
+`pyproject.toml` and `uv.lock` together. Releases run in clean GitHub Actions checkouts.
 
 ## Paired CY and queue release check
 
@@ -448,63 +448,52 @@ both sources in a temporary environment, checks dependencies and installed/sourc
 runs queue static checks, its suite and help, then removes the environment.
 `CY_QUEUE_DIR` selects the sibling checkout.
 
-Required pairing executes once against final proposed versions before release commit/tag
-creation, or against the unchanged pair for a no-version result. Immediate publishing
-reuses that result. Later publication reassesses the reviewed record and executes selected
-pairing against the published versions. Explicit `release-acceptance` always includes
-pairing. Failed/unavailable selected pairing blocks delivery. CY remains independent of
-the queue at runtime; the queue raises its CY minimum when it adopts a newer interface.
+Required pairing executes against the final proposed versions before human merge, or
+against the unchanged pair when no version is expected. Reassess evidence if proposed
+inputs change. Explicit `release-acceptance` always includes pairing. Failed/unavailable
+selected pairing blocks merge and delivery. The release job does not execute native or
+GPU checks and does not establish their outcomes. CY remains independent of the queue
+at runtime; the queue raises its CY minimum when it adopts a newer interface.
 
 ## Local releases
 
-Code releases use a GitHub release PR followed by separately authorized tag publication.
-The legacy `release-local` command is retired: never integrate ticket branches locally
-or push version commits to `master`. The replacement becomes the supported route when
-its implementation PR is accepted and merged. Model-weight releases remain separate.
+Code releases run automatically in GitHub Actions after a human merges a PR into
+`master`. The merge authorizes publication; there is no separate release PR or local
+publication step. `release-local`, `release-prepare` and `release-publish` are retired.
+Local development hooks remain available, and applicable verification, independent review
+and selected pairing must be complete before merge. Keep evidence and the pairing decision
+in the linked Linear issue and PR. Reuse applicable successful evidence rather than
+repeating blanket acceptance.
 
-Use a clean prepared checkout with an authenticated `gh` CLI and a GitHub `origin`.
-Review changes since the previous version, applicable source/environment evidence and
-selected pairing before either operation. Both commands require a full immutable
-`--expected-tip SHA`, `--verification-record PATH` and `--pairing required|not-required`.
-The record is a reviewed attestation, not machine-validated proof; link it from Linear.
-Preparation includes its contents in the release PR, so review it for credentials and
-private data before invoking the command. GitHub operations are bound to the repository
-identified by `origin`, regardless of a `GH_REPO` override. Fetch and push must resolve
-to one identical destination; differing or multiple push URLs are refused. Pushes disable
-automatic following of other annotated tags. Required checks must pass or have an explicit user waiver. Do not repeat
-blanket acceptance when existing evidence remains applicable.
+The [release workflow](../.github/workflows/release.yml) handles closed PR events only
+when the PR was merged into `master`. Unmerged closures, ordinary pushes and tag creation
+do not release. Jobs are serialized without canceling active releases. Each job reads the
+current `master` tip with full history and tags; closely spaced merges may share one
+release. Existing tags define the baseline, and a no-version result succeeds without
+creating a commit or tag.
 
-- `release-prepare`: start at the exact fetched `origin/master` source. semantic-release
-  determines the next version and prepares a version-only commit on `release/vVERSION`,
-  refreshing the lock's root version and changelog. The command pushes that branch and
-  opens or reuses its GitHub PR. It neither creates a version tag nor merges the PR.
-  A no-version result succeeds without opening a PR. Use a dedicated checkout because
-  preparation changes its checked-out branch.
-- `release-publish`: after a human merges the release PR, check out its exact merged
-  source and pass `--pr NUMBER --publish` in addition to the common arguments. The
-  command verifies GitHub merge metadata, release-only changes, source/lock versions,
-  containment in fetched `origin/master` and selected pairing. semantic-release creates
-  the annotated version tag at that merged source; only the tag is pushed and its remote
-  identity is confirmed. `--publish` attests separate publishing authorization; it does
-  not grant that authorization. No GitHub Release or package artifact is created.
+Python Semantic Release owns version calculation, changelog generation, the version
+commit and annotated `v{version}` tag. The metadata step changes only `project.version`,
+the root package version in `uv.lock`, and `CHANGELOG.md`; dependency resolutions remain
+unchanged. Tooling runs independently of application dependencies and the local wheelhouse.
+The release validates the metadata diff before atomically pushing the version commit and
+its tag with explicit refs. It rejects a moved remote tip or conflicting tag and verifies
+published ref identities. It never force-pushes or follows unrelated tags.
 
-Human merging remains a review obligation; GitHub merge metadata establishes merged
-state, not who authorized it. Reassess verification if the merged source differs from
-previously checked inputs. Version changes alone do not require CY/queue pairing;
-selected pairing runs against the proposed/final versions.
+Activation requires the repository-scoped `GITHUB_TOKEN` with `contents: write` and
+repository rules that permit the automated release commit. Confirm permissions before
+activation; if rules block it, arrange explicit release-bot authorization without weakening
+human branch protections. Do not treat a local rehearsal as evidence of GitHub permissions.
+An atomically rejected push leaves both remote refs unchanged. A connection failure can
+leave publication status uncertain: inspect remote refs before rerunning the workflow
+against refreshed `master`; an already published release is a successful no-op.
+Never overwrite an existing tag or recover by resetting unrelated work.
 
-Both operations retain a nonblocking repository-wide lock, clean-tree and immutable-tip
-checks, ref-stability checks and bounded version-only changes. Never break another
-attempt's lock or overwrite a mismatched remote ref. A valid prepared release branch can
-be retried to finish pushing or opening its PR without generating another version.
-After tag-push failure, retry publication for the same merged source and tag; an existing
-matching tag is reused, while mismatches fail. Inspect failed preparation before recovering
-only task-owned changes. Never force-push a release tag or reset unrelated work.
-
-Code releases contain Git commits and annotated tags only. semantic-release owns versions,
-changelog, version commits and annotated tags. The build hook refreshes only the root lock
-version and enforces the existing version exception; it builds no distributions. Version
-commits may skip only ordinary verification while staging and message validation remain.
+Code releases contain Git commits and annotated tags only. They create no GitHub Release,
+package, wheel, source archive, deployment or model-weight assets. Model-weight releases
+retain their separate authorization and procedure below. Record the run URL, source/final
+SHAs, version or no-version result, and confirmed remote tag identity in dated evidence;
+live publication remains unverified until a qualifying merged PR runs successfully.
 
 ## Model-weight releases
 

@@ -142,22 +142,6 @@ tasks:
           exit 1
         fi
         echo "Accepted tip: {{.START_HEAD}}"
-  release-commit-check:
-    desc: Release exception checks; runs only inside the semantic-release build_command
-    cmds:
-      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP" --pairing "$CY_RELEASE_PAIRING"'
-      - task: lock
-      - task: ruff
-      - task: format-check
-      - task: deptry
-      - |
-        case "$CY_RELEASE_PAIRING" in
-          required) "{{.TASK_EXE}}" --exit-code paired-check ;;
-          not-required) echo 'Pairing not required by the reviewed verification record' ;;
-          *) echo 'Missing or invalid release pairing decision' >&2; exit 1 ;;
-        esac
-      - '{{.RUN}} {{.UV}} python scripts/release.py check-prepared --expected-tip "$CY_RELEASE_EXPECTED_TIP" --pairing "$CY_RELEASE_PAIRING"'
-
   paired-check:
     desc: Paired CY and cy-queue release check in a temporary environment (CY_QUEUE_DIR, default ../cy-queue)
     dir: '{{.ROOT_DIR}}'
@@ -245,13 +229,3 @@ tasks:
     cmds:
       - task: release-validation
       - task: paired-check
-
-  release-prepare:
-    desc: Prepare a release branch and GitHub PR from reviewed master source
-    cmds:
-      - "{{.RUN}} {{.UV}} python scripts/release.py prepare {{.CLI_ARGS}}"
-
-  release-publish:
-    desc: Publish only the annotated tag of a verified merged release PR
-    cmds:
-      - "{{.RUN}} {{.UV}} python scripts/release.py publish {{.CLI_ARGS}}"
