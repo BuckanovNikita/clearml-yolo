@@ -34,7 +34,8 @@ record the grouping in Linear before implementation. Routine grouping needs no a
 Agents may push task branches and create PRs. Humans merge PRs. Use Conventional Commits,
 the existing SSH remote, and task-owned branches; never deliver by merging locally into
 `master` or pushing `master`. Explicit session restrictions take precedence. Code release
-publication has separate authorization and remains suspended pending replacement tooling.
+publication has separate authorization and follows the verified human-merged release PR
+procedure in [development guidance](../development.md#local-releases).
 
 For stacks, the first PR targets `master`; descendants target their parent branches.
 Link parent PRs and merge order. Review incremental diffs and verify the cumulative

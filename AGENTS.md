@@ -54,8 +54,8 @@ for every task. Read guidance instead of copying shared skills into the reposito
   criteria, checks and independent review before acceptance.
 - Task classifies staged inputs in hooks and the latest commit after committing.
   Use the [automatic route](docs/development.md#automatic-routing); explicit test,
-  acceptance commands retain their requested scope. Code release routes are suspended
-  pending PR-based release tooling.
+  acceptance commands retain their requested scope. Code releases use a human-merged
+  release PR and separately authorized tag publication.
 - Mocked tests do not establish native/GPU/upload outcomes.
 - Report each required check as passed, failed, deferred, waived or error. Deferred
   verification blocks acceptance, integration and release; waived checks never block.
@@ -79,7 +79,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
   evidence with an explicit pairing decision; it does not replay blanket acceptance.
 - Use Conventional Commits. Agents may commit task-owned changes, push task branches and
   open GitHub PRs; humans merge. Explicit no-commit/no-push limits and the active host
-  mode take precedence. Code release tooling is suspended pending its PR-based replacement. Preserve unrelated changes and stage only task-owned hunks;
+  mode take precedence. Code releases follow the PR-based release procedure. Preserve unrelated changes and stage only task-owned hunks;
   do not stash, reset or revert unrelated work, or bypass hooks to hide failures.
 - Follow the [commit procedure](docs/development.md#commit-procedure) for coherent split
   commits, targeted intermediate skips and final verification of committed inputs.

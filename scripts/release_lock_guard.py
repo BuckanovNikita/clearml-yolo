@@ -14,6 +14,7 @@ Exit status: 0 when the release changes only the version, 1 with one line per pr
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 import tomllib
@@ -96,13 +97,13 @@ def pyproject_problems(head: Document, staged: Document) -> list[str]:
     return problems
 
 
-def check(root: Path) -> list[str]:
+def check(root: Path, base: str = "HEAD", target: str = "") -> list[str]:
     """Compare ``HEAD`` with the index and return every release-policy violation."""
-    lock_head = _load(root, "HEAD", "uv.lock")
-    lock_staged = _load(root, "", "uv.lock")
-    project_staged = _load(root, "", "pyproject.toml")
+    lock_head = _load(root, base, "uv.lock")
+    lock_staged = _load(root, target, "uv.lock")
+    project_staged = _load(root, target, "pyproject.toml")
     problems = lock_problems(lock_head, lock_staged)
-    problems.extend(pyproject_problems(_load(root, "HEAD", "pyproject.toml"), project_staged))
+    problems.extend(pyproject_problems(_load(root, base, "pyproject.toml"), project_staged))
     version = project_staged.get("project", {}).get("version")
     roots = [package for package in lock_staged.get("package", []) if package.get("name") == PACKAGE]
     if len(roots) == 1 and roots[0].get("version") != version:
@@ -112,13 +113,17 @@ def check(root: Path) -> list[str]:
 
 def main() -> int:
     """Report release-policy violations of the staged release commit."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base", default="HEAD")
+    parser.add_argument("--target", default="")
+    args = parser.parse_args()
     root = Path(
         subprocess.run(
             ["git", "rev-parse", "--show-toplevel"], check=True, capture_output=True, text=True
         ).stdout.strip()
     )
     try:
-        problems = check(root)
+        problems = check(root, args.base, args.target)
     except (subprocess.CalledProcessError, tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
         problems = [f"cannot read release files: {exc}"]
     for problem in problems:
