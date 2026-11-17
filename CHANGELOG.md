@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.50.0 (2026-11-17)
+
+### Continuous Integration
+
+- Automate semantic releases after merges to master
+  ([#11](https://github.com/BuckanovNikita/clearml-yolo/pull/11),
+  [`80302bf`](https://github.com/BuckanovNikita/clearml-yolo/commit/80302bfadd95d460d644a4a4f98dbb124fd05616))
+
+### Documentation
+
+- Migrate workflow to Linear and GitHub PRs
+  ([#9](https://github.com/BuckanovNikita/clearml-yolo/pull/9),
+  [`99d45b4`](https://github.com/BuckanovNikita/clearml-yolo/commit/99d45b48ef8fdb7f8f9d4fcc60bd8ce677421022))
+
+### Features
+
+- Prepare releases through GitHub pull requests
+  ([#10](https://github.com/BuckanovNikita/clearml-yolo/pull/10),
+  [`d5381dd`](https://github.com/BuckanovNikita/clearml-yolo/commit/d5381ddb701af3509c64c94bc4e22e807d61ba00))
+
+
 ## v0.49.0 (2026-11-17)
 
 ### Bug Fixes
