@@ -1,7 +1,7 @@
 """Refuse a staged release commit that changes more than the root version.
 
-Run inside the semantic-release ``build_command`` (``task release-commit-check``) after
-the release files are staged. It compares the index with ``HEAD``:
+The GitHub release runner compares its selected source with the generated release
+commit. Direct invocation defaults to comparing the index with ``HEAD``:
 
 * ``uv.lock``: every top-level key and every ``[[package]]`` entry is identical, except
   the single ``clearml-yolo`` entry whose only change is ``version``;

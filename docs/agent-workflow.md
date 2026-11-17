@@ -26,9 +26,11 @@ diff and actual evidence before completion. Shared skills support this workflow 
 than introducing another specification process. Planning-only requests remain read-only.
 
 Agents may commit task-owned work, push task branches and open PRs; humans merge.
-Explicit session limits and host mode take precedence. Code releases prepare a GitHub release PR and publish its verified merged tag only
-with separate authorization; follow the [release procedure](development.md#local-releases).
-The legacy local integration command is retired. Deployment and package publishing require explicit authorization.
+Explicit session limits and host mode take precedence. Human merges to `master` authorize
+GitHub Actions to publish a version commit and annotated tag automatically; follow the
+[release procedure](development.md#local-releases). Complete applicable verification,
+independent review and selected pairing before merge. Local release commands are retired.
+Deployment and package publishing require explicit authorization.
 Model-weight release authorization remains separate. Project wheels and source archives
 are debugging tools only, never routine verification or release deliverables.
 
