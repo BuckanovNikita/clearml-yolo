@@ -30,7 +30,7 @@ for every task. Read guidance instead of copying shared skills into the reposito
 | Change application behavior or configuration | [Project contract summary](docs/project-contracts.md), then affected topics in the [current contract index](docs/current-contracts.md) and their implementation evidence |
 | Set up dependencies, verify code or commit | Relevant sections of [development procedures](docs/development.md); read the commit procedure before every commit |
 | Plan, implement, fix, resume or accept repository changes | [Workflow policy](docs/agent-workflow.md), including its [module boundaries](docs/agent-workflow.md#module-boundaries) |
-| Run any Spec Kit stage, including planning or bug-source capture | [Agent workflow policy](docs/agent-workflow.md), then the applicable installed skills |
+| Plan or deliver tickets and PRs | [Linear and GitHub workflow](docs/agents/issue-tracker.md) |
 | Verify changes, commit, or report completion | [verification-workflow](.agents/skills/verification-workflow/SKILL.md) |
 | Run live tests, acceptance, or remove a test environment | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
 | Triage mutants or change mutmut settings | [mutation-testing](.agents/skills/mutation-testing/SKILL.md) |
@@ -42,25 +42,20 @@ for every task. Read guidance instead of copying shared skills into the reposito
 
 - Preserve the selected parent model/effort and host planning restrictions.
 
-- The [constitution](.specify/memory/constitution.md) defines typed Python, effect
-  ownership, verification, preservation and collaboration rules. The
-  [workflow policy](docs/agent-workflow.md) owns task routing, authorization boundaries,
-  verification and documentation guidance. Read the policy before workflow
-  operations so its safeguards apply in time.
-- For Python repository work, preserve the declared Python compatibility, check
-  affected module boundaries, run the project verification gates and follow authorized
-  release procedures. The native Spec Kit workflow owns stage order, task artifacts and review
-  sequence.
-- Start from the [product specification](specs/000-baseline/spec.md) and its
-  technical contracts. New behavior changes use the native Spec Kit workflow;
-  product specifications describe requirements without implementation status.
-- Reconcile the actual task-owned diff with the ledger, checks and review before
-  acceptance; then evaluate the native release workflow within authorization.
-  Documentation-only changes may produce no new version. Missing or failed required
-  checks remain acceptance gaps.
+- The [workflow policy](docs/agent-workflow.md) owns planning, engineering safeguards,
+  authorization, verification and documentation guidance. Read it before repository work.
+- Linear owns active requirements, plans, acceptance criteria and status. GitHub PRs own
+  implementation review and delivery; follow the [ticket workflow](docs/agents/issue-tracker.md).
+- Spec Kit is temporarily disabled. Preserve `specs/`, `.specify/` and archived tooling
+  unchanged; do not invoke its stages or update its artifacts. Reactivation requires
+  explicit user instruction. Historical requirements do not authorize workflow gates.
+- Preserve product behavior through the [current contract index](docs/current-contracts.md)
+  and affected technical contracts. Reconcile the task-owned diff with Linear acceptance
+  criteria, checks and independent review before acceptance.
 - Task classifies staged inputs in hooks and the latest commit after committing.
   Use the [automatic route](docs/development.md#automatic-routing); explicit test,
-  acceptance and release commands retain their requested scope.
+  acceptance commands retain their requested scope. Code release routes are suspended
+  pending PR-based release tooling.
 - Mocked tests do not establish native/GPU/upload outcomes.
 - Report each required check as passed, failed, deferred, waived or error. Deferred
   verification blocks acceptance, integration and release; waived checks never block.
@@ -79,12 +74,12 @@ for every task. Read guidance instead of copying shared skills into the reposito
   source, checkout, dependency reference or locked revision without explicit user intent;
   general cleanup or dependency maintenance does not authorize this. Adapt this project's
   integration; report upstream issues rather than patching or monkeypatching the dependency.
-- Select verification and pairing through the reviewed native checklist in
+- Select verification and pairing through the reviewed verification checklist in
   [development procedures](docs/development.md#acceptance-tiers). Release consumes that
   evidence with an explicit pairing decision; it does not replay blanket acceptance.
-- Use Conventional Commits and complete the native release workflow when user or standing
-  authorization covers delivery; explicit no-commit/no-release limits and the active host
-  mode take precedence. Preserve unrelated changes and stage only task-owned hunks;
+- Use Conventional Commits. Agents may commit task-owned changes, push task branches and
+  open GitHub PRs; humans merge. Explicit no-commit/no-push limits and the active host
+  mode take precedence. Code release tooling is suspended pending its PR-based replacement. Preserve unrelated changes and stage only task-owned hunks;
   do not stash, reset or revert unrelated work, or bypass hooks to hide failures.
 - Follow the [commit procedure](docs/development.md#commit-procedure) for coherent split
   commits, targeted intermediate skips and final verification of committed inputs.
@@ -105,18 +100,16 @@ for every task. Read guidance instead of copying shared skills into the reposito
   importing it with `@AGENTS.md`.
 - Author project skills in `.agents/skills/`; `.claude/skills` is a symlink to it for
   Claude discovery.
-- Keep installed Spec Kit skills, commands, templates and `.specify/` files unchanged
-  unless explicitly requested. Project workflow policy belongs in linked project guidance
-  or separate project hooks; feature specifications under `specs/` are project documentation.
+- Keep archived Spec Kit skills, commands, templates, `.specify/` and `specs/` unchanged
+  and outside active discovery. Maintain project policy in linked guidance and project hooks.
 
 ## Project execution policy
 
-Use Spec Kit for new capabilities or documented behavior changes; routine fixes,
-docs and small refactors proceed directly, updating existing task artifacts as needed.
+Follow Linear planning and GitHub PR delivery for repository changes. One cohesive
+feature may include multiple tickets in one branch and PR; stacked PRs are optional.
 Behavior, interface, dependency, security and operational-policy changes require
-independent review after integration and verification; wording edits may be self-reviewed.
-Documentation checks are limited to native Spec Kit or OpenSpec checks. Local commits
-may be autonomous; pushes require separate authorization, including existing session authorization.
+independent review after integrated verification; wording edits may be self-reviewed.
+Review documentation consistency proportionately without adding a documentation checker.
 
 ## Specification rewrites
 
@@ -125,3 +118,17 @@ homes, including requirements embedded in scenarios. Separate approved policy ch
 from wording changes; resolve overloaded terms before editing. Retain compatibility
 obligations, remove historical status claims, and have the reviewer compare meaning
 against the original source rather than judge length or wording alone.
+
+## Agent skills
+
+### Issue tracker
+
+For ticket operations, use [Linear conventions](docs/agents/issue-tracker.md).
+
+### Triage labels
+
+For ticket triage, use the [standard roles](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Before domain exploration, follow the [single-context documentation guidance](docs/agents/domain.md).

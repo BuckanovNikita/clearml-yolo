@@ -84,7 +84,7 @@ execute their requested scope regardless of change classification.
 
 ### Order and evidence reuse
 
-Complete applicable native Spec Kit documentation analysis and consistency review as
+Review affected documentation for consistency with the Linear acceptance criteria as
 soon as inputs exist. Then run hygiene/safe fixes, syntax and required-input checks,
 lock freshness, remaining static checks, and resource preflight before expensive
 execution. Early failures and automatic edits stop later stages; inspect and stage
@@ -111,7 +111,7 @@ without first running an equivalent `verify`. No separate documentation checker 
 | `acceptance` | Explicit complete change acceptance on a clean committed tip |
 | `release-acceptance` | Explicit release automated gates and paired check |
 | `paired-check` | [Final CY/queue source compatibility](#paired-cy-and-queue-release-check) |
-| `release-local` / `release-publish` | [Local integration/versioning / authorized publishing](#local-releases) |
+| `release-local` / `release-publish` | [Suspended legacy release routes](#local-releases) |
 
 Inspect current host load before heavy stages and select the configured worker count
 accordingly. Verification never builds CY distributions. `local-deps` builds only
@@ -145,7 +145,7 @@ hooks; verify the combined content explicitly.
 
 ### Acceptance tiers
 
-Ordinary completion uses a reviewed native evidence checklist, not a blanket suite.
+Ordinary completion uses a reviewed verification checklist linked from Linear and the PR, not a blanket suite.
 Record the comparison base/tip, affected contracts, selected checks, exclusions, prior
 source/environment identities, reuse reasons and remaining gaps. For development,
 inspect the whole branch against its integration-base merge ancestor. For release,
@@ -416,7 +416,7 @@ issues instead of patching or monkeypatching the dependency.
 
 ## Commit procedure
 
-Commit when user or standing authorization covers the native completion workflow.
+Commit task-owned changes under the authorization in the Linear and GitHub workflow.
 Explicit no-commit/no-release limits and the active host mode take precedence. Stage
 explicit paths or hunks belonging to the task; preserve unrelated staged and unstaged
 changes. Do not stash, reset, revert or bypass hooks to make a check pass. Use Conventional
@@ -440,7 +440,7 @@ during verification; dependency changes land as ordinary reviewed commits that u
 
 ## Paired CY and queue release check
 
-Select pairing in the native verification record for dependency/installation changes,
+Select pairing in the verification record linked from Linear and the PR for dependency/installation changes,
 interfaces consumed by cy-queue, or uncertain compatibility impact. A version bump alone
 does not require it. Inspect current CY/cy-queue source state and intended versions when
 selected; stale installed metadata is not evidence. Task `paired-check` normally resolves
@@ -457,38 +457,19 @@ the queue at runtime; the queue raises its CY minimum when it adopts a newer int
 
 ## Local releases
 
-Code releases contain Git commits and annotated version tags only. Project distributions
-are debugging tools, not routine release artifacts. semantic-release owns versions,
-changelog, commits and annotated tags; no-version outcomes are successful.
+Code release execution is suspended pending PR-based release tooling. Do not invoke
+`release-local` or `release-publish`: the existing implementation integrates into local
+`master` and pushes version commits directly, bypassing the human-merged PR workflow.
+The commands remain in source for replacement, not as supported delivery routes.
+Feature delivery follows [GitHub PR delivery](agents/issue-tracker.md).
 
-Both Task entrypoints require `--expected-tip SHA`, `--verification-record PATH` and
-`--pairing required|not-required`:
-
-- `release-local`: locally integrate by fast-forward and version; optional `--branch NAME`
-  selects the source branch. `--publish` additionally requires publishing authorization.
-- `release-publish`: publish existing accepted source without re-versioning; optional
-  `--tag vX` identifies the intended annotated tag.
-
-The evidence file must exist. Supplying it attests that its native checklist was reviewed
-and required checks passed or were explicitly waived. The tool does not parse prose as
-proof or replay full acceptance. Review must cover source/environment applicability,
-affected manual observations, pairing selection and any reused results. This is an
-explicit review obligation, not machine verification of completeness. The release skill
-owns authorization and recovery; an implementation request alone does not authorize release.
-
-Both routes retain clean-tree/expected-tip checks, a nonblocking Git-common-directory lock,
-fast-forward-only integration and ref-stability checks. Never break another run's lock.
-Publishing pushes only master and the pinned annotated version tag, including an unpublished
-ancestor tag after prose-only changes, and confirms remote refs. The tag must declare the
-same source version. No persistent verification receipt system is introduced.
-
-The semantic-release build step refreshes the lock's root version, restricts prepared
-changes to `pyproject.toml`, `uv.lock` and `CHANGELOG.md`, validates version-only changes
-and runs pairing when selected. Failed validation creates no release commit/tag and leaves
-prepared files for inspection. Recover only this attempt's changes; keep version/tag
-creation with semantic-release. Version commits may skip only ordinary verification;
-staging and commit-message safeguards remain. A failed publication retains the local
-release: inspect remote refs and retry publication without creating another version.
+The replacement must prepare version/changelog/lock changes in a release PR, retain
+semantic-release ownership and successful no-version outcomes, and publish annotated
+tags only for the human-merged, verified source with separate publishing authorization.
+Preserve clean-tree/immutable-tip checks, concurrency locks, source/environment evidence,
+selected CY/queue pairing, ref confirmation and recovery limited to task-owned changes.
+Code releases contain Git commits and annotated tags only; distributions remain debugging
+tools. Existing historical release evidence does not authorize a new release.
 
 ## Model-weight releases
 

@@ -18,7 +18,7 @@ own invocation, selection, budgets and exit meanings; paths start at the reposit
    Identify coverage requiring live/hardware execution. Diagnose failed clean baselines
    and tool errors rather than interpreting report production as successful coverage.
 4. Record selected functions/tests, selection source, outcomes, dispositions and reruns
-   in native evidence. Use `verification-workflow` to assess reuse and remaining gaps.
+   in verification evidence linked from Linear and the PR. Use `verification-workflow` to assess reuse and remaining gaps.
 
 Changes to mutation tooling preserve product-only mutation, isolated staged inputs,
 bounded selectors, heavy/live exclusions and owned-process cleanup. Exercise tooling

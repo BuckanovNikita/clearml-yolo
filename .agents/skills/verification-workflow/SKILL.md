@@ -6,7 +6,7 @@ description: Use when selecting verification, committing, reporting completion o
 # Select verification
 
 Read `docs/development.md` (Verification and Commit procedure). Paths start at the
-repository root. Task owns execution; the native evidence record owns selection.
+repository root. Task owns execution; the verification record linked from Linear and the PR owns selection.
 
 1. Inspect changes and record the comparison base/tip: the whole development branch,
    or changes since the previous release. Select comprehensive verification when no
@@ -18,7 +18,7 @@ repository root. Task owns execution; the native evidence record owns selection.
 3. Record exclusions and reuse reasons alongside source/environment identities.
    Reuse successful evidence only while relevant inputs remain applicable; rerun
    invalidated checks. A focused run cannot establish the global coverage floor.
-4. Complete native consistency review, follow the commit procedure, then run the final
+4. Review documentation consistency against Linear acceptance criteria, follow the commit procedure, then run the final
    `prek run --all-files` with overrides cleared. Obtain independent review for behavior
    or policy changes after integrated verification.
 5. Report selected checks as passed, failed, deferred, waived or error. Unavailable
