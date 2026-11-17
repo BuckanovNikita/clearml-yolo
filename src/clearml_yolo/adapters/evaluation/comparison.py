@@ -3,10 +3,10 @@
 Only the numerical tests come from the library: ``compare_paired`` supplies the precision
 test, the recall interval and the recall test, and ``adjust_benjamini_hochberg`` the
 correction. Class eligibility, the split-wide Benjamini-Hochberg family and the pooled
-population stay in ``core.comparison.assemble``, so this module must not filter classes or
-change the family. The capability is optional: an evaluation engine without
-``compare_outcomes`` falls back to the core ``build_comparison_rows`` path, which must produce
-the same tables and callback order.
+population stay in ``core.comparison.assemble``, so this module only slices rows to the class
+under test and must not decide eligibility or change the family. The capability is optional:
+an evaluation engine without ``compare_outcomes`` falls back to the core
+``build_comparison_rows`` path, which must produce the same tables and callback order.
 """
 
 from collections.abc import Callable, Sequence

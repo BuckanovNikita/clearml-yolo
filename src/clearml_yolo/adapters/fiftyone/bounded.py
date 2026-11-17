@@ -7,7 +7,8 @@ session. Invariants:
 - Request, result and phase files live in an explicit scratch arena; the SDK keeps its own
   temporary selection. Output is drained continuously and only a short redacted tail is
   retained, so a chatty worker cannot block on its pipe.
-- The operation deadline covers import, work, worker exit and cleanup. Success requires exit
+- The operation deadline covers import, work and worker exit, and cleanup after a successful
+  exit; cleanup after a timeout or failure is bounded separately (below). Success requires exit
   status 0 before the deadline and a ``WorkerResult`` whose operation, operation ID and task
   ID match the request; a publish receipt must also be dataset- and run-complete. A receipt
   left by a failed or late worker is never success.
