@@ -5,7 +5,7 @@ configuration, storage, provenance and operations, use the
 [technical reference](../TECH_DETAILS.md).
 
 Use this index to select the maintained contract for a topic. The
-[product description](../specs/000-baseline/spec.md) describes functionality and links detailed contracts. New features amend that baseline and the affected topic guides. A contract describes required behavior; inspect implementation and
+[product description](../specs/000-baseline/spec.md) describes functionality and links detailed contracts. The baseline is archived; new features update Linear requirements and affected topic guides. Archived product requirements remain binding until explicitly superseded in active contracts. A contract describes required behavior; inspect implementation and
 tests before claiming verification. Surface an unexplained mismatch
 rather than silently changing the requirement or code.
 
@@ -55,21 +55,20 @@ and remote outcomes.
 
 ## Maintaining consistency
 
-Spec Kit implementation and bug-fix workflows require a **Documentation update**
-stage before completion. Follow the [project workflow policy](agent-workflow.md#documentation)
+Implementation and fixes require a review of affected documentation before completion. Follow the [project workflow policy](agent-workflow.md#documentation)
 to plan explicit documentation tasks, reconcile them with the actual changes and
 validate the result. If no documentation changes are needed, record the reviewed scope
-and reason in the workflow artifacts. Missing required updates or failed validation
+and reason in the Linear issue or PR. Missing required updates or failed validation
 blocks completion.
 
-For a contract change, inspect this index, affected contracts, active specifications,
+For a contract change, inspect this index, affected contracts, Linear acceptance criteria,
 quickstarts, README, project-owned integration skills and any applicable
 environment skill.
 Update current normative text together. Preserve completed task history and dated
 analysis/verification; annotate superseded intent and link to current guidance.
 Do not turn historical observations into a claim about a new implementation.
 
-Specs record intent, task ledgers record work, and dated evidence records checks
+Linear records intent and work; PRs record review, and dated evidence records checks
 performed. Completed checkboxes alone do not establish live acceptance. Current status
 must cite evidence and retain its limitations. Avoid copied artifact counts and
 dependency versions; use the maintained inventory and package metadata.
@@ -79,16 +78,14 @@ Planning permits inspection, not artifact writes or mutating hooks. A skill cann
 authorize commits, deployment, dependency updates or unrelated repairs. Verification is
 required proportionally; adding new tests depends on affected behavior and risk.
 
-Keep installed Spec Kit skills, commands, templates and `.specify/` files unchanged
-unless the user explicitly requests modifying them. Project workflow overrides belong
-in [agent workflow policy](agent-workflow.md), linked from [AGENTS.md](../AGENTS.md),
-or separate project hooks. Feature specifications in
-`specs/` remain maintained project documentation. Upstream regeneration must not erase
-separate project policy or treat historical requirements as current authority.
+Spec Kit is temporarily disabled. `specs/`, `.specify/` and
+`archive/spec-kit/` are frozen historical sources, not active workflow instructions.
+Do not update them. Maintain new or changed requirements in Linear and affected topic
+guides, preserving inherited product obligations. Reactivation requires explicit user intent.
 
 Machine-specific operations stay in the reference of the project's
 [live-verification skill](../.agents/skills/running-integration-tests/SKILL.md).
-The reviewed native checklist selects affected acceptance claims. Historical releases and dated evidence describe
+The reviewed verification checklist linked from Linear and the PR selects affected acceptance claims. Historical releases and dated evidence describe
 observations then; they are not current execution recipes.
 
 The historical force/admission controls are superseded by direct native execution and

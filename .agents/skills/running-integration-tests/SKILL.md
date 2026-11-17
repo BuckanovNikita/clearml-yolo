@@ -41,5 +41,5 @@ Select only affected observations, comparing actual results with their topic con
   separate from numerical quality or random-weight smoke.
 
 Record source identities, commands, task/model IDs, observations, limitations and cleanup
-in native evidence. Simulations do not establish physical multi-GPU, multi-user or NFS
+in verification evidence linked from Linear and the PR. Simulations do not establish physical multi-GPU, multi-user or NFS
 execution. Retain source data and user SDK settings throughout.

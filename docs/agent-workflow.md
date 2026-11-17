@@ -1,104 +1,126 @@
 # Agent workflow policy
 
-Read this policy before Spec Kit workflow stages, including planning, bug-source capture
-and governance updates. The [agent instructions](../AGENTS.md) route tasks here; this
-project policy supplements the installed skills without changing their files.
+Read this policy before planning, implementing, fixing, resuming or accepting repository
+changes. Linear owns active work and GitHub PRs own delivery; follow the
+[ticket workflow](agents/issue-tracker.md) for grouping, dependencies and lifecycle.
+Inspect current code, configuration, hooks and existing changes before relying on
+historical claims. Preserve unrelated work and ignored local configuration.
 
-Record Python compatibility, architecture, documentation, verification and authorized
-release evidence within these routes, following the project contracts and development
-procedures linked from [AGENTS.md](../AGENTS.md). Spec Kit retains its
-stage order, artifacts, execution roles and status ledger. Shared skills do not establish
-a second plan or review process. Inspect current code, configuration, hooks and changes
-before relying on historical task claims; preserve unrelated work and ignored local configuration.
+## Planning and archive policy
 
-## Spec Kit integration
+Spec Kit is temporarily disabled. Preserve `specs/`, `.specify/`, and archived skills,
+commands and templates unchanged. Do not invoke their workflows, generate artifacts,
+update their status ledgers or apply their governance gates. Reactivation requires
+explicit user instruction. Read archived sources only for historical context and
+requirement provenance; transfer requirements needed for active work into Linear.
 
-Each normative rule has one authoritative topic location and a linked executable
-check, or an explicit verification limitation. The [contract index](current-contracts.md)
-is navigation, not a duplicate specification. Contract changes reconcile specification,
-implementation, tests, examples and portable usage guidance together. Architecture
-gates inspect the actual product graph and source; unit tests exercise product behavior.
+The archive does not repeal product behavior. The [project contract summary](project-contracts.md)
+and [current contract index](current-contracts.md) lead to maintained topic contracts.
+Reconcile approved contract changes with implementation, tests, examples and portable
+usage guidance. Each normative rule has an authoritative home and an executable check
+or explicit verification limitation. Keep historical evidence separate from current claims.
 
-Keep installed Spec Kit skills, extension commands, templates and other `.specify/`
-files unchanged unless the user explicitly requests a change to those files. Put
-project workflow policy in this file or separate project hooks. Project feature
-specifications under `specs/` remain project documentation.
+Record the outcome, plan, compatibility boundaries, affected documentation, acceptance
+checks and authorized stopping point in Linear. Reconcile them with the final task-owned
+diff and actual evidence before completion. Shared skills support this workflow rather
+than introducing another specification process. Planning-only requests remain read-only.
 
-### Automatic workflow routing
+Agents may commit task-owned work, push task branches and open PRs; humans merge.
+Explicit session limits and host mode take precedence. Code releases are suspended
+pending PR-based release tooling; do not invoke the existing local integration or
+publication commands. Deployment and package publishing require explicit authorization.
+Model-weight release authorization remains separate. Project wheels and source archives
+are debugging tools only, never routine verification or release deliverables.
 
-The [product specification](../specs/000-baseline/spec.md) and linked capability
-contracts define desired behavior and acceptance. New feature work uses its own
-native Spec Kit artifacts; keep implementation status out of product requirements.
+## Engineering safeguards
 
-Use Spec Kit for new capabilities and changes to documented behavior. Routine fixes,
-documentation edits and small refactors proceed directly; update the existing native
-task artifacts when applicable. Keep historical execution records in Git history. Planning-only and read-only
-requests remain read-only. Verify the original failure path for bugs.
+These safeguards preserve the engineering obligations formerly recorded in the archived
+constitution; the archive's stage order and amendment process no longer apply.
 
-Record the task outcome, compatibility boundaries, affected documentation, concrete
-acceptance checks and authorized stopping point in the native ledger. Reconcile them
-with the final diff and actual check evidence before completion. Existing user or standing
-authorization covers its stated commit/release scope without another stage prompt;
-explicit no-commit/no-release limits and the active host mode take precedence. Evaluate
-the [native release workflow](development.md#local-releases) after
-[change acceptance](development.md#acceptance-tiers); the `release` skill owns the
-procedure. A docs-only change may correctly produce no version tag. Deployment and package publishing remain
-separate actions requiring explicit authorization.
+- Retain the declared Python compatibility, uv toolchain, uv_build backend and dependency
+  constraints. Declare directly imported dependencies; never weaken Ruff or strict mypy
+  merely to silence a failure. Executable values belong in maintained configuration.
+- Use runtime annotations, absolute imports, typed parameters/returns and `typing.Self`
+  where appropriate; quote forward references when runtime evaluation is unsupported.
+  Do not introduce `from __future__ import annotations`. Use Pydantic for configuration
+  and validated records, Pandera for dataframe validation, and factories for mutable defaults.
+- Keep project interfaces explicitly typed. Confine Any, casts and dynamic access to
+  necessary external boundaries with clear assumptions. Suppressions name specific codes
+  and have a clear reason. Recover or report exceptions at an appropriate boundary;
+  never silently discard unexpected failures.
+- Use Loguru through the observability adapter and injected ports; preserve CLI output
+  contracts, including Rich rendering. Comments and log messages are English. Names and
+  decomposition follow responsibilities and configured complexity; use pathlib conventions.
+- Keep package initialization inert and runtime initialization explicit. Defer heavyweight
+  SDK imports where required for responsive help/configuration. Composition roots inject
+  adapters; application use cases do not construct them or use global locators.
+- Preserve centralized Hydra contracts, pipeline-owned tracking and output routing,
+  isolated run identities, upload/flush completion, credential protection, native backend
+  ownership and validation/test separation. The topic contracts define configuration,
+  queue resource ownership, recovery order and publication behavior in detail.
+- Keep credentials out of tracked files and uploads. Preserve pre-existing services,
+  containers and data. Track and clean up only task-owned resources; shared-resource
+  intervention requires ownership evidence and authorization. Machine-specific values
+  belong in local configuration or environment guidance, not portable project policy.
 
-Project wheels (`.whl`) and source archives (`.tar.gz`) are debugging tools only.
-Do not add their construction, installation or delivery to routine release gates.
-Use source-checkout verification for releases; a concrete packaging/install
-debugging task may build local diagnostic distributions. This project-specific
-rule takes precedence over shared skills' generic packaging checklists.
+## Module boundaries
 
-### Module boundaries
-
-For affected Python modules, inspect the contracts in [.importlinter](../.importlinter),
+For affected Python modules, inspect [.importlinter](../.importlinter),
 [Ruff import restrictions](../src/ruff.toml) and the
 [architecture guidance](development.md#python-integration-and-architecture).
-Preserve responsibilities, interfaces, dependency direction and effect ownership.
-Account for type-only imports, function-local imports and justified exact-edge
-exceptions. Use ordinary local imports for fixed targets and documented exceptions
-for computed loading. Extend declarative contracts or product behavior tests when
-coverage is missing; preserve the approved enforcement limits in the import guidance.
+Classify runtime modules under core, application, adapters or entrypoints. Preserve the
+direction entrypoints → adapters → application ports/contracts → core; adapters do not
+import application use cases or entrypoints. Cross-adapter bridges remain explicit.
+Core owns no filesystem/network/process effects or SDK objects; effects belong at outer
+interfaces. Direct commands remain independent of queue and optional UI imports.
 
-Run the applicable [verification stages](development.md#verification); the
-`verification-workflow` skill selects them. The development check stage runs declarative
-import contracts and Ruff restrictions; product tests exercise imports and runtime
-targets. Effect ownership remains a review obligation. Automatic routing follows the
-staged/latest-commit classifier in Task; explicit acceptance keeps its full scope. The
-full unit suite includes CPU-DDP. Ordinary completion selects affected stages through
-the reviewed native checklist in Development procedures; explicit comprehensive commands
-retain full scope. Reuse results while checked inputs remain unchanged.
-Report deferred and waived checks as such, never as passed. Reconcile the final
-task-owned diff with contract coverage and record actual results in dated evidence.
+Account for type-only imports, function-local imports and justified exact-edge exceptions.
+Use ordinary imports for fixed targets and documented exceptions for computed loading.
+Extend declarative contracts or product tests when coverage is missing; preserve approved
+enforcement limits. Architecture gates inspect the actual product graph and source.
 
-### Documentation
+## Verification and review
 
-Update affected user guidance with behavior changes. Complete applicable native Spec Kit
-analysis and consistency review as soon as inputs exist, before expensive checks. Use
-only documentation checks native to Spec Kit or OpenSpec; no separate checker applies.
+Run applicable [verification stages](development.md#verification); use the
+`verification-workflow` skill for selection. Automatic routing follows the staged/latest-
+commit classifier in Task; explicit comprehensive commands retain their full scope.
+Assess the whole branch or feature delta, not merely its last documentation commit.
+Record selected checks, exclusions, source/environment identities and reuse reasons in
+Linear or linked dated evidence. Reuse results only while relevant inputs remain applicable.
 
-### Workflow safeguards
+Tests exercise observable product behavior with isolated paths and controlled substitutes.
+Bug fixes reproduce the original failing observation where feasible and verify that path
+again; distinguish hypotheses, static evidence and executed checks when reproduction is
+unavailable. Mocked tests cannot establish training, GPU or upload outcomes. Use the live
+integration skill for native claims. A focused test run cannot establish global coverage.
 
-- In host Plan Mode, return read-only findings or a proposed plan before executing
-  workflow hooks, mutating setup helpers, artifact writes or generated-file checks.
-  Existing authorization satisfies the same action/scope gate; retain only unresolved
-  decisions and the explicitly invoked SDD workflow's review gates.
-- Before plan setup, use read-only prerequisite discovery and confirm the exact
-  `spec.md` exists. Do not call `setup-plan.sh` when missing: that helper can
-  create the feature directory and write `plan.md` before specification validation.
-- Inspect ignore files without automatic edits outside the authorized task. Always
-  verify proportionally; add tests when required by the contract or behavior/risk.
-  Task templates do not authorize pushing or deployment.
-- For bug workflows, normalize slugs and validate containment and existing symlink
-  components before I/O. Preserve explicit slug identity on collisions; suffix only
-  generated slugs. Apply the URL trust policy before fetching, and redact secrets
-  from source URLs and quoted input before persistence. Ordinary web tools may fetch
-  allowlisted hosts without peer-IP metadata; raw HTTP or unrecognized-host requests
-  must enforce public-address selection. Private/metadata targets remain refused.
-- Reassess a disproven bug hypothesis and continue within the authorized bug scope,
-  documenting deviations. Ask only for material missing information or scope changes.
-- Preserve dated constitution history and keep temporary impact reports in the
-  response rather than tracked governance content. Use the current contract index
-  to identify amendments instead of presenting historical requirements as current.
+Follow the commit procedure and final hook gate. Review integrated changes independently
+after verification for behavior, interface, dependency, security or operational policy;
+wording edits may be self-reviewed. Delegated work has bounded scope, explicit ownership,
+dependencies and acceptance evidence; inspect combined results and preserve others' edits.
+Report checks as passed, failed, deferred, waived or error. Required deferred verification
+blocks acceptance and merge readiness; only the user may waive required checks.
+
+## Documentation
+
+Update affected user guidance with behavior changes. Review consistency between Linear
+acceptance criteria, current contracts and the actual diff before expensive verification.
+Do not invoke archived Spec Kit checks or introduce a separate documentation checker.
+README is Russian; other documentation is English unless explicitly required otherwise.
+Keep counts, timings and deployment observations in dated evidence.
+
+## Workflow safeguards
+
+- Host Plan Mode remains read-only: do not run mutating setup helpers, hooks or artifact
+  generators until execution is authorized. Inspect ignore files without unrelated edits.
+- Preserve unrelated staged and unstaged changes. Stage only task-owned paths or hunks;
+  never stash, reset, revert or bypass hooks to hide failures. Use unique temporary
+  commit-message files when writers are concurrent.
+- For bug-source capture, validate file containment and symlink components before I/O.
+  Preserve explicit slugs on collisions; suffix only generated slugs. Redact secrets
+  from source URLs and quoted input before persistence. Apply the URL trust policy:
+  ordinary web tools may fetch allowlisted hosts without peer-IP metadata; raw HTTP
+  or unrecognized-host requests require public-address selection. Private/metadata
+  targets remain refused.
+- Reassess disproven bug hypotheses within the authorized scope. Ask only for material
+  missing information or scope changes; document assumptions and deviations in Linear.
