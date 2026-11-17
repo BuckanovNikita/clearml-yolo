@@ -1,6 +1,6 @@
 version: '3'
 
-# Included by Taskfile.yml: bootstrap, owned infrastructure and release workflows.
+# Included by Taskfile.yml: bootstrap, owned infrastructure and explicit acceptance stages.
 # Shared execution settings and tool commands belong to the root Taskfile.
 tasks:
   local-deps:

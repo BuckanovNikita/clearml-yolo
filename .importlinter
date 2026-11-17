@@ -1,5 +1,5 @@
 # Import architecture contracts. Run: uv run lint-imports
-# See docs/development.md and tests/test_architecture.py.
+# See docs/architecture.md and tests/test_architecture.py.
 # Contracts group identical policies; exceptions remain exact import edges.
 # Forbidden contracts skip source/target self-pairs. Adapter groups preserve
 # the existing storage and observability permissions without wildcard allowances.

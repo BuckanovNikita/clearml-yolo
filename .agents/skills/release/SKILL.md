@@ -1,29 +1,38 @@
 ---
 name: release
-description: Use when inspecting automatic code releases, preparing merge readiness, or recovering a failed release workflow.
+description: Use when preparing a PR for merge, inspecting the automatic release after a merge, or recovering a failed release workflow.
 ---
 
-# Automatic releases after merge
+# Merge readiness and automatic releases
 
-Read `docs/development.md` (Local releases and Paired CY and queue release check).
-Human merges to `master` authorize the GitHub release workflow to publish a version
-commit and annotated tag. Local release commands are retired; agents deliver task
-branches and PRs, and humans merge.
+Paths start at the repository root. `docs/development.md#releases` describes the release
+workflow and what it publishes; `docs/development.md#paired-cy-and-queue-check` describes
+pairing; model-weight releases follow `docs/development.md#model-weight-releases` only
+when the user asks for one.
 
-1. Before merge, reconcile the delta since the previous release with reviewed verification
-   evidence and the explicit pairing decision. Use `verification-workflow` for gaps.
-   Required checks must pass or have an explicit user waiver. Complete selected pairing
-   against the final proposed versions; record source/environment applicability in Linear.
-2. Inspect the workflow result after merge. Confirm its source/final SHAs, no-version or
-   version result, and remote commit/tag identities. The metadata-only job does not
-   establish native, GPU, upload or pairing outcomes.
-3. For a failed run, inspect the error and current remote refs before rerunning the workflow.
-   A stale tip requires refreshed `master`; a conflicting tag requires investigation.
-   Never overwrite tags, force-push, or reset unrelated work. An already published release
-   is a successful no-op. Report unresolved GitHub authorization separately from local checks.
-4. Record the workflow URL and outcome in Linear or linked dated evidence. Keep model-weight
-   releases separate and follow their procedure only when explicitly requested.
+## Before merge
 
-The workflow owns serialization, metadata validation and atomic commit/tag publication.
-It creates no GitHub Release, package or deployment. Repository rules must permit its
-release commit; resolve missing bot authorization without weakening human branch protections.
+1. Check the issue's Verification section: every kept line has a status, and none is
+   deferred, failed or error. Use `verification-workflow` for gaps.
+2. When pairing is selected, run it against the final proposed versions; otherwise write
+   the reason it is not selected in the issue.
+3. Read the PR title and the commit headers that will land in the squash body, and
+   correct any whose Conventional type does not match the release the change should get.
+4. Report the PR as ready for a human merge. Done when the issue links the PR and the
+   verification statuses.
+
+## After merge
+
+5. Open the release workflow run for the merge and record on the Linear issue the fields
+   `docs/development.md#releases` lists. Done when the issue states the version or
+   no-version result. The release job establishes no native, GPU, upload or pairing
+   outcome.
+
+## Recovering a failed run
+
+6. Read the error and the current remote refs before rerunning anything, then follow the
+   recovery paragraph of `docs/development.md#releases`. A conflicting tag needs
+   investigation before any rerun; report missing GitHub authorization separately from
+   local checks.
+7. Never force-push, delete or move tags, or reset unrelated work. Record the recovery and
+   its outcome on the issue.

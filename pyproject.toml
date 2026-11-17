@@ -146,7 +146,7 @@ ignore_missing_imports = true
 # Cross-file uses matter; never reduce this to pre-commit's staged filename list.
 paths = ["src", "scripts", "tests"]
 # Include unused arguments/unreachable code (100%) and imports (90%). Dynamic
-# framework members (60%) remain an advisory audit; see docs/static-analysis.md.
+# framework members (60%) remain an advisory audit; see docs/development.md.
 min_confidence = 80
 
 [tool.pytest.ini_options]

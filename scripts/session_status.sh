@@ -2,7 +2,7 @@
 # Session-start status for agent sessions (Claude and Codex SessionStart hooks).
 # Shows parallel work that a new session should know about before editing:
 # the branch against master, uncommitted changes, other worktrees and unmerged
-# branches, a held release lock and a recorded live-test environment. At most about
+# branches and a recorded live-test environment. At most about
 # ten lines; never fails the session.
 set -u
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
@@ -31,12 +31,6 @@ fi
 unmerged=$(git branch --no-merged master --format='%(refname:short)' 2>/dev/null | grep -Fvx -e "$branch" | head -4 | paste -sd ' ' -)
 if [ -n "$unmerged" ]; then
     echo "  unmerged branches: $unmerged"
-fi
-
-common=$(git rev-parse --git-common-dir 2>/dev/null) || common=""
-lock="$common/clearml-yolo-release.lock"
-if [ -n "$common" ] && [ -e "$lock" ] && command -v flock >/dev/null && ! flock -n "$lock" true 2>/dev/null; then
-    echo "  release lock held: another session is merging or releasing master"
 fi
 
 if [ -s tests/integration/.run-tag ]; then

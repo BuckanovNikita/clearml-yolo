@@ -1,135 +1,83 @@
 # clearml-yolo agent instructions
 
-`clearml-yolo` (CY) supports Python `>=3.12.13,<3.14` and provides Hydra/hydra-zen
-applications for native Ultralytics YOLO training, prediction, validation, metrics,
-reports and comparison. Pass ClearML project names and tags explicitly; application
-configuration must not depend on an agent harness or machine.
+`clearml-yolo` (CY) provides Hydra/hydra-zen applications for training, prediction,
+validation, metrics, reports, comparison and export across several detector families,
+with ClearML publication. The [README](README.md) describes usage.
 
-## Commands
+## Rules
 
-Authoritative details and prerequisites: [development procedures](docs/development.md#verification).
-
-```bash
-uv sync --locked --dev                         # after external/, wheelhouse and uv.toml (docs/development.md#external-dependencies)
-bash scripts/install-hooks.sh                  # once per worktree: staging guard, verify, commit-msg
-env -u SKIP -u PRE_COMMIT_ALLOW_NO_CONFIG uv run --locked prek run --all-files # final automatic pass
-uv run --locked task --exit-code acceptance    # explicit full acceptance on a clean tip
-```
-
-`scripts/session_status.sh` runs at Claude and Codex session start and reports the
-branch, uncommitted paths, other worktrees, a held release lock and a recorded test environment;
-treat changes it lists as possibly another session's.
+- Deliver every change through a Linear issue in project `clearml-yolo`, a task branch and
+  a GitHub PR. Agents commit, push task branches and open PRs; humans merge, and a merge to
+  `master` releases automatically. Never push to or merge into `master`. Explicit
+  no-commit or no-push limits and the active host mode take precedence.
+- Stage only task-owned paths or hunks. Never stash, reset or revert other work, or bypass
+  hooks to hide a failure. Preserve ignored local configuration.
+- Preserve pre-existing services, containers and data. Track and clean up only resources
+  the task created; touch a shared resource only with ownership evidence and user
+  authorization.
+- Use Conventional Commits. The commit type decides the release: `feat`, `fix` and `perf`
+  bump the version, and so does any type marked breaking (`!` or a `BREAKING CHANGE:`
+  footer); other types do not.
+- Keep `digital-metrics` pinned to the approved upstream revision. Change its source,
+  checkout, dependency reference or locked revision only on explicit user intent; adapt
+  this project's integration and report upstream issues instead of patching the dependency.
+- Never commit `[tool.uv.sources]`.
+- Code releases are Git commits and annotated tags only. Build project wheels and source
+  archives only for a concrete debugging task, never as deliverables or routine checks;
+  this overrides generic distribution-build guidance in shared skills. Independently
+  versioned `weights-*` GitHub Releases are the one exception, and only when the user
+  explicitly asks for one.
+- Mocked tests do not establish native, GPU or upload outcomes.
+- Report each required check as passed, failed, deferred, waived or error. A deferred
+  required check blocks acceptance and merge readiness; only the user waives a check.
+- Behavior, interface, dependency, security and operational-policy changes get a fresh
+  independent review after integrated verification; wording edits may be self-reviewed.
+- Tests exercise product code, never project tooling.
+- Pass ClearML project names and tags explicitly; application configuration must not
+  depend on an agent harness or machine.
+- `README.md` is Russian and user-facing; other documentation, skills and instructions are
+  English.
+- Documentation states current behavior only. Observations (counts, timings, results,
+  dates) go to the Linear issue or PR. Do not add a documentation checker.
+- Adding, renaming or removing a `docs/feature/` file updates its README section in the
+  same change; a README section states nothing its feature file does not.
+- When rewriting behavior documentation, compare the original behavior, conditions and
+  exceptions with their new homes, separate policy changes from wording changes, and have
+  the reviewer compare meaning against the original rather than judge length or wording.
+- Preserve the selected parent model/effort and host planning restrictions when delegating.
 
 ## Read when relevant
 
-Read the linked guidance when the task matches its trigger; do not load every reference
-for every task. Read guidance instead of copying shared skills into the repository.
-
-| Task | Required guidance |
+| Trigger | Read |
 | --- | --- |
-| Change application behavior or configuration | [Project contract summary](docs/project-contracts.md), then affected topics in the [current contract index](docs/current-contracts.md) and their implementation evidence |
-| Set up dependencies, verify code or commit | Relevant sections of [development procedures](docs/development.md); read the commit procedure before every commit |
-| Plan, implement, fix, resume or accept repository changes | [Workflow policy](docs/agent-workflow.md), including its [module boundaries](docs/agent-workflow.md#module-boundaries) |
-| Plan or deliver tickets and PRs | [Linear and GitHub workflow](docs/agents/issue-tracker.md) |
-| Verify changes, commit, or report completion | [verification-workflow](.agents/skills/verification-workflow/SKILL.md) |
-| Run live tests, acceptance, or remove a test environment | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
-| Triage mutants or change mutmut settings | [mutation-testing](.agents/skills/mutation-testing/SKILL.md) |
-| Release, or recover a failed release | [release](.agents/skills/release/SKILL.md) |
-| Verify native execution, training, GPU use or ClearML publication | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
-| Change contracts or their documentation | [Current contract index](docs/current-contracts.md#maintaining-consistency) and the [documentation guidance](docs/agent-workflow.md#documentation) |
+| Change application behavior or configuration | The affected [`docs/feature/`](docs/feature/) file |
+| Change imports, module structure or lint policy | [Architecture](docs/architecture.md) |
+| Set up dependencies, verify, commit, pair or release | [Development procedures](docs/development.md); read its commit procedure before every commit |
+| Plan or deliver tickets and PRs | [Issue tracker](docs/agents/issue-tracker.md) and [issue template](docs/agents/issue-template.md) |
+| Select checks, report verification | [verification-workflow](.agents/skills/verification-workflow/SKILL.md) |
+| Run live tests or native observations, manage a test environment | [running-integration-tests](.agents/skills/running-integration-tests/SKILL.md) |
+| Triage mutation survivors or change mutation selection | [mutation-testing](.agents/skills/mutation-testing/SKILL.md) |
+| Prepare merge readiness, inspect or recover a release | [release](.agents/skills/release/SKILL.md) |
 
-## Workflow and completion
+`scripts/session_status.sh` runs at Claude and Codex session start and reports the branch,
+uncommitted paths, other worktrees, unmerged branches and a recorded test environment.
+Changes it lists may belong to another session.
 
-- Preserve the selected parent model/effort and host planning restrictions.
+## Instruction files
 
-- The [workflow policy](docs/agent-workflow.md) owns planning, engineering safeguards,
-  authorization, verification and documentation guidance. Read it before repository work.
-- Linear owns active requirements, plans, acceptance criteria and status. GitHub PRs own
-  implementation review and delivery; follow the [ticket workflow](docs/agents/issue-tracker.md).
-- Spec Kit is temporarily disabled. Preserve `specs/`, `.specify/` and archived tooling
-  unchanged; do not invoke its stages or update its artifacts. Reactivation requires
-  explicit user instruction. Historical requirements do not authorize workflow gates.
-- Preserve product behavior through the [current contract index](docs/current-contracts.md)
-  and affected technical contracts. Reconcile the task-owned diff with Linear acceptance
-  criteria, checks and independent review before acceptance.
-- Task classifies staged inputs in hooks and the latest commit after committing.
-  Use the [automatic route](docs/development.md#automatic-routing); explicit test,
-  acceptance commands retain their requested scope. Human merges to `master` authorize
-  automatic code releases through the [release workflow](docs/development.md#local-releases).
-- Mocked tests do not establish native/GPU/upload outcomes.
-- Report each required check as passed, failed, deferred, waived or error. Deferred
-  verification blocks acceptance, integration and release; waived checks never block.
-
-## Dependencies, commits and releases
-
-- Code releases consist only of Git commits and annotated version tags. Independently
-  versioned `weights-*` GitHub Releases may contain the project's verified model asset
-  tar archives, manifests, checksums and upstream notices under the explicit
-  model-assets exception; follow [weight releases](docs/development.md#model-weight-releases).
-  Code releases do not publish these assets.
-- Build project `.whl` wheels and `.tar.gz` source archives only for a concrete
-  debugging task; never build or present them as release deliverables or routine release
-  checks. This project rule overrides generic distribution-build guidance in shared skills.
-- Keep `digital-metrics` pinned to the approved upstream revision. Do not change its
-  source, checkout, dependency reference or locked revision without explicit user intent;
-  general cleanup or dependency maintenance does not authorize this. Adapt this project's
-  integration; report upstream issues rather than patching or monkeypatching the dependency.
-- Select verification and pairing through the reviewed verification checklist in
-  [development procedures](docs/development.md#acceptance-tiers). Complete selected checks and record the pairing decision before human merge;
-  release automation does not replay acceptance.
-- Use Conventional Commits. Agents may commit task-owned changes, push task branches and
-  open GitHub PRs; humans merge. Explicit no-commit/no-push limits and the active host
-  mode take precedence. Release automation alone publishes version commits to `master`.
-  Preserve unrelated changes and stage only task-owned hunks;
-  do not stash, reset or revert unrelated work, or bypass hooks to hide failures.
-- Follow the [commit procedure](docs/development.md#commit-procedure) for coherent split
-  commits, targeted intermediate skips and final verification of committed inputs.
-  Never commit `[tool.uv.sources]`; local packages come from the ignored wheelhouse.
-
-## Documentation
-
-- Write `README.md` in Russian for users, with installation, usage, configuration and
-  troubleshooting; keep agent workflow policy elsewhere. Write other documentation,
-  skills and instructions in English unless required otherwise.
-- Keep observed counts, timings and deployment status in dated evidence. Keep artifact
-  inventories in maintained publication contracts rather than copying counts into
-  instructions.
-
-## Instruction files and installed tooling
-
-- `AGENTS.md` is the shared instruction source; keep `CLAUDE.md` a regular file
-  importing it with `@AGENTS.md`.
-- Author project skills in `.agents/skills/`; `.claude/skills` is a symlink to it for
-  Claude discovery.
-- Keep archived Spec Kit skills, commands, templates, `.specify/` and `specs/` unchanged
-  and outside active discovery. Maintain project policy in linked guidance and project hooks.
-
-## Project execution policy
-
-Follow Linear planning and GitHub PR delivery for repository changes. One cohesive
-feature may include multiple tickets in one branch and PR; stacked PRs are optional.
-Behavior, interface, dependency, security and operational-policy changes require
-independent review after integrated verification; wording edits may be self-reviewed.
-Review documentation consistency proportionately without adding a documentation checker.
-
-## Specification rewrites
-
-Compare the original behavior, conditions and exceptions with their new authoritative
-homes, including requirements embedded in scenarios. Separate approved policy changes
-from wording changes; resolve overloaded terms before editing. Retain compatibility
-obligations, remove historical status claims, and have the reviewer compare meaning
-against the original source rather than judge length or wording alone.
+`AGENTS.md` is the shared instruction source; `CLAUDE.md` stays a regular file containing
+`@AGENTS.md`. Author project skills in `.agents/skills/`; `.claude/skills` is a symlink to it.
 
 ## Agent skills
 
 ### Issue tracker
 
-For ticket operations, use [Linear conventions](docs/agents/issue-tracker.md).
+For ticket operations, use the [Linear conventions](docs/agents/issue-tracker.md).
 
 ### Triage labels
 
-For ticket triage, use the [standard roles](docs/agents/triage-labels.md).
+For ticket triage, use the [readiness labels](docs/agents/triage-labels.md).
 
 ### Domain docs
 
-Before domain exploration, follow the [single-context documentation guidance](docs/agents/domain.md).
+Before domain exploration, follow the [domain documentation guidance](docs/agents/domain.md).

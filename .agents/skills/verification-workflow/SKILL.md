@@ -1,26 +1,32 @@
 ---
 name: verification-workflow
-description: Use when selecting verification, committing, reporting completion or evaluating reusable evidence.
+description: Use when selecting verification for a change, committing, reporting completion or deciding whether earlier results can be reused.
 ---
 
-# Select verification
+# Select and report verification
 
-Read `docs/development.md` (Verification and Commit procedure). Paths start at the
-repository root. Task owns execution; the verification record linked from Linear and the PR owns selection.
+Paths start at the repository root. `docs/development.md` owns every command and the
+selection policy; the Verification section of `docs/agents/issue-template.md` is the
+checklist you fill in.
 
-1. Inspect changes and record the comparison base/tip: the whole development branch,
-   or changes since the previous release. Select comprehensive verification when no
-   reliable release baseline exists.
-2. Map affected contracts to checks. Use focused product tests for local changes;
-   full coverage for shared runtime/configuration, broad refactors or uncertain impact.
-   Select live/manual checks for affected claims automation cannot establish. Use
-   `mutation-testing` for product changes and `running-integration-tests` for live work.
-3. Record exclusions and reuse reasons alongside source/environment identities.
-   Reuse successful evidence only while relevant inputs remain applicable; rerun
-   invalidated checks. A focused run cannot establish the global coverage floor.
-4. Review documentation consistency against Linear acceptance criteria, follow the commit procedure, then run the final
-   `prek run --all-files` with overrides cleared. Obtain independent review for behavior
-   or policy changes after integrated verification.
-5. Report selected checks as passed, failed, deferred, waived or error. Unavailable
-   required checks block completion until executed or explicitly waived by the user.
-   Use `release` only within release authorization.
+1. Record the comparison base and tip: the whole task branch against its merge base with
+   `master`, never only its last commit. Done when both SHAs are written in the issue.
+2. Copy the template's Verification section into the Linear issue if it is not there, and
+   delete every line that does not apply. Select lines with
+   `docs/development.md#acceptance-tiers`; use `#automatic-routing` to see what the hooks
+   will run on their own. Add `running-integration-tests` lines for live claims and
+   `mutation-testing` for product changes. Done when every remaining line is one you will
+   run, defer or ask the user to waive.
+3. Before running checks, review documentation consistency against the issue's
+   acceptance criteria and the diff. If no documentation change is needed, write the
+   reviewed scope and the reason in the issue; a missing required update blocks completion.
+4. Run the selected checks in the order of `docs/development.md#order-and-evidence-reuse`.
+   Reuse an earlier result only while its inputs are unchanged, and write the reuse
+   reason next to the line.
+5. Commit by `docs/development.md#commit-procedure`, ending with the final
+   `prek run --all-files` pass on the committed tip.
+6. Request the independent review the change type requires, after step 5.
+7. Write one status after every kept line and tick boxes as the template says. Done when
+   no kept line lacks a status.
+
+Use `release` for merge readiness and after-merge inspection.
