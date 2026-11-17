@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.50.1 (2026-11-17)
+
+### Bug Fixes
+
+- Point the weights download hint at the feature documentation
+  ([#12](https://github.com/BuckanovNikita/clearml-yolo/pull/12),
+  [`e3be91a`](https://github.com/BuckanovNikita/clearml-yolo/commit/e3be91ac1908cd390001d29af6c0730b1739c6f9))
+
+### Documentation
+
+- Correct statements found by the follow-up review
+  ([#12](https://github.com/BuckanovNikita/clearml-yolo/pull/12),
+  [`e3be91a`](https://github.com/BuckanovNikita/clearml-yolo/commit/e3be91ac1908cd390001d29af6c0730b1739c6f9))
+
+- Rebuild documentation around feature files and remove Spec Kit
+  ([#12](https://github.com/BuckanovNikita/clearml-yolo/pull/12),
+  [`e3be91a`](https://github.com/BuckanovNikita/clearml-yolo/commit/e3be91ac1908cd390001d29af6c0730b1739c6f9))
+
+- **readme**: Simplify the user guide for CV engineers
+  ([#12](https://github.com/BuckanovNikita/clearml-yolo/pull/12),
+  [`e3be91a`](https://github.com/BuckanovNikita/clearml-yolo/commit/e3be91ac1908cd390001d29af6c0730b1739c6f9))
+
+- **src**: Correct three docstrings found wrong in review
+  ([#12](https://github.com/BuckanovNikita/clearml-yolo/pull/12),
+  [`e3be91a`](https://github.com/BuckanovNikita/clearml-yolo/commit/e3be91ac1908cd390001d29af6c0730b1739c6f9))
+
+- **src**: Move technical detail into module docstrings
+  ([#12](https://github.com/BuckanovNikita/clearml-yolo/pull/12),
+  [`e3be91a`](https://github.com/BuckanovNikita/clearml-yolo/commit/e3be91ac1908cd390001d29af6c0730b1739c6f9))
+
+
 ## v0.50.0 (2026-11-17)
 
 ### Continuous Integration
