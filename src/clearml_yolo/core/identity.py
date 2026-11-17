@@ -1,4 +1,16 @@
-"""Tracking-neutral identity of the model whose checkpoint was evaluated."""
+"""Tracking-neutral identity of the model whose checkpoint was evaluated.
+
+``ModelIdentity`` (display name plus optional training task, checkpoint SHA-256 and model
+ID) is persisted in checkpoint identity sidecars, comparison manifests and workbook identity
+metadata, so its fields and JSON shape are a stored format. It never holds the ID of the
+task that is reporting. ``label`` and ``caption`` are the only visible forms and never print
+identifiers.
+
+``IdentityLinks`` are render-time presentation: absolute http(s) URLs derived from the
+invocation's ClearML session, never stored as identity. ``require_model_identity`` prefers
+recorded provenance; a custom label is accepted only when provenance is missing and never
+invents a training task.
+"""
 
 from collections.abc import Mapping
 from typing import Self

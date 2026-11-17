@@ -2,6 +2,21 @@
 
 The monitor reads immutable snapshots without acquiring application or Loguru locks.
 Only locations are sampled: no traceback formatting, source lookup or locals access.
+- Enabled only when ``LOGURU_LEVEL`` is ``TRACE``; otherwise every helper is inert and starts
+  no thread.
+- Lifecycle records go through the caller's Loguru sinks; the watchdog writes to its own dup
+  of stderr so a blocked sink cannot hide heartbeats.
+- Cadence: ``HEARTBEAT_SECONDS`` deepest-operation heartbeats and ``STACK_SECONDS`` grouped
+  stacks emitted only on change, bounded by ``MAX_STACK_GROUPS`` and ``MAX_STACK_FRAMES``.
+  These are sampling intervals, never execution deadlines.
+- Context accepts only allow-listed keys with exact scalar types, redacted and capped; never
+  stringify arbitrary objects.
+- Diagnostic failures never replace an application error or result. Termination raised in a
+  sink propagates, except inside cleanup spans, which defer it until the cleanup body
+  finishes. Tracing never installs or replaces signal handlers.
+- State is per process: a forked child discards inherited locks, threads and descriptors.
+- ``command.return`` is emitted after cleanup, on failure as well, so it is not a success
+  signal.
 """
 
 import os

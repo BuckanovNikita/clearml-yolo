@@ -1,4 +1,10 @@
-"""Concrete workflow operations behind application ports."""
+"""Archive native tabular and text outputs for local retention.
+
+The archive keeps ``.csv``, ``.json``, ``.txt``, ``.yaml`` and ``.yml`` files from a native
+save directory and never copies source-derived images. JSON and YAML content is sanitized
+before it is written, so credentials in native settings never enter the archive. The archive
+is a local output; nothing here uploads it.
+"""
 
 import json
 import zipfile

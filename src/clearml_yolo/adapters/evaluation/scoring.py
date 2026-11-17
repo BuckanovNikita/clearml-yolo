@@ -1,11 +1,19 @@
-"""Score one split at fixed per-class confidence thresholds.
+"""Calibrate thresholds and score one split at frozen thresholds via digital-metrics.
 
-digital-metrics exposes no public way to score at thresholds that were solved
-elsewhere: ``Evaluation`` either calibrates in-sample or on a held-out split, and
-its threshold search is private. Comparing two models fairly needs the opposite —
-the same split scored twice at each model's own frozen production thresholds — so
-this module composes the public sub-package functions (``match_boxes`` then
-``slice_by_conf``) and does its own tally.
+``compute_evaluation`` makes one ``digital_metrics.fixed.evaluate_fixed`` call with two
+populations: the prepared predictions for fixed-threshold matching, confusion counts and
+per-image outcomes, and the geometry-valid predictions before preprocessing for AP and PR
+observations, so low-confidence and NMS-suppressed boxes still count toward AP.
+Reconstructed per-class AP50 must equal the library's ``compute_map`` value, or evaluation
+fails. Library objects are converted to project records here, preserving float precision,
+confidence ties, match relationships and unavailable values; they never cross into core.
+
+``calibrate_thresholds`` runs ``match_boxes`` on the calibration split only, keeping empty
+images in the match scope. Ground-truth deduplication runs per image with the library's
+duplicate-box detection. ``filter_invalid_prediction_boxes`` drops rows for the first of
+missing, nonnumeric, nonfinite, reversed corners or zero area, only in the evaluation copy,
+after the upstream validators have seen every non-geometry error. ``score_split`` composes
+``match_boxes`` and ``slice_by_conf`` directly; only tests call it.
 """
 
 import math

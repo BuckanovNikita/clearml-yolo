@@ -1,4 +1,13 @@
-"""Prepare an execution copy while leaving canonical model selectors unchanged."""
+"""Prepare an execution copy while leaving canonical model selectors unchanged.
+
+Callers invoke it only when a command or measurement actually executes: after the canonical
+``run`` is published, for batch measurement and for detector inference. The caller's
+``ModelConfig`` keeps its selectors and nulls; only the returned copy holds resolved paths,
+and the returned provenance is published separately as the ``model_assets`` configuration
+object rather than in ``run``. Explicit paths are validated and kept. Only assets needed now
+are resolved, and network and filesystem effects stay in the asset resolver. Ultralytics
+models pass through unchanged.
+"""
 
 from clearml_yolo.adapters.assets.resolver import resolve_assets
 from clearml_yolo.adapters.assets.sources import existing_source, extract_resolved_source

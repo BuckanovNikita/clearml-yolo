@@ -1,4 +1,18 @@
-"""Application-owned model identity schema over generic reversible OOXML mechanics."""
+"""Application-owned model identity schema over generic reversible OOXML mechanics.
+
+report-generator owns the package mechanics: bottom placement, hyperlinks, the page footer,
+fingerprints and byte-exact recovery of the original workbook. This module owns the identity
+envelope (namespace ``https://clearml-yolo/model-identity/v1``, part
+``customXml/clearml-yolo-identity.xml``) and the presentation envelope for readable class
+aliases; both schemas are stored formats read back from published artifacts.
+
+Envelope order is fixed: the identity envelope wraps the presentation envelope, and readers
+unwrap identity first. When identities exist, the identity envelope owns the one visible
+footer block and the page footer; the alias notice is appended to it and the presentation
+envelope carries metadata only. Annotation always restores the authenticated original first,
+so re-annotation is idempotent and replaces any earlier visible layout. Footer lines are
+literal strings; visible text never contains task IDs, model IDs or digests.
+"""
 
 import io
 import json

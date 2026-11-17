@@ -1,4 +1,23 @@
-"""Bound optional SDK execution, including imports, service shutdown and cleanup."""
+"""Bound optional SDK execution, including imports, service shutdown and cleanup.
+
+Each preflight or publish runs ``adapters.fiftyone.worker`` in a fresh interpreter and its own
+session. Invariants:
+- The worker environment drops owner and queue variables and hides every GPU; the worker
+  never owns a ClearML task, queue lease or device.
+- Request, result and phase files live in an explicit scratch arena; the SDK keeps its own
+  temporary selection. Output is drained continuously and only a short redacted tail is
+  retained, so a chatty worker cannot block on its pipe.
+- The operation deadline covers import, work, worker exit and cleanup. Success requires exit
+  status 0 before the deadline and a ``WorkerResult`` whose operation, operation ID and task
+  ID match the request; a publish receipt must also be dataset- and run-complete. A receipt
+  left by a failed or late worker is never success.
+- Cleanup itself is bounded (SIGTERM, then SIGKILL, each followed by at most
+  ``_CLEANUP_SECONDS``) over the worker's tracked descendants (``/proc`` on Linux, a job
+  object on Windows). When ownership cannot be proven, the scratch directory is retained with
+  a ``.cy-unsafe-cleanup.json`` marker and the failure says so.
+- Cancellation and other non-``Exception`` failures propagate after cleanup, so callers that
+  downgrade publication failures to warnings never swallow them.
+"""
 
 import json
 import os

@@ -1,4 +1,12 @@
-"""Advisory launch-directory Git inspection, independent of package provenance."""
+"""Advisory launch-directory Git inspection, independent of package provenance.
+
+The probe runs ``git -C DIR rev-parse --is-inside-work-tree`` read-only, with every inherited
+``GIT_*`` variable removed and a five-second timeout. Only exit status zero with stripped
+stdout exactly ``true`` counts as verified; every other outcome, including missing Git, OS
+errors and timeouts, logs one warning and continues. Raw Git stderr is never exposed, Git
+state is never written, and the result never changes the command's outcome. The CLI launch
+calls it once, inside console capture and before Hydra composition.
+"""
 
 import os
 import shutil

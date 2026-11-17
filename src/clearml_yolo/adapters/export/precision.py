@@ -1,4 +1,19 @@
-"""Private Float accumulation for selected Half-rounded backbone products."""
+"""Private Float accumulation for selected Half-rounded backbone products.
+
+The rewrite edits the in-memory ONNX graph only; original declarations, parameters and
+external tensor types are unchanged.
+- Eligible products are Gemm/MatMul nodes with FP32 initializer weights and 1x1 convolutions
+  with group 1, no padding and dilation 1, outside the feature pyramid, RPN head, ROI box
+  head and predictor. Convolutions become NCHW matrix products with explicit spatial slicing
+  for strides.
+- Each eligible product rounds its operands to FP16, multiplies in FP32 and immediately
+  rounds the product through FP16 as its sole consumer, so TensorRT can fuse Half
+  multiplication with Float accumulation; consumers receive FP32. Bias addition and Gemm
+  coefficient scaling stay FP32.
+- Spatial convolutions, combined attention QKV projections (see ``attention_precision``),
+  dynamic attention, normalization and geometry stay FP32.
+- A Conv or Gemm without a direct FP32 initializer weight fails before the graph is mutated.
+"""
 
 from typing import Any
 

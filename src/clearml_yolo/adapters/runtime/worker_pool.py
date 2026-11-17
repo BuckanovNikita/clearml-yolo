@@ -1,4 +1,16 @@
-"""Supervise independent case processes with per-case descendant ownership."""
+"""Supervise independent case processes with per-case descendant ownership.
+
+Each case starts in its own session with a fresh ``CY_BATCH_CASE_OWNER`` token, so detached
+descendants stay attributable to their case, and its tree is scoped beneath this process as
+subreaper. Cleanup of one finished case never touches a sibling. Registration and
+process-tree construction run with interruptions deferred, so a signal cannot orphan a
+started case.
+
+The pool has no whole-case timeout: the caller chooses slots and admission, and trials carry
+their own deadlines. A case failure does not stop peers. A key is never reused, and a slot is
+reusable only after confirmed cleanup; failed cleanup is reported once and retried at pool
+exit, which signals every remaining case before waiting on any of them.
+"""
 
 import os
 import signal

@@ -1,4 +1,14 @@
-"""Concrete workflow operations behind application ports."""
+"""YOLO training execution and shared post-training publication helpers.
+
+``execute_training`` resolves the batch through ``resolve_yolo_batch`` before loading the
+model, keeps the requested native arguments separate from the effective ones, and runs
+training inside the DDP relay so rank-zero callbacks replay in the owner. Training succeeds
+only when the native run returns and ``weights/best.pt`` exists. After that boundary,
+publication failures (population counts, replay, model finalization) may be recorded as
+pipeline warnings; earlier failures always propagate, and a relay exit failure is softened
+only once a completed result exists. Native detector training reuses
+``training_publication`` for the same boundary.
+"""
 
 from collections.abc import Iterator
 from contextlib import contextmanager

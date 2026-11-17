@@ -1,4 +1,13 @@
-"""Versioned shared cache for prepared CSV-owned datasets."""
+"""Versioned shared cache for prepared CSV-owned datasets.
+
+An entry's identity hashes the CSV bytes, the ordered resolved image references, the format
+and ``PREPARATION_VERSION``; bump the version whenever prepared output changes so old entries
+are never reused. A hit must not read image contents or mtimes. Every consumer holds a
+native ``filelock`` lock for the whole use; soft locks are never a fallback. Entries are
+published by renaming a uniquely named staging directory created with exclusive ``mkdir``,
+which is the only thing a failed build may delete. An existing entry that fails validation
+is preserved and reported, never removed or rebuilt in place.
+"""
 
 import hashlib
 import json

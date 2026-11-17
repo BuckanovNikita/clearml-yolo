@@ -1,4 +1,14 @@
-"""Ground-truth selection policy shared by standalone and composed workflows."""
+"""Ground-truth selection policy shared by standalone and composed workflows.
+
+``normalize_ground_truth`` validates shape only and touches no files, SDKs or tracking, so it
+is safe before any effect. ``resolve_ground_truth`` resolves the original input once per
+invocation; nested stages receive the ``ResolvedGroundTruth`` record, which passes through
+unchanged, so they never resolve or warn again. A derived CSV may replace the record's
+``path`` while the original dataset provenance stays. The requested selector stays in
+executable configuration; the resolved dataset identity, version and CSV digest are recorded
+separately as ``ground_truth_source``. Without a ``ground_truth_repository`` only local CSV
+paths resolve.
+"""
 
 from collections.abc import Mapping
 from pathlib import Path

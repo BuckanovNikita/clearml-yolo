@@ -1,8 +1,14 @@
 """Stdlib-only project workspace and retained invocation scratch.
 
-Library configuration, caches and temporary defaults remain library/user-owned.
-Project temporary files receive an explicit directory without changing global
-``tempfile`` settings or scanning existing directories.
+This module imports only the standard library so it can run before any SDK import.
+``initialize_runtime_environment`` freezes ``CY_HOME`` as an absolute path in the
+environment. ``project_write_path`` is the containment check for project-owned writes; it
+compares fully resolved paths, so symlinks cannot escape the workspace. Library
+configuration, caches and temporary defaults remain library/user-owned: ``TMPDIR`` and
+``tempfile.tempdir`` are never changed. Arenas get a unique ``cy-runtime-*`` name, are shared
+with children through ``CY_RUNTIME_ARENA``, are reused by nested scopes in the same process
+and are retained on every exit path; nothing here scans, recovers or deletes existing
+directories. On the main thread SIGTERM becomes ``SystemExit`` so cleanup blocks still run.
 """
 
 import os

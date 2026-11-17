@@ -1,4 +1,14 @@
-"""Typed capabilities required by application workflows, supplied per invocation."""
+"""Typed capabilities required by application workflows, supplied per invocation.
+
+``WorkflowDependencies`` is the only way a workflow reaches storage, models, evaluation,
+rendering, tracking, publication and logging. Tests and embedding applications may pass
+their own implementations without touching shared state. ``ExecutionResources`` carries
+logging, progress and ``trace_operation``; an alternative implementation must provide an
+outcome-preserving context manager there, a no-op when tracing is not needed.
+``TrackingSession`` and ``RunStorage`` are cohesive per-invocation lifecycles: keep each
+port whole rather than splitting it to satisfy method-count rules. ``ground_truth_repository``
+stays the final, optional field so positional construction remains valid.
+"""
 
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager

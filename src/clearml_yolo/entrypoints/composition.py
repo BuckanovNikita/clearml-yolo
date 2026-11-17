@@ -1,4 +1,15 @@
-"""Compose explicit workflow dependencies at the outer application boundary."""
+"""Compose explicit workflow dependencies at the outer application boundary.
+
+This module is the only place concrete adapters are bound to application ports.
+``build_dependencies`` returns a new, independent ``WorkflowDependencies`` bundle for one
+invocation; never cache or share it, and Hydra configuration never supplies or replaces a
+capability. Evaluation computation, evaluation writing and report rendering are separate
+ports, so computation never renders and only reporting writes workbooks and plots. Visual
+publication is selected once here (``create_publisher``). Heavy adapters (detector runners,
+exporters, FiftyOne) load through function-local imports. Manual construction of the bundle
+stays valid: ``ground_truth_repository`` defaults to ``None``, which supports local CSV paths
+only, so callers that pass ClearML dataset selectors must inject a repository.
+"""
 
 from contextlib import AbstractContextManager
 from pathlib import Path

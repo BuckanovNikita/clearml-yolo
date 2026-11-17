@@ -1,4 +1,22 @@
-"""Linux invocation ownership across native children that start new sessions."""
+"""Linux invocation ownership across native children that start new sessions.
+
+Invariants every tree preserves:
+- A process is identified by PID plus its /proc start time; identities are rechecked
+  immediately before every pidfd signal or reap, so a reused PID is never adopted.
+- Signals go only to confirmed owners, descendants before their direct worker. Owned
+  candidates that cannot be read raise ``UnverifiableProcessTreeError`` instead of counting
+  as gone.
+- Quiescence needs two consecutive scans with no owned process and no topology change.
+- ``terminate`` sends SIGTERM, escalates to SIGKILL after two seconds and fails after ten,
+  with SIGINT/SIGTERM deferred until it finishes.
+- Owner markers are launch provenance, not a security boundary; environ bytes are never
+  retained or logged.
+Tree kinds: ``LinuxProcessTree`` recovers marked processes through global marker discovery
+when no live anchor exists; ``ScopedProcessTree`` discovers descendants of a live subreaper
+and filters them by recorded births and markers; ``SubreaperProcessTree`` owns every branch
+of a dedicated supervisor; ``_NativeProcessTree`` protects branches that already exist when
+the direct scope opens and relies on markers and fork records for new children.
+"""
 
 import ctypes
 import os

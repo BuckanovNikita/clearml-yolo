@@ -1,4 +1,15 @@
-"""Concrete workflow operations behind application ports."""
+"""Build paired developer and business report workbooks with report-generator.
+
+Inputs are two per-model dashboards (candidate and baseline), read through
+``deannotated_workbook`` so identity and alias envelopes are validated and the original
+metric layout is recovered before any value is read. A statistical comparison workbook is
+not a valid input. Rows whose training count is missing or invalid are partitioned out
+before the builders run, because the builders treat the training-count column as an
+eligibility filter; those rows are kept for the ``Unknown training count`` and
+``Report issues`` sheets appended afterwards. Both builders present counts below each table.
+Reporting never chooses a statistical protocol or recalculates values. Identity annotation
+happens in the caller, after this module has finished writing both files.
+"""
 
 from pathlib import Path
 

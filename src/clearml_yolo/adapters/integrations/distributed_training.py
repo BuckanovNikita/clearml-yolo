@@ -1,4 +1,15 @@
-"""Owner-side native worker composition and scalar replay."""
+"""Owner-side native worker composition and scalar replay.
+
+The invocation owner stays outside the ranks. It writes one typed request, starts one rank
+process per device with logical indexes mapped through the inherited
+``CUDA_VISIBLE_DEVICES``, and relays complete ``rank-0.jsonl`` scalar lines and rank console
+logs while ranks run, draining both after exit. ``TORCHELASTIC_RUN_ID`` is set so Lightning
+accepts the external rank environment instead of relaunching CY.
+
+A result is accepted only when supervision succeeded and every rank wrote a receipt with the
+request token, its own rank and status ``success``; rank zero's result is returned to the
+owner, which alone publishes it.
+"""
 
 import os
 import socket

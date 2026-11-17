@@ -1,4 +1,15 @@
-"""Concrete workflow operations behind application ports."""
+"""Write per-split evaluation and candidate-only workbooks from computed values.
+
+Workbooks are rendered from an already evaluated split; nothing here matches boxes or
+calibrates thresholds. The metric sheets come first, then the ``Dataset counts`` sheet, and
+only then the identity annotation: annotation fingerprints the finished package, so any later
+cell edit would make the workbook fail ingestion. A workbook without a model identity
+receives only the readable-alias envelope. Row-level evidence (ground-truth and prediction
+matches, thresholds, methodology) is written as sibling CSV files rather than sheets so large
+tables and arbitrary text survive exactly; floats use 17 significant digits. The four
+confidence-interval plots, both dashboards and the confusion matrix must already exist; a
+missing file or a different plot inventory fails the split.
+"""
 
 import json
 from pathlib import Path
