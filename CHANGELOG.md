@@ -1,6 +1,181 @@
 # CHANGELOG
 
 
+## v0.49.0 (2026-11-17)
+
+### Bug Fixes
+
+- **batch**: Apply native YOLO deterministic policy
+  ([`7c8f694`](https://github.com/BuckanovNikita/clearml-yolo/commit/7c8f69431e470b1fc3aa4a1b4bd2831d8cf4e2ff))
+
+- **batch**: Bind native probe candidate batch
+  ([`fbcfa25`](https://github.com/BuckanovNikita/clearml-yolo/commit/fbcfa251e4b26ffd786d2e4cb72174fa4fe8606a))
+
+- **compare**: Report only eligible compared classes
+  ([`31e2733`](https://github.com/BuckanovNikita/clearml-yolo/commit/31e2733dd79f82f1b7d5a9166dbe3b90a8c73b47))
+
+- **runtime**: Align CUDA and NVML reserve memory bases
+  ([`4cbb3d4`](https://github.com/BuckanovNikita/clearml-yolo/commit/4cbb3d4f47e92f9fa5673b535b39abf7ce1f3591))
+
+- **runtime**: Bound CUDA allocations by whole-device memory
+  ([`5f6746b`](https://github.com/BuckanovNikita/clearml-yolo/commit/5f6746b9781e960534c5f7e413fcb93f8c5784a8))
+
+- **runtime**: Include driver reservations in GPU admission
+  ([`04ad0e5`](https://github.com/BuckanovNikita/clearml-yolo/commit/04ad0e5443cbd9855a57cf5c8ebbfd0b35dfbfac))
+
+- **runtime**: Preserve nested worker ownership
+  ([`e1fe64e`](https://github.com/BuckanovNikita/clearml-yolo/commit/e1fe64ea7a053bb39daf4d8f477f63e4a6a8a236))
+
+- **train**: Stop hidden YOLO OOM batch retries
+  ([`4b73f62`](https://github.com/BuckanovNikita/clearml-yolo/commit/4b73f6227e789e17b3431f4de1039c1351890862))
+
+### Code Style
+
+- **evidence**: Format probe mutation invocation
+  ([`c161f3f`](https://github.com/BuckanovNikita/clearml-yolo/commit/c161f3f7e1baca638d13d0bc366e4101437ee11d))
+
+- **evidence**: Format reserve mutation invocation
+  ([`872fe25`](https://github.com/BuckanovNikita/clearml-yolo/commit/872fe2500cf1e73afb23d473681882e225218af9))
+
+- **evidence**: Normalize captured log whitespace
+  ([`f822b7e`](https://github.com/BuckanovNikita/clearml-yolo/commit/f822b7ecee2ec533c826dde0a6c29b1a043afdb5))
+
+- **evidence**: Normalize captured pytest whitespace
+  ([`6560160`](https://github.com/BuckanovNikita/clearml-yolo/commit/65601608c6f9bcae0f792298e9578e1aa97b3744))
+
+- **evidence**: Normalize paired check log whitespace
+  ([`755bee1`](https://github.com/BuckanovNikita/clearml-yolo/commit/755bee109f7cb9125b64cbbce62f9eb21ace703c))
+
+- **runtime**: Format memory-basis correction
+  ([`8b7b4b3`](https://github.com/BuckanovNikita/clearml-yolo/commit/8b7b4b3aea4d950e9cc3c4422c3d5e6714a80511))
+
+- **tests**: Format metadata boundary regressions
+  ([`b3a8bd8`](https://github.com/BuckanovNikita/clearml-yolo/commit/b3a8bd8888b382087917a3cda4f2a09e2ba965c7))
+
+### Documentation
+
+- Accept DEIM M matrix and L native verification
+  ([`5477685`](https://github.com/BuckanovNikita/clearml-yolo/commit/5477685025c70cb0454340c311a65681375de846))
+
+- Accept medium variants and queue recovery
+  ([`98d7dc4`](https://github.com/BuckanovNikita/clearml-yolo/commit/98d7dc455d8653fec705e122a3edd7ee072235d2))
+
+- Accept Nano mosaic and geometry readback correction
+  ([`001ce6c`](https://github.com/BuckanovNikita/clearml-yolo/commit/001ce6c9406f44077dc1579c928b5799edf05a46))
+
+- Accept queue lifecycle observation verification
+  ([`a8fc8b6`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8fc8b6f16accde0d07fb594800e602f5df8db84))
+
+- Accept RF-DETR Large native verification
+  ([`213fbe8`](https://github.com/BuckanovNikita/clearml-yolo/commit/213fbe8c280224f577564fb8219e3abdc1ad6758))
+
+- Accept RF-DETR Nano native and JSON verification
+  ([`c0576a4`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0576a49200e030c2315d6cbe9bc1269b7e34b2e))
+
+- Accept RF-DETR Small and queue parity verification
+  ([`9676174`](https://github.com/BuckanovNikita/clearml-yolo/commit/9676174e5263c75fdcdaf3d06fee3b5b919bc986))
+
+- Accept Small JSON and native queue cancellation
+  ([`c0b6065`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0b6065572ac6e1b92147acd58f667a72bc5eac6))
+
+- Accept Small mosaic and Medium native verification
+  ([`b8417c2`](https://github.com/BuckanovNikita/clearml-yolo/commit/b8417c2ccbeb01a3411901325ed9f9cc5a425ef7))
+
+- Accept ticket15 and guarded verification resumption
+  ([`657edda`](https://github.com/BuckanovNikita/clearml-yolo/commit/657edda357539fb6640533ca3de557c5f91f5970))
+
+- Preserve Windows-local diagnostic failures
+  ([`15e47f2`](https://github.com/BuckanovNikita/clearml-yolo/commit/15e47f2cd45550904dfd97af029e3fe798bf065e))
+
+- Record completed DEIM L and X verification
+  ([`17fdb61`](https://github.com/BuckanovNikita/clearml-yolo/commit/17fdb61e426c7c690e3be4220228c1de21613abf))
+
+- Record GPU telemetry recurrence and idle diagnosis
+  ([`0eea850`](https://github.com/BuckanovNikita/clearml-yolo/commit/0eea850878b4666d137713a0614033d3cf098fdb))
+
+- Record guarded WSL telemetry diagnosis
+  ([`58abcf0`](https://github.com/BuckanovNikita/clearml-yolo/commit/58abcf0eb4400992f01042f0e0109a9f4fa20502))
+
+- Record isolated TensorRT prerequisite verification
+  ([`378af90`](https://github.com/BuckanovNikita/clearml-yolo/commit/378af90717e0f8ca606bf725a2e4c208824078cc))
+
+- Record owned service recovery after WSL restart
+  ([`50c32e7`](https://github.com/BuckanovNikita/clearml-yolo/commit/50c32e78f5278df07b59f5e123832666ba9f1eb1))
+
+- Record queue runtime alignment and pairing gaps
+  ([`a71737e`](https://github.com/BuckanovNikita/clearml-yolo/commit/a71737e0dc0b756a8e0428318f31713ca740091f))
+
+- Record Windows telemetry timeout comparison
+  ([`a4a9ef4`](https://github.com/BuckanovNikita/clearml-yolo/commit/a4a9ef46955cc6c85aa937200f87ed6d9f842fb7))
+
+- **batch**: Record native probe corrections and mutation limits
+  ([`4565f42`](https://github.com/BuckanovNikita/clearml-yolo/commit/4565f426c7eced30809b7c54371402415fb68314))
+
+- **readme**: Rewrite the user guide in plain language
+  ([`88caee9`](https://github.com/BuckanovNikita/clearml-yolo/commit/88caee98560b7571fa08e15d783c545468405f3c))
+
+- **release**: Record accepted ticket scope and verification
+  ([`60329b5`](https://github.com/BuckanovNikita/clearml-yolo/commit/60329b55a9e1a4da9dde4ee35f36f29eac9339d9))
+
+- **release**: Record final independent approval
+  ([`eb00c69`](https://github.com/BuckanovNikita/clearml-yolo/commit/eb00c697fe860e14a16e881f6f194313ec2343d4))
+
+- **verification**: Accept DEIM JSON and live memory correction
+  ([`5c0ece1`](https://github.com/BuckanovNikita/clearml-yolo/commit/5c0ece16a73ecc9ce279b564b7d69471c69007fa))
+
+- **verification**: Accept DEIM mosaic execution and readback
+  ([`ba56e2f`](https://github.com/BuckanovNikita/clearml-yolo/commit/ba56e2f2751954fb9c65799817d22b9e51b36b89))
+
+- **verification**: Accept representative GPU recipe and record cleanup
+  ([`60b5c63`](https://github.com/BuckanovNikita/clearml-yolo/commit/60b5c63aebd70fbe6329f6e0534bd1cccfc6832b))
+
+- **verification**: Preserve raw evidence hash provenance
+  ([`ba2b984`](https://github.com/BuckanovNikita/clearml-yolo/commit/ba2b98436638f361c25ce786d5e51e9602190b21))
+
+- **verification**: Record fixture, service and replay evidence
+  ([`56fbf8b`](https://github.com/BuckanovNikita/clearml-yolo/commit/56fbf8bbcf05d92662bd747031a407433f286dc5))
+
+- **verification**: Record guarded queue admission failure
+  ([`41d2053`](https://github.com/BuckanovNikita/clearml-yolo/commit/41d20533b9437e019e8c61c54c56bb2dfa484477))
+
+- **verification**: Record JSON run, remote readback and queue pairing
+  ([`de29281`](https://github.com/BuckanovNikita/clearml-yolo/commit/de292813633de5d130bbf3a73311631017a8dd29))
+
+- **verification**: Record memory guard coverage and mutation evidence
+  ([`d665668`](https://github.com/BuckanovNikita/clearml-yolo/commit/d665668e85b9d0a99e1ce2c361c1e8d74a8c70f3))
+
+- **verification**: Record Mosaic and reporting outcomes
+  ([`137079d`](https://github.com/BuckanovNikita/clearml-yolo/commit/137079d099490e2153405f042befe8325e9a38bc))
+
+- **verification**: Record native DEIM execution and readback
+  ([`0e1d039`](https://github.com/BuckanovNikita/clearml-yolo/commit/0e1d03920725b33c2a6aed68c8ecaa089af17892))
+
+- **verification**: Record native FiftyOne publication and views
+  ([`c026a75`](https://github.com/BuckanovNikita/clearml-yolo/commit/c026a75148378240070c9a588f93eb19964719b7))
+
+- **verification**: Record remote asset and cache checks
+  ([`5dda250`](https://github.com/BuckanovNikita/clearml-yolo/commit/5dda250c56a074f1dd174783e4d71025f673083a))
+
+- **verification**: Retain filesystem and resumed execution evidence
+  ([`a8e6ac5`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8e6ac52f8999417bac056eaf788a59b38018267))
+
+### Features
+
+- **verification**: Estimate batches for two-epoch acceptance
+  ([`cbf076d`](https://github.com/BuckanovNikita/clearml-yolo/commit/cbf076d6a35186466c4241da76ad138e103a3b9b))
+
+### Testing
+
+- **runtime**: Cover metadata subprocess and allocator boundaries
+  ([`93680d2`](https://github.com/BuckanovNikita/clearml-yolo/commit/93680d2fe4b6fed085c004e49b7bdb3991e8c9b7))
+
+- **runtime**: Cover reserve device and equality boundaries
+  ([`e38ab36`](https://github.com/BuckanovNikita/clearml-yolo/commit/e38ab36f1099dd67f68f7f824c7b1bf89a6c240c))
+
+- **verification**: Close memory boundaries and record native acceptance
+  ([`cd1b2ce`](https://github.com/BuckanovNikita/clearml-yolo/commit/cd1b2ce615fb9852e9c300e91503319a61559675))
+
+
 ## v0.48.2 (2026-11-13)
 
 ### Bug Fixes
