@@ -9,7 +9,9 @@ The original decision below is retained as history. Its verification routing, ph
 DDP gate and release orchestration, including mandatory property exploration and
 blanket release acceptance, are superseded by
 [change-aware workflow](../../specs/013-change-aware-workflow/spec.md) and the current
-[development procedures](../development.md#verification).
+[development procedures](../development.md#verification). The release integration and
+publishing portions are also superseded by the [release PR procedure](../development.md#local-releases):
+version commits enter through human-merged PRs and publication pushes only annotated tags.
 
 ## Context
 

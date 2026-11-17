@@ -246,12 +246,12 @@ tasks:
       - task: release-validation
       - task: paired-check
 
-  release-local:
-    desc: Integrate and version an expected tip locally; publishing needs explicit --publish
+  release-prepare:
+    desc: Prepare a release branch and GitHub PR from reviewed master source
     cmds:
-      - "{{.RUN}} {{.UV}} python scripts/release.py local {{.CLI_ARGS}}"
+      - "{{.RUN}} {{.UV}} python scripts/release.py prepare {{.CLI_ARGS}}"
 
   release-publish:
-    desc: Publish reviewed existing refs with explicit evidence and pairing decision
+    desc: Publish only the annotated tag of a verified merged release PR
     cmds:
       - "{{.RUN}} {{.UV}} python scripts/release.py publish {{.CLI_ARGS}}"

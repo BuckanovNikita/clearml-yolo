@@ -1,4 +1,4 @@
-"""Serialize explicit local releases and publication without persisting check receipts."""
+"""Prepare a release PR, then publish only its verified merged-source version tag."""
 
 import argparse
 import fcntl
@@ -6,14 +6,41 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict, Field
+
+TAG_PATTERN = r"v[0-9]+\.[0-9]+\.[0-9]+"
+RELEASE_PATHS = {"pyproject.toml", "uv.lock", "CHANGELOG.md"}
+
 
 class ReleaseError(RuntimeError):
     """An input or repository state cannot safely complete this release."""
+
+
+class CommitIdentity(BaseModel):
+    oid: str
+
+
+class PullRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    number: int
+    state: str
+    url: str
+    base: str = Field(alias="baseRefName")
+    branch: str = Field(alias="headRefName")
+    head: str = Field(alias="headRefOid")
+    cross_repository: bool = Field(alias="isCrossRepository")
+    merged_at: str | None = Field(alias="mergedAt")
+    merged: CommitIdentity | None = Field(alias="mergeCommit")
+    commits: list[CommitIdentity]
+
+
+PR_FIELDS = "number,state,url,baseRefName,headRefName,headRefOid,isCrossRepository,mergedAt,mergeCommit,commits"
 
 
 def output(*command: str) -> str:
@@ -32,23 +59,62 @@ def commit(reference: str) -> str:
 
 
 def require_tip(expected: str, *, clean: bool = True) -> None:
-    """Refuse moved refs or changed inputs at every stage boundary."""
     if commit("HEAD") != expected:
         raise ReleaseError(f"HEAD moved from expected commit {expected}")
     if clean and output("git", "status", "--porcelain", "--untracked-files=all"):
         raise ReleaseError("release requires a clean committed tree")
 
 
+def branch_name() -> str:
+    return output("git", "rev-parse", "--abbrev-ref", "HEAD")
+
+
+def require_branch(branch: str, expected: str, *, clean: bool = True) -> None:
+    require_tip(expected, clean=clean)
+    if branch_name() != branch or commit(f"refs/heads/{branch}") != expected:
+        raise ReleaseError(f"release branch {branch} moved or is no longer checked out")
+
+
 def require_ancestor(ancestor: str, descendant: str) -> None:
-    """Require an actual fast-forward rather than rewriting either history."""
     result = subprocess.run(["git", "merge-base", "--is-ancestor", ancestor, descendant], check=False)
     if result.returncode:
-        raise ReleaseError(f"{ancestor} is not an ancestor of {descendant}; fast-forward refused")
+        raise ReleaseError(f"{ancestor} is not an ancestor of {descendant}")
+
+
+def fetch_master() -> str:
+    run("git", "fetch", "origin", "--tags", "refs/heads/master:refs/remotes/origin/master")
+    return commit("refs/remotes/origin/master")
+
+
+def remote_ref(reference: str) -> str:
+    value = output("git", "ls-remote", "--refs", "origin", reference)
+    return value.split("\t", 1)[0] if value else ""
+
+
+def require_remote_master(expected: str) -> None:
+    if remote_ref("refs/heads/master") != expected:
+        raise ReleaseError("remote master moved; review evidence and restart on the new source")
+
+
+def version(reference: str = "HEAD") -> str:
+    return str(tomllib.loads(output("git", "show", f"{reference}:pyproject.toml"))["project"]["version"])
+
+
+def code_tag(value: str) -> str:
+    if not re.fullmatch(TAG_PATTERN, value):
+        raise ReleaseError(f"invalid stable code release tag: {value!r}")
+    return value
+
+
+def exists(reference: str) -> bool:
+    result = subprocess.run(["git", "show-ref", "--verify", "--quiet", reference], check=False)
+    if result.returncode not in (0, 1):
+        raise ReleaseError(f"cannot inspect {reference}")
+    return result.returncode == 0
 
 
 @contextmanager
 def release_lock() -> Iterator[None]:
-    """Hold the repository-wide lock across validation, versioning and optional push."""
     common = Path(output("git", "rev-parse", "--path-format=absolute", "--git-common-dir"))
     with (common / "clearml-yolo-release.lock").open("a") as handle:
         try:
@@ -62,7 +128,6 @@ def release_lock() -> Iterator[None]:
 
 
 def task(name: str) -> None:
-    """Explicit stages run independently of automatic change classification."""
     environment = dict(os.environ)
     environment.pop("SKIP", None)
     environment.pop("PREK_SKIP", None)
@@ -70,119 +135,202 @@ def task(name: str) -> None:
 
 
 def check_pair(pairing: str) -> None:
-    """Execute only the explicitly selected final-source compatibility check."""
     if pairing == "required":
         task("paired-check")
-    elif pairing == "not-required":
-        print("Pairing not required by the reviewed verification record")
     else:
-        raise ReleaseError("pairing decision must be required or not-required")
+        print("Pairing not required by the reviewed verification record")
 
 
 def prepared(expected: str) -> None:
-    """Recheck mutable release inputs immediately around final paired verification."""
-    require_master(expected, clean=False)
-    run("uv", "run", "--locked", "task", "--exit-code", "staging-check")
-    paths = output("git", "diff", "--cached", "--name-only").splitlines()
-    if set(paths) - {"pyproject.toml", "uv.lock", "CHANGELOG.md"}:
+    """Validate the staged version exception around the selected pairing check."""
+    branch = f"release/v{tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']}"
+    require_branch(branch, expected, clean=False)
+    task("staging-check")
+    if set(output("git", "diff", "--cached", "--name-only").splitlines()) - RELEASE_PATHS:
         raise ReleaseError("prepared release includes paths outside its version exception")
     run("uv", "run", "--locked", "python", "scripts/release_lock_guard.py")
 
 
-def tag_object(tag: str, expected: str, *, allow_ancestor: bool = False) -> str:
-    """Validate the source-version tag at the accepted tip or its release ancestor."""
-    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", tag):
-        raise ReleaseError(f"invalid code release tag: {tag}")
-    reference = f"refs/tags/{tag}"
+def release_delta(base: str, head: str) -> None:
+    """Validate actual committed version-only content, not PR labels or titles."""
+    paths = set(output("git", "diff", "--name-only", base, head).splitlines())
+    if not {"pyproject.toml", "uv.lock"} <= paths or paths - RELEASE_PATHS:
+        raise ReleaseError("release changes must be limited to version, lock and changelog")
+    if tuple(map(int, version(head).split("."))) <= tuple(map(int, version(base).split("."))):
+        raise ReleaseError("release version must increase")
+    run("uv", "run", "--locked", "python", "scripts/release_lock_guard.py", "--base", base, "--target", head)
+
+
+def tag_object(tag: str, expected: str) -> str:
+    reference = f"refs/tags/{code_tag(tag)}"
     identity = output("git", "rev-parse", "--verify", reference)
-    if output("git", "cat-file", "-t", identity) != "tag":
-        raise ReleaseError(f"{tag} must be an annotated release tag")
-    target = commit(identity)
-    if allow_ancestor:
-        require_ancestor(target, expected)
-    elif target != expected:
-        raise ReleaseError(f"{tag} must point at {expected}")
-    version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    if tag != f"v{version}":
-        raise ReleaseError(f"tag {tag} differs from source version {version}")
-    tagged_version = tomllib.loads(output("git", "show", f"{target}:pyproject.toml"))["project"]["version"]
-    if tagged_version != version:
-        raise ReleaseError(f"tag {tag} has tagged source version {tagged_version}, expected {version}")
+    if output("git", "cat-file", "-t", identity) != "tag" or commit(identity) != expected:
+        raise ReleaseError(f"{tag} must be an annotated tag at {expected}")
+    if tag != f"v{version(expected)}":
+        raise ReleaseError("tag differs from the merged source version")
     return identity
 
 
-def require_master(expected: str, *, clean: bool = True) -> None:
-    """Keep the checked-out branch and its ref bound to the intended release."""
-    require_tip(expected, clean=clean)
-    if output("git", "symbolic-ref", "--short", "HEAD") != "master" or commit("refs/heads/master") != expected:
-        raise ReleaseError("master moved or is no longer checked out")
+def predicted_tag() -> str:
+    return code_tag(output("uv", "run", "--locked", "semantic-release", "version", "--print-tag"))
 
 
-def publish(expected: str, tag: tuple[str, str]) -> None:
-    """Push exact intended refs atomically and verify their remote identities."""
-    require_master(expected)
-    require_ancestor("refs/remotes/origin/master", expected)
-    refs = {"refs/heads/master": expected}
-    refspecs = [f"{expected}:refs/heads/master"]
-    name, identity = tag
-    reference = f"refs/tags/{name}"
-    if tag_object(name, expected, allow_ancestor=True) != identity:
-        raise ReleaseError(f"tag {name} moved after validation")
-    refs[reference] = identity
-    refspecs.append(f"{identity}:{reference}")
-    run("git", "push", "--atomic", "origin", *refspecs)
-    remote = output("git", "ls-remote", "origin", *refs)
-    observed = dict(line.split("\t", 1)[::-1] for line in remote.splitlines())
-    if observed != refs:
-        raise ReleaseError(f"remote confirmation failed for {', '.join(refs)}")
-    print(f"Confirmed remote refs: {', '.join(refs)}")
+@contextmanager
+def calculation_branch(expected: str) -> Iterator[None]:
+    """Give semantic-release a configured branch without moving existing branches."""
+    previous = branch_name()
+    temporary = f"release/preparing-{expected}"
+    run("git", "switch", "--create", temporary, expected)
+    try:
+        yield
+    finally:
+        # Preserve an interrupted attempt's changed files or new commit for inspection.
+        if branch_name() == temporary and commit("HEAD") == expected and not output("git", "status", "--porcelain"):
+            if previous != "HEAD" and commit(f"refs/heads/{previous}") != expected:
+                raise ReleaseError("original checkout branch moved; temporary release branch retained")
+            run("git", "switch", "--detach", expected) if previous == "HEAD" else run("git", "switch", previous)
+            run("git", "branch", "--delete", temporary)
 
 
-def validate_and_integrate(expected: str, branch: str | None) -> None:
-    """Accept unchanged branch inputs before advancing the unchanged master ref."""
+def github_repository() -> str:
+    """Bind GitHub API operations to the same origin receiving Git pushes."""
+    fetch_urls = output("git", "remote", "get-url", "--all", "origin").splitlines()
+    push_urls = output("git", "remote", "get-url", "--push", "--all", "origin").splitlines()
+    if len(fetch_urls) != 1 or push_urls != fetch_urls:
+        raise ReleaseError("origin must have one identical effective fetch and push destination")
+    origin = fetch_urls[0]
+    match = re.fullmatch(
+        r"(?:git@github\.com:|https://github\.com/|ssh://git@github\.com/)([^/]+/[^/]+?)(?:\.git)?",
+        origin,
+    )
+    if match is None:
+        raise ReleaseError("origin must be a GitHub SSH or HTTPS repository URL")
+    return match[1]
+
+
+def inspect_pr(number: str) -> PullRequest:
+    return PullRequest.model_validate_json(
+        output("gh", "pr", "view", number, "--repo", github_repository(), "--json", PR_FIELDS)
+    )
+
+
+def open_pr(branch: str, head: str, base: str, record: Path) -> None:
+    """Push only the release branch and reuse its existing PR on retries."""
+    require_branch(branch, head)
+    require_remote_master(base)
+    remote = remote_ref(f"refs/heads/{branch}")
+    if remote and remote != head:
+        raise ReleaseError("remote release branch differs; refusing to overwrite it")
+    github_repository()
+    run("git", "push", "--no-follow-tags", "origin", f"{head}:refs/heads/{branch}")
+    if remote_ref(f"refs/heads/{branch}") != head:
+        raise ReleaseError("release branch push could not be confirmed")
+    require_branch(branch, head)
+    require_remote_master(base)
+    existing = output(
+        "gh",
+        "pr",
+        "list",
+        "--repo",
+        github_repository(),
+        "--head",
+        branch,
+        "--base",
+        "master",
+        "--state",
+        "all",
+        "--json",
+        "number",
+        "--jq",
+        ".[].number",
+    )
+    if existing:
+        if len(existing.splitlines()) != 1:
+            raise ReleaseError("multiple release PRs match; resolve their ownership before retrying")
+        pr = inspect_pr(existing)
+        if (
+            pr.state != "OPEN"
+            or pr.head != head
+            or pr.cross_repository
+            or pr.base != "master"
+            or pr.branch != branch
+            or len(pr.commits) != 1
+            or pr.commits[0].oid != head
+        ):
+            raise ReleaseError("existing release PR is closed, merged or has different source")
+        require_branch(branch, head)
+        require_remote_master(base)
+        print(f"Release PR: {pr.url}")
+        return
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", encoding="utf-8") as body:
+        body.write(
+            f"Prepare {branch.removeprefix('release/')} from `{base}`.\n\n"
+            "## Verification evidence\n\n"
+            f"{record.read_text(encoding='utf-8').strip()}\n\n"
+            "Human merge required. Tag publication is a separate authorized command "
+            "after merged-source verification.\n"
+        )
+        body.flush()
+        run(
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            github_repository(),
+            "--base",
+            "master",
+            "--head",
+            branch,
+            "--title",
+            f"chore(release): {version(head)}",
+            "--body-file",
+            body.name,
+        )
+    created = inspect_pr(branch)
+    require_branch(branch, head)
+    require_remote_master(base)
+    if created.state != "OPEN" or created.head != head or created.base != "master" or created.cross_repository:
+        raise ReleaseError("new PR identity could not be confirmed")
+    print(f"Release PR: {created.url}")
+
+
+def prepare_release(expected: str, pairing: str, record: Path) -> None:
     require_tip(expected)
-    checked_out = output("git", "symbolic-ref", "--short", "HEAD")
-    selected = branch or checked_out
-    if commit(f"refs/heads/{selected}") != expected:
-        raise ReleaseError(f"branch {selected} moved from {expected}")
-    run("git", "fetch", "origin", "--tags", "refs/heads/master:refs/remotes/origin/master")
-    require_ancestor("refs/remotes/origin/master", expected)
-    master_tip = commit("refs/heads/master")
-    require_ancestor(master_tip, expected)
-    tag_refs = output("git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags/v*")
+    github_repository()
+    base = fetch_master()
     require_tip(expected)
-    if output("git", "symbolic-ref", "--short", "HEAD") != checked_out:
-        raise ReleaseError("checked-out branch changed during validation")
-    if commit(f"refs/heads/{selected}") != expected:
-        raise ReleaseError(f"branch {selected} moved during validation")
-    if commit("refs/heads/master") != master_tip:
-        raise ReleaseError("master moved during validation")
-    if output("git", "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags/v*") != tag_refs:
-        raise ReleaseError("version tags changed during validation")
-    run("git", "switch", "master")
-    require_master(master_tip)
-    run("git", "merge", "--ff-only", expected)
-    require_master(expected)
-
-
-def local_release(expected: str, branch: str | None, *, push: bool, pairing: str) -> None:
-    """Integrate the accepted tip and let semantic-release alone create a version."""
-    validate_and_integrate(expected, branch)
-    predicted = output("uv", "run", "--locked", "semantic-release", "version", "--print-tag")
-    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", predicted):
-        raise ReleaseError(f"unexpected semantic-release tag output: {predicted!r}")
-    exists = subprocess.run(
-        ["git", "show-ref", "--verify", "--quiet", f"refs/tags/{predicted}"], check=False
-    ).returncode
-    if exists == 0:
-        identity = tag_object(predicted, expected, allow_ancestor=True)
+    branch = branch_name()
+    if re.fullmatch(f"release/{TAG_PATTERN}", branch):
+        parent = commit("HEAD^")
+        if parent != base or output("git", "rev-list", "--parents", "-n", "1", expected).count(" ") != 1:
+            raise ReleaseError("retry needs exactly one release commit on current origin/master")
+        release_delta(base, expected)
+        if branch != f"release/v{version(expected)}":
+            raise ReleaseError("release branch name differs from version")
         check_pair(pairing)
-        require_master(expected)
-        if tag_object(predicted, expected, allow_ancestor=True) != identity:
-            raise ReleaseError(f"tag {predicted} moved during paired verification")
-        print(f"No new version; accepted tip {expected}")
-        released_tag = (predicted, identity)
-    elif exists == 1:
+        open_pr(branch, expected, base, record)
+        return
+    if expected != base:
+        raise ReleaseError("preparation must start at current origin/master")
+    with calculation_branch(expected):
+        tag = predicted_tag()
+        require_tip(expected)
+        require_remote_master(base)
+        if exists(f"refs/tags/{tag}"):
+            target = commit(f"refs/tags/{tag}")
+            identity = tag_object(tag, target)
+            require_ancestor(target, expected)
+            if tag != f"v{version(expected)}":
+                raise ReleaseError("source version differs from existing release")
+            check_pair(pairing)
+            require_tip(expected)
+            require_remote_master(base)
+            if tag_object(tag, target) != identity:
+                raise ReleaseError("existing version tag moved during verification")
+            print(f"No new version; accepted source {expected}")
+            return
+        branch = f"release/{tag}"
+        run("git", "branch", "--move", branch)
         environment = {
             **os.environ,
             "CY_RELEASE_CHECK": "1",
@@ -197,92 +345,145 @@ def local_release(expected: str, branch: str | None, *, push: bool, pairing: str
             "--locked",
             "semantic-release",
             "version",
+            "--no-tag",
             "--no-push",
             "--no-vcs-release",
             environment=environment,
         )
         released = commit("HEAD")
         if commit("HEAD^") != expected:
-            raise ReleaseError("semantic-release did not create exactly one commit on the accepted tip")
-        identity = tag_object(predicted, released)
-        require_master(released)
-        released_tag = (predicted, identity)
-        print(f"Local release: {predicted} at {released}")
-    else:
-        raise ReleaseError("cannot inspect the predicted release tag")
-    if push:
-        publish(commit("HEAD"), released_tag)
+            raise ReleaseError("semantic-release must create exactly one version commit")
+        require_branch(branch, released)
+        release_delta(expected, released)
+        if version(released) != tag.removeprefix("v") or exists(f"refs/tags/{tag}"):
+            raise ReleaseError("prepared version differs from prediction or a premature tag appeared")
+        open_pr(branch, released, base, record)
 
 
-def publish_existing(expected: str, tag: str | None, *, pairing: str) -> None:
-    """Publish an existing version with reviewed evidence and the selected pairing check."""
+def merged_release(number: int, expected: str) -> PullRequest:
+    pr = inspect_pr(str(number))
+    if pr.state != "MERGED" or not pr.merged_at or pr.merged is None or pr.merged.oid != expected:
+        raise ReleaseError("expected tip must be the GitHub-confirmed merged release PR commit")
+    if pr.base != "master" or pr.cross_repository or pr.branch != f"release/v{version(expected)}":
+        raise ReleaseError("release PR must target master from the matching repository release branch")
+    run("git", "fetch", "origin", f"refs/pull/{number}/head")
+    head = commit("FETCH_HEAD")
+    if head != pr.head:
+        raise ReleaseError("release PR head changed during validation")
+    if output("git", "rev-list", "--parents", "-n", "1", head).count(" ") != 1:
+        raise ReleaseError("release PR head must be a single-parent version commit")
+    parent = commit(f"{head}^")
+    require_ancestor(parent, expected)
+    release_delta(parent, head)
+    if output("git", "diff", head, expected, "--", *sorted(RELEASE_PATHS)):
+        raise ReleaseError("merged release files differ from the reviewed PR head")
+    if len(pr.commits) != 1 or pr.commits[0].oid != head:
+        raise ReleaseError("release PR must contain exactly one version commit")
+    return pr
+
+
+def require_checkout(branch: str, expected: str) -> None:
     require_tip(expected)
-    if output("git", "symbolic-ref", "--short", "HEAD") != "master":
-        raise ReleaseError("later publication requires the expected tip checked out on master")
-    if tag is None:
-        version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-        tag = f"v{version}"
-    selected_tag = (tag, tag_object(tag, expected, allow_ancestor=True))
-    run("git", "fetch", "origin", "--tags", "refs/heads/master:refs/remotes/origin/master")
-    require_ancestor("refs/remotes/origin/master", expected)
+    if branch_name() != branch:
+        raise ReleaseError("checked-out branch changed during publication")
+    if branch != "HEAD":
+        require_branch(branch, expected)
+
+
+def publish_release(expected: str, number: int, pairing: str) -> None:
+    original = branch_name()
+    require_checkout(original, expected)
+    base = fetch_master()
+    require_ancestor(expected, base)
+    pr = merged_release(number, expected)
+    tag = code_tag(f"v{version(expected)}")
+    existing_tag = tag_object(tag, expected) if exists(f"refs/tags/{tag}") else None
     check_pair(pairing)
-    require_tip(expected)
-    publish(expected, selected_tag)
+    require_checkout(original, expected)
+    require_remote_master(base)
+    if existing_tag is not None and tag_object(tag, expected) != existing_tag:
+        raise ReleaseError("release tag moved during verification")
+    if inspect_pr(str(number)) != pr:
+        raise ReleaseError("release PR metadata changed during verification")
+    tag = code_tag(f"v{version(expected)}")
+    if not exists(f"refs/tags/{tag}"):
+        with calculation_branch(expected):
+            if predicted_tag() != tag:
+                raise ReleaseError("semantic-release prediction differs from merged source version")
+            require_tip(expected)
+            require_remote_master(base)
+            run(
+                "uv",
+                "run",
+                "--locked",
+                "semantic-release",
+                "version",
+                "--no-commit",
+                "--no-changelog",
+                "--skip-build",
+                "--no-push",
+                "--no-vcs-release",
+            )
+            require_tip(expected)
+    identity = tag_object(tag, expected)
+    require_checkout(original, expected)
+    require_remote_master(base)
+    remote = remote_ref(f"refs/tags/{tag}")
+    if remote and remote != identity:
+        raise ReleaseError("remote tag differs; refusing to replace it")
+    github_repository()
+    run("git", "push", "--no-follow-tags", "origin", f"{identity}:refs/tags/{tag}")
+    if remote_ref(f"refs/tags/{tag}") != identity:
+        raise ReleaseError("tag publication could not be confirmed")
+    print(f"Published {tag} at merged release source {expected}; master was not pushed")
 
 
 def expected_commit(value: str) -> str:
-    """Require immutable identity rather than a branch that can move during checks."""
     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", value):
         raise ReleaseError("--expected-tip must be a full immutable commit SHA")
     return commit(value)
 
 
-def verification_record(path: Path, pairing: str) -> None:
-    """Require an evidence file without pretending to validate its reviewed contents."""
+def verification_record(path: Path) -> Path:
     record = path.resolve()
-    if not record.is_file():
-        raise ReleaseError(f"verification record must be an existing regular file: {record}")
+    if not record.is_file() or not record.read_text(encoding="utf-8").strip():
+        raise ReleaseError("verification record must be an existing nonempty UTF-8 file")
     print(f"Reviewed verification record: {record} (attestation, not machine-validated proof)")
-    print(f"Pairing decision: {pairing}")
+    return record
 
 
 def main() -> int:
-    """Expose explicit local and publish operations with mandatory expected identity."""
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    local = commands.add_parser("local")
-    local.add_argument("--expected-tip", required=True)
-    local.add_argument("--branch")
-    local.add_argument("--publish", action="store_true", help="publish now; requires separate push authorization")
+    preparing = commands.add_parser("prepare")
     publishing = commands.add_parser("publish")
-    publishing.add_argument("--expected-tip", required=True)
-    publishing.add_argument("--tag")
+    publishing.add_argument("--pr", required=True, type=int)
+    publishing.add_argument(
+        "--publish", required=True, action="store_true", help="attest separate tag publishing authorization"
+    )
     check = commands.add_parser("check-prepared")
-    check.add_argument("--expected-tip", required=True)
-    for operation in (local, publishing):
-        operation.add_argument(
-            "--verification-record",
-            type=Path,
-            required=True,
-            help="existing reviewed evidence file; its contents are not validated as proof",
-        )
+    for operation in (preparing, publishing, check):
+        operation.add_argument("--expected-tip", required=True)
         operation.add_argument("--pairing", choices=("required", "not-required"), required=True)
-    check.add_argument("--pairing", choices=("required", "not-required"), required=True)
+    for operation in (preparing, publishing):
+        operation.add_argument("--verification-record", type=Path, required=True)
     arguments = parser.parse_args()
     try:
         if arguments.command != "check-prepared":
-            verification_record(arguments.verification_record, arguments.pairing)
+            arguments.verification_record = arguments.verification_record.resolve()
         os.chdir(output("git", "rev-parse", "--show-toplevel"))
         expected = expected_commit(arguments.expected_tip)
         if arguments.command == "check-prepared":
             prepared(expected)
             return 0
+        record = verification_record(arguments.verification_record)
         with release_lock():
-            if arguments.command == "local":
-                local_release(expected, arguments.branch, push=arguments.publish, pairing=arguments.pairing)
+            github_repository()
+            if arguments.command == "prepare":
+                prepare_release(expected, arguments.pairing, record)
             else:
-                publish_existing(expected, arguments.tag, pairing=arguments.pairing)
-    except (ReleaseError, OSError, subprocess.CalledProcessError) as exc:
+                publish_release(expected, arguments.pr, arguments.pairing)
+    except (ReleaseError, OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"release: {exc}", file=sys.stderr)
         return exc.returncode if isinstance(exc, subprocess.CalledProcessError) else 1
     return 0

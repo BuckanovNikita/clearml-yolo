@@ -111,7 +111,7 @@ without first running an equivalent `verify`. No separate documentation checker 
 | `acceptance` | Explicit complete change acceptance on a clean committed tip |
 | `release-acceptance` | Explicit release automated gates and paired check |
 | `paired-check` | [Final CY/queue source compatibility](#paired-cy-and-queue-release-check) |
-| `release-local` / `release-publish` | [Suspended legacy release routes](#local-releases) |
+| `release-prepare` / `release-publish` | [Release PR preparation / authorized tag publication](#local-releases) |
 
 Inspect current host load before heavy stages and select the configured worker count
 accordingly. Verification never builds CY distributions. `local-deps` builds only
@@ -457,19 +457,54 @@ the queue at runtime; the queue raises its CY minimum when it adopts a newer int
 
 ## Local releases
 
-Code release execution is suspended pending PR-based release tooling. Do not invoke
-`release-local` or `release-publish`: the existing implementation integrates into local
-`master` and pushes version commits directly, bypassing the human-merged PR workflow.
-The commands remain in source for replacement, not as supported delivery routes.
-Feature delivery follows [GitHub PR delivery](agents/issue-tracker.md).
+Code releases use a GitHub release PR followed by separately authorized tag publication.
+The legacy `release-local` command is retired: never integrate ticket branches locally
+or push version commits to `master`. The replacement becomes the supported route when
+its implementation PR is accepted and merged. Model-weight releases remain separate.
 
-The replacement must prepare version/changelog/lock changes in a release PR, retain
-semantic-release ownership and successful no-version outcomes, and publish annotated
-tags only for the human-merged, verified source with separate publishing authorization.
-Preserve clean-tree/immutable-tip checks, concurrency locks, source/environment evidence,
-selected CY/queue pairing, ref confirmation and recovery limited to task-owned changes.
-Code releases contain Git commits and annotated tags only; distributions remain debugging
-tools. Existing historical release evidence does not authorize a new release.
+Use a clean prepared checkout with an authenticated `gh` CLI and a GitHub `origin`.
+Review changes since the previous version, applicable source/environment evidence and
+selected pairing before either operation. Both commands require a full immutable
+`--expected-tip SHA`, `--verification-record PATH` and `--pairing required|not-required`.
+The record is a reviewed attestation, not machine-validated proof; link it from Linear.
+Preparation includes its contents in the release PR, so review it for credentials and
+private data before invoking the command. GitHub operations are bound to the repository
+identified by `origin`, regardless of a `GH_REPO` override. Fetch and push must resolve
+to one identical destination; differing or multiple push URLs are refused. Pushes disable
+automatic following of other annotated tags. Required checks must pass or have an explicit user waiver. Do not repeat
+blanket acceptance when existing evidence remains applicable.
+
+- `release-prepare`: start at the exact fetched `origin/master` source. semantic-release
+  determines the next version and prepares a version-only commit on `release/vVERSION`,
+  refreshing the lock's root version and changelog. The command pushes that branch and
+  opens or reuses its GitHub PR. It neither creates a version tag nor merges the PR.
+  A no-version result succeeds without opening a PR. Use a dedicated checkout because
+  preparation changes its checked-out branch.
+- `release-publish`: after a human merges the release PR, check out its exact merged
+  source and pass `--pr NUMBER --publish` in addition to the common arguments. The
+  command verifies GitHub merge metadata, release-only changes, source/lock versions,
+  containment in fetched `origin/master` and selected pairing. semantic-release creates
+  the annotated version tag at that merged source; only the tag is pushed and its remote
+  identity is confirmed. `--publish` attests separate publishing authorization; it does
+  not grant that authorization. No GitHub Release or package artifact is created.
+
+Human merging remains a review obligation; GitHub merge metadata establishes merged
+state, not who authorized it. Reassess verification if the merged source differs from
+previously checked inputs. Version changes alone do not require CY/queue pairing;
+selected pairing runs against the proposed/final versions.
+
+Both operations retain a nonblocking repository-wide lock, clean-tree and immutable-tip
+checks, ref-stability checks and bounded version-only changes. Never break another
+attempt's lock or overwrite a mismatched remote ref. A valid prepared release branch can
+be retried to finish pushing or opening its PR without generating another version.
+After tag-push failure, retry publication for the same merged source and tag; an existing
+matching tag is reused, while mismatches fail. Inspect failed preparation before recovering
+only task-owned changes. Never force-push a release tag or reset unrelated work.
+
+Code releases contain Git commits and annotated tags only. semantic-release owns versions,
+changelog, version commits and annotated tags. The build hook refreshes only the root lock
+version and enforces the existing version exception; it builds no distributions. Version
+commits may skip only ordinary verification while staging and message validation remain.
 
 ## Model-weight releases
 
