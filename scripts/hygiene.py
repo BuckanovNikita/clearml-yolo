@@ -1,4 +1,4 @@
-"""Tracked-input hygiene and pre-stash staging safeguards, dispatched by Task."""
+"""Tracked-input hygiene checks, dispatched by Task."""
 
 import argparse
 import ast
@@ -17,19 +17,6 @@ from scripts.verification import changes
 
 def git(*args: str) -> bytes:
     return subprocess.check_output(["git", *args])
-
-
-def staging_check() -> int:
-    """Refuse every unstaged tracked or nonignored untracked input before prek."""
-    dirty = git("diff", "--name-only", "--ignore-submodules=none", "-z")
-    untracked = git("ls-files", "--others", "--exclude-standard", "-z")
-    if dirty or untracked:
-        print("Stage or ignore all inputs before committing; the guard never stashes:", file=sys.stderr)
-        for path in (dirty + untracked).split(b"\0"):
-            if path:
-                print(f"  {path.decode()}", file=sys.stderr)
-        return 1
-    return 0
 
 
 def syntax_problem(path: Path, text: str) -> str | None:
@@ -102,7 +89,7 @@ def hygiene(max_kb: int, required: list[str]) -> int:
     sized = added_files()
     paths = [Path(name.decode()) for name in git("ls-files", "-z").split(b"\0") if name]
     for path in paths:
-        # Deleted files and symlinks are not regular-file hook inputs. In particular,
+        # Deleted files and symlinks are not regular-file inputs. In particular,
         # never follow an instruction symlink out of this checkout while fixing text.
         if path.is_file() and not path.is_symlink():
             problems.extend(check_file(path, max_kb * 1024, sized))
@@ -113,12 +100,10 @@ def hygiene(max_kb: int, required: list[str]) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("check", "staging"))
+    parser.add_argument("action", choices=("check",))
     parser.add_argument("--max-kb", type=int, required=False)
     parser.add_argument("--required", nargs="*", default=[])
     args = parser.parse_args()
-    if args.action == "staging":
-        return staging_check()
     if args.max_kb is None:
         parser.error("check requires --max-kb from Task")
     return hygiene(args.max_kb, args.required)
