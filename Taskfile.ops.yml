@@ -17,7 +17,7 @@ tasks:
         done
         if [ -n "$missing" ]; then
           echo "local-deps: missing approved checkouts:$missing" >&2
-          echo "local-deps: check out the approved digital-metrics and report-generator revisions there (docs/development.md, External dependencies)." >&2
+          echo "local-deps: check out the approved digital-metrics and report-generator revisions there (DOCS.md, Installation and dependencies)." >&2
           exit 1
         fi
         # Never overwrite an existing uv.toml: it may hold other local settings.
@@ -200,9 +200,9 @@ tasks:
 
   release-validation:
     desc: Shared release stages (acceptance, single-GPU Severstal and FiftyOne); pair checked at final versions
-    # Manual observations in the running-integration-tests skill remain separate. A GPU
+    # Manual live observations (DOCS.md, Live test environment) remain separate. A GPU
     # busy with the user's workload is deferred verification, checked by the agent or
-    # operator before starting (verification-workflow skill); it is not automated here.
+    # operator before starting; it is not automated here.
     cmds:
       - |
         if [ -z "${CY_SEVERSTAL_ARGS:-}" ]; then

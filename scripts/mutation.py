@@ -245,7 +245,7 @@ def link_external(workspace: Path) -> None:
     """Expose the repository's ``external/`` dependency copies inside *workspace*."""
     external = (REPO_ROOT / "external").resolve()
     if not external.is_dir():
-        msg = f"{external} is missing; populate external sources first (docs/development.md)."
+        msg = f"{external} is missing; populate external sources first (DOCS.md, Installation and dependencies)."
         raise MutationError(msg)
     (workspace / "external").symlink_to(external, target_is_directory=True)
 

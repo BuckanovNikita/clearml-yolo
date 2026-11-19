@@ -15,10 +15,10 @@
   обучения и оценки не работают;
 - для установки из исходников — исходники `digital-metrics` и `report-generator`
   утверждённых ревизий. Ревизии перечислены
-  в [руководстве по разработке](docs/development.md#external-dependencies).
+  в [DOCS.md](DOCS.md#installation-and-dependencies).
 
 В PyPI пакета нет. Ниже — установка из исходников. Про установку по Git-ссылке см.
-[docs/feature/installation.md](docs/feature/installation.md). Скопируйте обе зависимости
+[DOCS.md](DOCS.md#installation-and-dependencies). Скопируйте обе зависимости
 в `external/digital-metrics` и `external/report-generator`. Затем выполните в корне
 репозитория:
 
@@ -132,7 +132,7 @@ Task можно выполнить через ClearML Agent. Настройки 
 (`ultralytics.`, `model.train.`) и сверьтесь со свежим YAML из `cy-init-config`.
 
 Подробнее:
-[docs/feature/commands-and-configuration.md](docs/feature/commands-and-configuration.md).
+[DOCS.md](DOCS.md#commands-and-configuration).
 
 ## Данные и разметка
 
@@ -182,7 +182,7 @@ clearml.task_name=convert-ground-truth 'clearml.tags=[conversion]'`. Если в
 `train` и `val`, а для `cy` — ещё и `test`.
 
 Подробнее:
-[docs/feature/datasets-and-ground-truth.md](docs/feature/datasets-and-ground-truth.md).
+[DOCS.md](DOCS.md#datasets-and-ground-truth).
 
 ## Обучение
 
@@ -208,7 +208,7 @@ cy --config-dir cy-config --config-name cy 'ultralytics.device=[0,1]' ultralytic
 У остальных семейств это `'model.train.device=[0,1]'`, и `model.train.batch` должен
 делиться на число GPU.
 
-Подробнее: [docs/feature/training.md](docs/feature/training.md).
+Подробнее: [DOCS.md](DOCS.md#training).
 
 ## Семейства моделей
 
@@ -237,7 +237,7 @@ RF-DETR и DEIMv2 размер изображения должен быть кв
 ещё и не меньше 128. Исходники и веса DEIMv2 скачиваются при первом запуске. Что делать
 без доступа к GitHub — в разделе «Веса моделей».
 
-Подробнее: [docs/feature/detector-families.md](docs/feature/detector-families.md).
+Подробнее: [DOCS.md](DOCS.md#detector-families).
 
 ## Аугментации
 
@@ -270,7 +270,7 @@ cy-train model=rfdetr/nano ground_truth=./ground_truth.csv \
 - Готовые примеры: `examples/augmentation/flip.json`
   и `examples/augmentation/mosaic.json`.
 
-Подробнее: [docs/feature/augmentation.md](docs/feature/augmentation.md).
+Подробнее: [DOCS.md](DOCS.md#augmentation).
 
 ## Предсказания и валидация
 
@@ -307,7 +307,7 @@ cy-val weights=./best.pt ground_truth=./ground_truth.csv 'splits=[val,test]' \
 `.identity.json` и `.provenance.json` рядом с весами и предсказаниями.
 
 Подробнее:
-[docs/feature/prediction-and-validation.md](docs/feature/prediction-and-validation.md).
+[DOCS.md](DOCS.md#prediction-and-validation).
 
 ## Метрики
 
@@ -329,7 +329,7 @@ cy-metrics ground_truth=./ground_truth.csv predictions=./predictions/predictions
 
 `cy-val` и `cy-metrics` подбирают пороги на `val`, даже если оценивается только `test`.
 
-Подробнее: [docs/feature/evaluation-metrics.md](docs/feature/evaluation-metrics.md).
+Подробнее: [DOCS.md](DOCS.md#evaluation-and-metrics).
 
 ## Сравнение с baseline
 
@@ -362,7 +362,7 @@ cy-compare ground_truth=./ground_truth.csv baseline_model.task_id=BASELINE_TASK_
 Если нет сравнения и отчётов, проверьте, есть ли завершённый Task с тегом `prod`
 и верна ли явная ссылка на baseline.
 
-Подробнее: [docs/feature/comparison.md](docs/feature/comparison.md).
+Подробнее: [DOCS.md](DOCS.md#comparison).
 
 ## Отчёты
 
@@ -380,7 +380,7 @@ cy-report comparison_dir=./comparison output_dir=./reports \
 
 `cy-report` работает только с каталогом, который создал `cy-compare`.
 
-Подробнее: [docs/feature/reports.md](docs/feature/reports.md).
+Подробнее: [DOCS.md](DOCS.md#reports).
 
 ## Публикация в ClearML
 
@@ -427,7 +427,7 @@ clearml:
 При ошибке ClearML или загрузки проверьте доступ к серверу и хранилищу, локальный лог
 и `pipeline_outcome.json`.
 
-Подробнее: [docs/feature/clearml-publication.md](docs/feature/clearml-publication.md).
+Подробнее: [DOCS.md](DOCS.md#clearml-publication).
 
 ## Просмотр в FiftyOne
 
@@ -444,9 +444,9 @@ cy --config-dir cy-config --config-name cy fiftyone.enabled=false   # без Fif
 
 Первая команда даёт публикации больше времени, вторая выключает её. Имя датасета
 записано в `fiftyone_publication.json` в выходном каталоге команды. Как открыть датасет
-в FiftyOne App, описано в файле ниже.
+в FiftyOne App, описано в разделе ниже.
 
-Подробнее: [docs/feature/fiftyone-publication.md](docs/feature/fiftyone-publication.md).
+Подробнее: [DOCS.md](DOCS.md#fiftyone-publication).
 
 ## Веса моделей
 
@@ -499,7 +499,7 @@ DINOv3 — отдельное соглашение Meta с ограничени�
 - если нет ни сети, ни прокси, разложите файлы вручную: сообщение об ошибке перечисляет
   недостающие файлы, их исходные адреса и пути, куда их положить.
 
-Подробнее: [docs/feature/model-assets.md](docs/feature/model-assets.md).
+Подробнее: [DOCS.md](DOCS.md#model-assets).
 
 ## Подбор batch size
 
@@ -532,7 +532,7 @@ cy-batch-estimate --list
 Если записи нет, добавьте её в `batch-sizes.yaml`, запустите `cy-batch-estimate` или
 задайте batch size числом.
 
-Подробнее: [docs/feature/batch-estimation.md](docs/feature/batch-estimation.md).
+Подробнее: [DOCS.md](DOCS.md#batch-estimation).
 
 ## Экспорт в ONNX и TensorRT
 
@@ -556,7 +556,7 @@ TensorRT ставится отдельно и в зависимости прое
 версиям TensorRT и CUDA, на которых собран. Для другой машины соберите и проверьте его
 заново.
 
-Подробнее: [docs/feature/export.md](docs/feature/export.md).
+Подробнее: [DOCS.md](DOCS.md#export).
 
 ## Процессы команды
 
@@ -570,7 +570,7 @@ multi-GPU обучения и загрузчики данных. Затем пр
 Чтобы остановить запуск, нажмите `Ctrl+C` и дождитесь, пока завершатся процессы,
 которые запустила команда.
 
-Подробнее: [docs/feature/process-ownership.md](docs/feature/process-ownership.md).
+Подробнее: [DOCS.md](DOCS.md#process-ownership).
 
 ## Очередь
 
@@ -586,12 +586,12 @@ cy-queue worker
 
 Перед отправкой уберите устройства из YAML (`device: null`): GPU назначает очередь.
 Установка, настройка и команды описаны в документации `cy-queue`. Правила для
-администратора общей очереди — в файле ниже.
+администратора общей очереди — в разделе ниже.
 
 Если очередь не запускает задание, проверьте, запущен ли ваш worker и хватает ли
 свободных GPU. Прямая команда GPU не ждёт.
 
-Подробнее: [docs/feature/queue.md](docs/feature/queue.md).
+Подробнее: [DOCS.md](DOCS.md#queue).
 
 ## Диагностика
 
@@ -607,7 +607,7 @@ cy-queue worker
 - `DEBUG` — с местом каждой ошибки в коде (по умолчанию);
 - `TRACE` — для разбора зависаний.
 
-Подробнее: [docs/feature/diagnostics.md](docs/feature/diagnostics.md).
+Подробнее: [DOCS.md](DOCS.md#diagnostics).
 
 ## Дедупликация кэша
 
@@ -622,7 +622,7 @@ cy-dedup --dry-run
 cy-dedup
 ```
 
-Подробнее: [docs/feature/cache-deduplication.md](docs/feature/cache-deduplication.md).
+Подробнее: [DOCS.md](DOCS.md#filesystem-and-cache-deduplication).
 
 ## Рабочий каталог
 
@@ -635,7 +635,7 @@ batch size и временные файлы. Входные данные — CSV
 Выходные каталоги (`run_dir`, `output_dir`), кэш и логи должны быть внутри `CY_HOME`.
 Путь снаружи отклоняется до начала работы.
 
-Подробнее: [docs/feature/filesystem.md](docs/feature/filesystem.md).
+Подробнее: [DOCS.md](DOCS.md#filesystem-and-cache-deduplication).
 
 ## Совместимость и зависимости
 
@@ -649,16 +649,12 @@ CY ставится в окружение uv на Linux — по Git-ссылк�
 Драйверы GPU, TensorRT, доступ к ClearML и отдельный пакет `cy-queue` вы ставите
 и настраиваете сами. Во время работы CY ничего не устанавливает.
 
-Подробнее: [docs/feature/installation.md](docs/feature/installation.md).
+Подробнее: [DOCS.md](DOCS.md#installation-and-dependencies).
 
 ## Разработка
 
 Окружение для разработки ставится так же, как в разделе «Установка», для каждого
-рабочего дерева отдельно. Потом установите Git-хуки:
+рабочего дерева отдельно.
 
-```bash
-bash scripts/install-hooks.sh
-```
-
-Проверки, коммиты и релизы описаны в [docs/development.md](docs/development.md).
-Устройство кода и правила для него — в [docs/architecture.md](docs/architecture.md).
+Проверки, коммиты и релизы описаны в [AGENTS.md](AGENTS.md).
+Устройство кода и правила для него — в [DOCS.md](DOCS.md#architecture-and-data-flow).

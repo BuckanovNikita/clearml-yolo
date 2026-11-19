@@ -41,7 +41,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "(positive finite seconds; default 1800 per attempt).\n"
                 "Keep TLS verification enabled; configure SSL_CERT_FILE for a private CA.\n"
                 "Retry: cy-download-weights\n"
-                "Details: docs/feature/model-assets.md\n"
+                "Details: DOCS.md, section Model assets\n"
             )
             raise SystemExit(1)
 
