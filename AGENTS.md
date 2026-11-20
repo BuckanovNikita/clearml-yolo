@@ -3,13 +3,28 @@
 `clearml-yolo` (CY) provides Hydra/hydra-zen commands (`cy`, `cy-train`, `cy-predict`, `cy-val`,
 `cy-metrics`, `cy-compare`, `cy-report`, `cy-ground-truth`, `cy-export` and tools) that train,
 predict, evaluate, compare, report and export detectors (YOLO, DEIMv2, RF-DETR, Faster R-CNN,
-FCOS) with ClearML publication. The Russian user documentation is [README.md](README.md) (entry
-page) and [docs/](docs/README.md): one page per command, config group and file format, where each
-shared fact has one owning page and other pages link to it. [GLOSSARY.md](GLOSSARY.md) defines the
-user-facing terms in English with their Russian wording. [DOCS.md](DOCS.md) holds architecture,
-behavior contracts, config keys and operations. Read the affected DOCS.md section before changing
-behavior or configuration. A behavior or configuration change updates its DOCS.md section and the
-user page that owns the fact in the same change; user pages state only what the code does.
+FCOS) with ClearML publication. [DOCS.md](DOCS.md) holds architecture, behavior contracts, config
+keys and operations. Read the affected DOCS.md section and the user page that owns the fact before
+changing behavior or configuration.
+
+## User documentation
+
+- The Russian user documentation is [README.md](README.md) (entry page) and [docs/](docs/README.md):
+  one page per command, config group and file format, plus topic pages. `docs/README.md` lists
+  every page.
+- Each fact has one owning page: the page `docs/README.md` lists for its command, config group,
+  file format or topic. Other pages link to the owner; `README.md` and `docs/README.md` also
+  restate a few facts (the command list, Python range, install command, weight licences).
+- A behavior or configuration change updates, in the same change, its DOCS.md section, the owning
+  user page and every user page that restates the fact (search `README.md` and `docs/`). A fact
+  with no owning page goes on the page of its command or config group. Adding or removing a
+  command or page also updates the `README.md` command table and `docs/README.md`.
+- User pages describe current behavior: every behavior claim matches the code and agrees with
+  DOCS.md, and a mismatch is fixed in the same change.
+- [GLOSSARY.md](GLOSSARY.md) defines the user-facing terms in English with their Russian wording
+  and lists the terms the pages keep in English; developer and contract terms stay in the DOCS.md
+  glossary section. User pages use the glossary's Russian wording. A change that introduces,
+  renames or narrows a user-facing term updates GLOSSARY.md in the same change.
 
 ## Layout
 

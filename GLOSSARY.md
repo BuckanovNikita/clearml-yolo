@@ -1,6 +1,6 @@
 # Glossary
 
-Terms that `clearml-yolo` (CY) defines or narrows. Each entry gives the Russian wording the user documentation uses. Terms that the documentation keeps in English (split, preset, backend, baseline, multirun and the others listed in the documentation rules) appear here only when CY gives them a narrower meaning.
+Terms that `clearml-yolo` (CY) defines or narrows. Each entry gives the Russian wording the user documentation uses. The documentation keeps these terms in English inside Russian sentences: checkpoint, batch size, split, baseline, preset, backend, IoU, override, multirun, sweep, seed, GPU, CPU, ONNX, TensorRT, YAML, JSON, CSV, and every command, flag, config key, file, column and environment variable name. They appear below only when CY gives them a narrower meaning.
 
 ## Workspace and runs
 
