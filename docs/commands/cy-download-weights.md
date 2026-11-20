@@ -73,10 +73,10 @@ GHR preserves owner/repo/releases/download/tag/file.
 For slow archive transfers, set CY_WEIGHTS_DOWNLOAD_TIMEOUT=3600 (positive finite seconds; default 1800 per attempt).
 Keep TLS verification enabled; configure SSL_CERT_FILE for a private CA.
 Retry: cy-download-weights
-Details: DOCS.md, section Model assets
+Details: https://github.com/BuckanovNikita/clearml-yolo/blob/master/docs/commands/cy-download-weights.md
 ```
 
-Строка `Details: DOCS.md, section Model assets` ссылается на файл, которого в документации нет; нужные сведения — на этой странице и в [Установке](../installation.md#зеркала-весов).
+Строка `Details:` ведёт на эту страницу; о зеркалах см. также [Установку](../installation.md#зеркала-весов).
 
 ### Коды завершения
 
