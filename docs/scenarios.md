@@ -12,7 +12,7 @@
    export CY_HOME=/workspace/project CLEARML_API_HOST=https://clearml.example.com
    ```
 
-   Результаты CY пишет только внутри `CY_HOME`, см. [Рабочий каталог](workspace.md#правило-записи-внутри-cy_home).
+   Результаты CY пишет только внутри `CY_HOME` — это правило записи внутри `CY_HOME` ([write containment rule](../GLOSSARY.md#write-containment-rule)), см. [Рабочий каталог](workspace.md#правило-записи-внутри-cy_home).
 
 2. Создайте локальное дерево конфигурации для `cy` ([`cy-init-config`](commands/cy-init-config.md)):
 
@@ -20,7 +20,7 @@
    cy-init-config configs
    ```
 
-   В `configs` появляются корневой файл `cy.yaml` и копии встроенных файлов групп. Свои значения правьте в `cy.yaml`.
+   В `configs` появляются корневой файл `cy.yaml` и копии встроенных файлов групп конфигурации (config group). Свои значения правьте в `cy.yaml`.
 
 3. Постройте CSV разметки ([ground truth](../GLOSSARY.md#ground-truth)) из YAML YOLO-датасета ([`cy-ground-truth`](commands/cy-ground-truth.md)):
 
@@ -36,11 +36,11 @@
    cy --config-dir configs --config-name cy ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Команда обучает модель Ultralytics YOLO по умолчанию, строит предсказания, метрики, сравнение и отчёт в каталоге запуска ([run directory](../GLOSSARY.md#run-directory)) `runs/my-project/my-run-<task-id>/`. Итог этапов ([stage](../GLOSSARY.md#stage)) — в `pipeline_outcome.txt` того же каталога. Если в проекте нет завершённой задачи с тегом `prod`, сравнение и отчёт пропускаются, а команда продолжается.
+   Команда обучает модель Ultralytics YOLO по умолчанию, строит предсказания (predictions), метрики, сравнение (comparison) и отчёт (report) в каталоге запуска ([run directory](../GLOSSARY.md#run-directory)) `runs/my-project/my-run-<task-id>/`. Итог пайплайна ([pipeline outcome](../GLOSSARY.md#pipeline-outcome)) по этапам ([stage](../GLOSSARY.md#stage)) — в `pipeline_outcome.txt` того же каталога. Если в проекте нет завершённой задачи с тегом `prod`, сравнение и отчёт пропускаются, а команда продолжается.
 
 ## 2. Этап за этапом
 
-Этапы `cy` отдельными командами и валидация в конце. Каждая команда создаёт свою задачу ClearML.
+Этапы `cy` отдельными командами и валидация (validation) в конце. Каждая команда создаёт свою задачу ClearML.
 
 1. Обучите модель ([`cy-train`](commands/cy-train.md)):
 
@@ -48,9 +48,9 @@
    cy-train ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Checkpoint — `runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt`; ID этой задачи нужен на следующих шагах.
+   Checkpoint лежит в каталоге обучения ([training directory](../GLOSSARY.md#training-directory)): `runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt`; ID этой задачи нужен на следующих шагах.
 
-2. Постройте предсказания весами задачи обучения ([`cy-predict`](commands/cy-predict.md)):
+2. Постройте предсказания весами (weights) задачи обучения ([`cy-predict`](commands/cy-predict.md)):
 
    ```bash
    cy-predict weights=<task-id> ground_truth=data/ground_truth.csv output=runs/my-run/predict.csv clearml.project_name=my-project clearml.task_name=my-run
@@ -64,15 +64,15 @@
    cy-metrics predictions=runs/my-run/predict.csv ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   В каталог `metrics` каталога запуска (ключ `output_dir`) записываются `metrics_best_confidences_val.csv` с порогами уверенности (confidence threshold) и книги Excel (workbook) по каждому split, см. [Книги Excel](formats/workbooks.md#метрики-cy-metrics).
+   В каталог `metrics` каталога запуска (ключ `output_dir`) записываются `metrics_best_confidences_val.csv` с подобранными порогами ([selected confidence thresholds](../GLOSSARY.md#selected-confidence-thresholds)) и книги Excel (workbook) по каждому split, см. [Книги Excel](formats/workbooks.md#метрики-cy-metrics).
 
-4. Отчёт строится по результату сравнения, поэтому сначала сравните обученную модель с [baseline](../GLOSSARY.md#baseline) ([`cy-compare`](commands/cy-compare.md)). Пороги локального checkpoint задаются явно, по одному на каждый класс, по которому оценивается модель; возьмите их из `metrics_best_confidences_val.csv`:
+4. Отчёт строится по результату сравнения, поэтому сначала сравните обученную модель с [baseline](../GLOSSARY.md#baseline) ([`cy-compare`](commands/cy-compare.md)). Пороги уверенности (confidence threshold) локального checkpoint задаются явно, по одному на каждый класс, по которому оценивается модель; возьмите их из `metrics_best_confidences_val.csv`:
 
    ```bash
    cy-compare ground_truth=data/ground_truth.csv candidate_model.source=local candidate_model.weights=runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt 'candidate_model.thresholds={defect: 0.35}' output_dir=runs/my-run/compare clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Baseline по умолчанию — последняя завершённая задача проекта с тегом `prod`. В `runs/my-run/compare/` появляются книга сравнения и `comparison_manifest.json`. Если baseline не найден, сравнение пропускается и манифеста ([comparison manifest](../GLOSSARY.md#comparison-manifest)) нет; тогда следующий шаг завершается ошибкой `Comparison directory <каталог> has no comparison_manifest.json; run cy-compare first`.
+   Baseline по умолчанию — последняя завершённая задача проекта с тегом `prod`. В `runs/my-run/compare/` появляются книга сравнения и `comparison_manifest.json`. Если baseline не найден, сравнение пропускается и манифеста сравнения ([comparison manifest](../GLOSSARY.md#comparison-manifest)) нет; тогда следующий шаг завершается ошибкой `Comparison directory <каталог> has no comparison_manifest.json; run cy-compare first`.
 
 5. Постройте отчёты ([`cy-report`](commands/cy-report.md)):
 
@@ -82,7 +82,7 @@
 
    Результат — `report_dev_test.xlsx` и `report_business_test.xlsx` в каталоге `report` каталога запуска.
 
-6. Проверьте веса валидацией (validation) на `val` и `test` ([`cy-val`](commands/cy-val.md)):
+6. Проверьте веса валидацией на `val` и `test` ([`cy-val`](commands/cy-val.md)):
 
    ```bash
    cy-val weights=<task-id> ground_truth=data/ground_truth.csv 'splits=[val,test]' clearml.project_name=my-project clearml.task_name=my-run
@@ -114,9 +114,9 @@
 
    Модель-кандидат — модель, обученная в этом запуске. Сравнение пишется в `comparison/`, отчёт — в `reports/` каталога запуска. Если явно заданный baseline не найден, этап сравнения завершается ошибкой.
 
-## 4. Другое семейство моделей и свой пайплайн аугментации
+## 4. Другое семейство моделей и свой пайплайн аугментаций
 
-1. Сохраните пайплайн Albumentations в `augmentation/flip.json` (правила файла — в [`transforms`](configuration/transforms.md#файл-пайплайна)):
+1. Сохраните файл пайплайна ([augmentation pipeline file](../GLOSSARY.md#augmentation-pipeline-file)) Albumentations в `augmentation/flip.json` (правила файла — в [`transforms`](configuration/transforms.md#файл-пайплайна)):
 
    ```json
    {
@@ -139,9 +139,9 @@
    cy-train --cfg job model=fcos/resnet50_fpn transforms=albumentations transforms.pipeline_file=augmentation/flip.json ground_truth=data/ground_truth.csv
    ```
 
-   Команда печатает конфигурацию и ничего не запускает. Сам файл пайплайна ([augmentation pipeline file](../GLOSSARY.md#augmentation-pipeline-file)) при `--cfg job` не читается и не проверяется.
+   Команда печатает конфигурацию и ничего не запускает. Сам файл пайплайна при `--cfg job` не читается и не проверяется.
 
-3. Обучите FCOS со своим пайплайном ([`cy-train`](commands/cy-train.md)):
+3. Обучите FCOS со своим файлом пайплайна ([`cy-train`](commands/cy-train.md)):
 
    ```bash
    cy-train model=fcos/resnet50_fpn transforms=albumentations transforms.pipeline_file=augmentation/flip.json ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
@@ -159,7 +159,7 @@
 
 ## 5. Подготовка GPU-хоста
 
-1. Если прямого доступа к GitHub нет, задайте зеркало ([Зеркала весов](installation.md#зеркала-весов) ([weight mirror](../GLOSSARY.md#weight-mirror))):
+1. Если прямого доступа к GitHub нет, задайте зеркало весов ([weight mirror](../GLOSSARY.md#weight-mirror)), см. [Зеркала весов](installation.md#зеркала-весов):
 
    ```bash
    export GHR=https://artifactory.example/artifactory/github-files
@@ -209,7 +209,7 @@
    cy-export model=fasterrcnn/resnet50_fpn weights=weights/best.pt clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Граф и его метаданные пишутся в `runs/my-project/my-run-<task-id>/export/`: `model.onnx` и `model.onnx.json`.
+   Граф и метаданные экспорта ([export metadata](../GLOSSARY.md#export-metadata)) пишутся в `runs/my-project/my-run-<task-id>/export/`: `model.onnx` и `model.onnx.json`.
 
 2. Соберите движок TensorRT ([TensorRT engine](../GLOSSARY.md#tensorrt-engine)) FP16 на GPU 0 из этого графа:
 
@@ -241,7 +241,7 @@
    cy-train -m ground_truth=data/ground_truth.csv ultralytics.epochs=50,100 clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Задания выполняются последовательно, каждое — отдельная задача ClearML. Все они получают общий тег multirun ([multirun tag](../GLOSSARY.md#multirun-tag)) `multirun-<ГГГГММДД-ЧЧММСС>-<шесть слов через дефис>`. Файлы Hydra пишутся в `CY_HOME/multirun/`, результаты обучения — в каталоги запуска в `runs/`. Параллельный запуск через очередь описан в [Очереди](queue.md).
+   Задания выполняются последовательно, каждое — отдельная задача ClearML. Все они получают общий тег multirun ([multirun tag](../GLOSSARY.md#multirun-tag)) `multirun-<ГГГГММДД-ЧЧММСС>-<шесть слов через дефис>`. Каталоги Hydra ([Hydra output directory](../GLOSSARY.md#hydra-output-directory)) создаются в `CY_HOME/multirun/`, результаты обучения — в каталоги запуска в `runs/`. Параллельный запуск через очередь описан в [Очереди](queue.md).
 
 ## См. также
 

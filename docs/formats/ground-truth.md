@@ -7,16 +7,16 @@
 - Пишет: [`cy-ground-truth`](../commands/cy-ground-truth.md) из YOLO-датасета (см. [Датасеты](datasets.md)), или вы сами.
 - Читают: [`cy-train`](../commands/cy-train.md) и [`cy`](../commands/cy.md) (полная проверка, описанная ниже), [`cy-export`](../commands/cy-export.md) при проверке модели (та же проверка, но обязателен только проверяемый split), [`cy-predict`](../commands/cy-predict.md) (берёт `image_path` и `split`), [`cy-metrics`](../commands/cy-metrics.md) и [`cy-compare`](../commands/cy-compare.md) (сопоставляют предсказания по `image_name`), [`cy-val`](../commands/cy-val.md) (предсказания и метрики подряд).
 
-Ключ `ground_truth` принимает путь к CSV или ссылку на датасет ClearML. Датасет ClearML должен быть финализирован и содержать только один файл `dataset.csv` в корне; изображения храните вне датасета. CSV из датасета ClearML скачивается в локальный кэш, и относительный `image_path` отсчитывается от каталога этой копии, поэтому в таком CSV указывайте абсолютные пути к изображениям. Для локального пути команда пишет предупреждение `Using local ground-truth CSV ...; prefer a ClearML dataset reference for versioned annotations.`
+Ключ `ground_truth` принимает путь к CSV или ссылку на ClearML Dataset ([ClearML dataset reference](../../GLOSSARY.md#clearml-dataset-reference)). Датасет ClearML должен быть финализирован и содержать только один файл `dataset.csv` в корне; изображения храните вне датасета. CSV из датасета ClearML скачивается в локальный кэш, и относительный `image_path` отсчитывается от каталога этой копии, поэтому в таком CSV указывайте абсолютные пути к изображениям. Для локального пути команда пишет предупреждение `Using local ground-truth CSV ...; prefer a ClearML dataset reference for versioned annotations.`
 
-Ссылка на датасет ClearML записывается так:
+Ссылка на ClearML Dataset записывается так:
 
 ```bash
 cy-train 'ground_truth={dataset_id:<dataset-id>}'
 cy-train 'ground_truth={project_name:my-project,name:my-dataset,version:"1.0.0"}'
 ```
 
-`dataset_id` нельзя совмещать с `project_name`, `name` и `version`; без `dataset_id` нужны и `project_name`, и `name`. Без `version` ClearML выбирает версию сам, и следующий запуск может получить другую. Какой датасет был выбран (ID, проект, имя, версия и SHA-256 CSV), команда записывает в задачу ClearML как `ground_truth_source`.
+`dataset_id` нельзя совмещать с `project_name`, `name` и `version`; без `dataset_id` нужны и `project_name`, и `name`. Без `version` ClearML выбирает версию сам, и следующий запуск может получить другую. Какой датасет был выбран (ID, проект, имя, версия и SHA-256 CSV), команда записывает в задачу ClearML (task) как `ground_truth_source`.
 
 ## Колонки
 
@@ -74,13 +74,13 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 
 1. Заголовок: нет повторяющихся колонок, есть все колонки, кроме `source_row_id`.
 2. Каждая строка: `image_name` и `image_path` не пусты, `split` допустим, `image_name` совпадает с именем файла.
-3. Принадлежность изображений split, повторяющиеся пустые строки и смешение пустой строки с рамками.
+3. Принадлежность изображений split, повторяющиеся строки изображений без объектов и смешение такой строки с рамками.
 4. Каждое изображение открывается. Допустимые расширения: `avif`, `bmp`, `dng`, `heic`, `heif`, `jp2`, `jpeg`, `jpg`, `mpo`, `png`, `tif`, `tiff`, `webp`. Обе стороны не меньше 10 пикселей. Для JPEG с поворотом в EXIF (значения 6 и 8) ширина и высота меняются местами.
 5. Каждая рамка проверяется по размерам изображения.
 
 Рамка с ошибкой не останавливает обучение: она отбрасывается, а в лог пишется `Invalid bounding boxes dropped: N`. Причины для такой рамки: `missing label` (есть координаты, но пустой `instance_label`), `incomplete coordinates`, `coordinates must be numeric`, `coordinates must be finite`, `box width and height must be positive`, `coordinates are outside image bounds 0..W x 0..H`. Список отброшенных рамок с номерами строк попадает в `preparation.json` (см. [Датасеты](datasets.md)). Если в классе не осталось ни одной рамки в `train`, команда пишет предупреждение `Class 'car' has no valid training examples`.
 
-При обучении подготовленный датасет кэшируется по содержимому CSV (см. [Датасеты](datasets.md)). Пока CSV не изменился, повторный запуск берёт готовый кэш и шаги 1–5 не повторяет; проверяется только наличие изображений в обязательных split.
+При обучении рабочая копия датасета ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)) привязана к содержимому CSV (см. [Датасеты](datasets.md)). Пока CSV не изменился, повторный запуск берёт готовую копию и шаги 1–5 не повторяет; проверяется только наличие изображений в обязательных split.
 
 ## Ошибки
 
@@ -98,7 +98,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `data/ground_truth.csv: image 'a.jpg' belongs to both split 'train' and 'val' (row 5)` | Одно изображение в двух split |
 | `data/ground_truth.csv: image name 'a.jpg' refers to both /workspace/project/data/a.jpg and /workspace/project/data/images/train/a.jpg (row 5)` | Одно имя у двух разных файлов |
 | `data/ground_truth.csv: Duplicate background row 5` | Две одинаковые строки изображения без объектов |
-| `data/ground_truth.csv: image 'b.jpg' mixes an explicit background row with an annotation row` | У изображения есть и пустая строка, и рамки |
+| `data/ground_truth.csv: image 'b.jpg' mixes an explicit background row with an annotation row` | У изображения есть и строка изображения без объектов, и рамки |
 | `data/ground_truth.csv: Duplicate box for image 'a.jpg' at row 5; numerically repeats row 2` | Та же рамка того же класса повторяется (сравниваются числа, `240` и `240.0` совпадают) |
 | `data/ground_truth.csv: image 'z.jpg' at /workspace/project/data/images/train/z.jpg cannot be read` | Файл изображения отсутствует или повреждён |
 | `data/ground_truth.csv: image 'a.gif' has unsupported extension '.gif'; supported extensions: ...` | Расширение не из списка |
@@ -107,7 +107,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `data/ground_truth.csv: required split(s) contain no images: val` | Нет изображений в обязательном split |
 | `data/ground_truth.csv: at least one valid training box is required` | В `train` не осталось ни одной корректной рамки |
 | `Unsupported required split(s): dev; expected train, val, or test` | В `required_splits` указан недопустимый split |
-| `Cached dataset required split(s) contain no images: test` | CSV уже в кэше, но в нём нет изображений split из `required_splits` |
+| `Cached dataset required split(s) contain no images: test` | Рабочая копия датасета для этого CSV уже есть, но в ней нет изображений split из `required_splits` |
 
 При загрузке разметки из датасета ClearML:
 

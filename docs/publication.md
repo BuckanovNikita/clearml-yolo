@@ -63,7 +63,7 @@ ClearML results page: ...
 | --- | --- | --- |
 | `gt_csv` | `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare`, `cy-ground-truth` | Разметка ([ground truth](../GLOSSARY.md#ground-truth)), с которой работал запуск. В `cy-train` и при обучении в `cy` — подготовленная для обучения разметка. |
 | `predicts_csv` | `cy`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare` | Общая таблица строк разметки и предсказаний (predictions); после оценки строки дополнены статусами сопоставления. Загружается, когда все этапы запуска, работающие с предсказаниями, закончили. |
-| `metrics_best_confidences_val` | `cy-metrics`, `cy-val`, этап метрик `cy` | Пороги уверенности (confidence threshold), подобранные на split `val`: столбцы `class_name`, `confidence`. |
+| `metrics_best_confidences_val` | `cy-metrics`, `cy-val`, этап метрик `cy` | Подобранные пороги ([selected confidence thresholds](../GLOSSARY.md#selected-confidence-thresholds)) — пороги уверенности (confidence threshold), выбранные на split `val`: столбцы `class_name`, `confidence`. |
 | `metrics_dashboard_full_<split>` | `cy-metrics`, `cy-val`, этап метрик `cy` | Полный дашборд ([dashboard](../GLOSSARY.md#dashboard)) метрик по split. |
 | `metrics_dashboard_dtrk_<split>` | `cy-metrics`, `cy-val`, этап метрик `cy` | Сокращённый дашборд метрик по split. |
 | `comparison_baseline_dashboard_full_<split>`, `comparison_baseline_dashboard_dtrk_<split>` | `cy-compare`, этап сравнения `cy` | Дашборды модели [baseline](../GLOSSARY.md#baseline). |
@@ -74,7 +74,7 @@ ClearML results page: ...
 | `export_onnx`, `export_metadata` | `cy-export` при `export.operation=onnx` | Граф ONNX и описание экспорта. |
 | `export_engine`, `export_metadata` | `cy-export` при `export.operation=build` | Движок TensorRT ([TensorRT engine](../GLOSSARY.md#tensorrt-engine)) и описание экспорта. |
 | `export_corpus`, `export_verification` | `cy-export` при `export.operation=verify` | Набор изображений для проверки и отчёт о проверке движка. |
-| `pipeline_outcome` | `cy` | Итог по этапам пайплайна ([pipeline](../GLOSSARY.md#pipeline)): статус и причина для каждого этапа. Тот же итог лежит в каталоге запуска в `pipeline_outcome.json` и `pipeline_outcome.txt`. |
+| `pipeline_outcome` | `cy` | Итог пайплайна ([pipeline outcome](../GLOSSARY.md#pipeline-outcome)): статус и причина для каждого этапа пайплайна ([pipeline](../GLOSSARY.md#pipeline)). Тот же итог лежит в каталоге запуска в `pipeline_outcome.json` и `pipeline_outcome.txt`. |
 
 Содержимое книг и дашбордов описано в разделе [Книги Excel](formats/workbooks.md).
 
@@ -151,7 +151,7 @@ ClearML results page: ...
 
 ### Предварительная проверка и таймауты
 
-1. Сразу после создания задачи ClearML команда запускает отдельный процесс, который загружает FiftyOne и запрашивает список датасетов. Процесс не видит GPU. На это отводится `fiftyone.preflight_timeout_seconds`.
+1. Сразу после создания задачи ClearML команда запускает предварительную проверку ([FiftyOne preflight](../GLOSSARY.md#fiftyone-preflight)) — отдельный процесс, который загружает FiftyOne и запрашивает список датасетов. Процесс не видит GPU. На это отводится `fiftyone.preflight_timeout_seconds`.
 2. Если проверка не прошла (FiftyOne не установлен, база недоступна, время вышло), команда пишет предупреждение `FiftyOne visualization setup failed; continuing without visualization` и выполняет всю остальную работу без публикации в FiftyOne.
 3. После вычислений публикация выполняется в новом отдельном процессе. Весь процесс, включая загрузку FiftyOne, запись и выход, ограничен `fiftyone.publish_timeout_seconds`; по истечении процесс останавливается.
 4. Перед записью процесс берёт блокировку датасета и ждёт её не дольше `fiftyone.lock_timeout_seconds`. Файл блокировки лежит в каталоге `clearml-yolo-locks` внутри каталога базы данных FiftyOne на этой машине.

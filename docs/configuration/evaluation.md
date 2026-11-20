@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `cy-metrics` | `evaluation.*` | Подбор порогов на split `val` и метрики по каждому split. |
 | `cy-val` | `evaluation.*` | То же, после предсказания по checkpoint. |
-| `cy-compare` | `evaluation.*` | Сопоставление и метрики модели [baseline](../../GLOSSARY.md#baseline) и модели-кандидата ([candidate model](../../GLOSSARY.md#candidate-model)) при уже известных порогах. |
+| `cy-compare` | `evaluation.*` | Сопоставление и метрики модели baseline ([baseline](../../GLOSSARY.md#baseline)) и модели-кандидата ([candidate model](../../GLOSSARY.md#candidate-model)) при уже известных порогах. |
 | `cy` | `metrics.evaluation.*` | Этап ([stage](../../GLOSSARY.md#stage)) метрик и этап сравнения пайплайна ([pipeline](../../GLOSSARY.md#pipeline)). |
 
 У остальных команд этой группы нет. Override `evaluation.<ключ>` для команды, у которой нет группы, или неизвестный ключ завершается ошибкой Hydra ещё до запуска, например `Could not override 'evaluation.foo'`.
@@ -36,7 +36,7 @@ Hydra не проверяет значения ключей: `--cfg job` при�
 
 ## Пороги уверенности
 
-Пороги подбираются один раз, только на split `val`, и затем применяются без изменений ко всем запрошенным split. Split для подбора задаёт ключ `calibration_split` рядом с группой (`calibration_split` в `cy-metrics`, `metrics.calibration_split` в `cy`); любое значение, кроме `val`, даёт ошибку. Пороги подбираются по разметке и предсказаниям после предварительной обработки: ключи `preprocess` и `preprocess_preds_*` меняют и пороги, и метрики. `cy-compare` пороги не подбирает: он берёт их у каждой модели (см. [`cy-compare`](../commands/cy-compare.md)), поэтому `confidence_optimization` там не действует.
+Подобранные пороги ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)) определяются один раз, только на split `val`, и затем применяются без изменений ко всем запрошенным split. Split для подбора задаёт ключ `calibration_split` рядом с группой (`calibration_split` в `cy-metrics`, `metrics.calibration_split` в `cy`); любое значение, кроме `val`, даёт ошибку. Пороги подбираются по разметке и предсказаниям после предварительной обработки: ключи `preprocess` и `preprocess_preds_*` меняют и пороги, и метрики. `cy-compare` пороги не подбирает: он берёт их у каждой модели (см. [`cy-compare`](../commands/cy-compare.md)), поэтому `confidence_optimization` там не действует.
 
 Значения ключей группы записываются в конфигурацию задачи ClearML и в книгу Excel (workbook) с метриками (см. [Книги Excel](../formats/workbooks.md)).
 

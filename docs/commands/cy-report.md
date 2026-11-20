@@ -28,9 +28,9 @@ cy-report [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
 | `comparison_dir` | обязателен | Каталог результатов `cy-compare` с файлом `comparison_manifest.json`. |
-| `baseline_label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)) baseline. Используется, только если ни книга модели baseline, ни манифест ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) не содержат описания модели. |
+| `baseline_label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)) baseline. Используется, только если ни книга модели baseline, ни манифест сравнения ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) не содержат описания модели. |
 | `candidate_label` | `null` | То же для модели-кандидата. |
-| `output_dir` | `null` | Каталог результатов. При `null` — `runs/<проект>/<задача>-<ID>/report` (см. [Рабочий каталог](../workspace.md) ([workspace](../../GLOSSARY.md#workspace))). Должен быть внутри `CY_HOME`. |
+| `output_dir` | `null` | Каталог результатов. При `null` — `runs/<проект>/<задача>-<ID>/report` в каталоге запуска ([run directory](../../GLOSSARY.md#run-directory)). Должен быть внутри рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) `CY_HOME`, см. [Рабочий каталог](../workspace.md). |
 | `report_config_path` | `null` | YAML с настройками генератора отчётов, например имена листов в разделе `sheet_names`. При `null` — встроенные настройки. |
 | `clearml` | см. группу | Задача ClearML (task): [`clearml`](../configuration/clearml.md). |
 
@@ -66,7 +66,7 @@ cy-report [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 | `Comparison candidate dashboard does not exist: <путь>` | Книги из манифеста нет в каталоге (или `baseline dashboard`). Не переносите и не удаляйте файлы каталога сравнения. |
 | `baseline dashboard identity does not match comparison manifest` | Книга подменена книгой другой модели (или `candidate`). Повторите `cy-compare`. |
 | `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Модель нигде не описана. Задайте `baseline_label` или `candidate_label`. |
-| `Project write destination ... must be contained beneath CY_HOME=...` | `output_dir` вне рабочего каталога (см. [Правило записи](../workspace.md#правило-записи-внутри-cy_home)). |
+| `Project write destination ... must be contained beneath CY_HOME=...` | `output_dir` вне рабочего каталога: нарушено правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)), см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home). |
 | `Unrecognized Authentication Error: ...` | Сервер ClearML недоступен или не настроены учётные данные (см. [Установка](../installation.md#clearml)). |
 
 ## См. также

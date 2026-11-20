@@ -97,7 +97,7 @@ ValueError: Changed ultralytics settings ['epochs'] are inactive for fcos/swin_t
 | `amp` | `true` | Смешанная точность. У DEIMv2, Faster R-CNN и FCOS включается только на CUDA. |
 | `grad_accum_steps` | `1` | Число шагов накопления градиента, больше 0. DEIMv2 принимает только `1`: `DEIMv2 native grad_accum_steps other than 1 is unsupported`. |
 | `use_ema` | `true` | Экспоненциальное усреднение весов (EMA). |
-| `augmentation` | `null` | Отключаемые встроенные аугментации семейства. Заполняется автоматически при `transforms=albumentations`, см. [группу `transforms`](transforms.md). При профиле `default` должно быть `null`, иначе: `model.train.augmentation requires transforms=albumentations`. |
+| `augmentation` | `null` | Отключаемые встроенные аугментации семейства. Заполняется автоматически при `transforms=albumentations`, см. [группу `transforms`](transforms.md). При профиле ([transforms profile](../../GLOSSARY.md#transforms-profile)) `default` должно быть `null`, иначе: `model.train.augmentation requires transforms=albumentations`. |
 
 ## `model.predict`
 
@@ -109,13 +109,13 @@ ValueError: Changed ultralytics settings ['epochs'] are inactive for fcos/swin_t
 | `batch` | `1` | Число изображений в batch, целое больше 0. |
 | `imgsz` | `null` | Размер входа; `null` — размер, записанный в checkpoint при обучении. RF-DETR: целое, кратное 32. DEIMv2: стороны кратны 32 и не меньше 128. |
 | `conf` | `0.001` | Порог уверенности (confidence threshold) сохраняемых детекций, от 0 до 1. Низкий порог оставляет запас для последующего выбора порога по метрикам. |
-| `iou` | `0.7` | Порог IoU подавления пересекающихся рамок, больше 0 и не больше 1. Faster R-CNN и FCOS используют его для NMS. DEIMv2 и RF-DETR принимают только `0.7`. |
+| `iou` | `0.7` | Порог IoU подавления пересекающихся рамок (bounding box), больше 0 и не больше 1. Faster R-CNN и FCOS используют его для NMS. DEIMv2 и RF-DETR принимают только `0.7`. |
 | `max_det` | `300` | Максимум детекций на изображение, целое больше 0. |
 | `half` | `false` | FP16 при предсказании. Faster R-CNN и FCOS: только на CUDA (`Torchvision half inference requires CUDA`). DEIMv2 и RF-DETR принимают только `false`. |
 
 Для DEIMv2 и RF-DETR другие значения `iou` и `half` останавливают предсказание: `DEIMv2 nondefault iou and half controls are unsupported` (для RF-DETR — `RF-DETR nondefault iou and half controls are unsupported`).
 
-Файл весов для предсказания задаётся не в группе `model`, а ключом `weights` команды, например [`cy-predict`](../commands/cy-predict.md). Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит семейство и preset, с которыми он обучен. Выбор `model=` должен им соответствовать, иначе команда останавливается: `Explicit model selection disagrees with the checkpoint descriptor`.
+Файл весов для предсказания задаётся не в группе `model`, а ключом `weights` команды, например [`cy-predict`](../commands/cy-predict.md). Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит описание модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)) с семейством и preset, с которыми он обучен. Выбор `model=` должен им соответствовать, иначе команда останавливается: `Explicit model selection disagrees with the checkpoint descriptor`.
 
 ## Как выбираются веса
 
@@ -130,9 +130,9 @@ ValueError: Changed ultralytics settings ['epochs'] are inactive for fcos/swin_t
 
 Явно заданные `weights` и `backbone_weights` проверяются перед обучением, уже после создания задачи ClearML (task): `Explicit model weights do not exist: weights/best.pt`.
 
-Для DEIMv2 CY также готовит исходники DEIMv2, если `model.source_dir=null`, и кладёт архив в `CY_HOME/.cache/clearml-yolo/sources/DEIMv2/` (см. [рабочий каталог](../workspace.md) ([workspace](../../GLOSSARY.md#workspace))).
+Для DEIMv2 CY также готовит исходники DEIMv2, если `model.source_dir=null`, и кладёт архив в рабочий каталог ([workspace](../../GLOSSARY.md#workspace)), в `CY_HOME/.cache/clearml-yolo/sources/DEIMv2/` (см. [Рабочий каталог](../workspace.md)).
 
-Подготовка выполняется только для тех весов, которые нужны текущему запуску, и использует уже скачанные файлы из кэшей. Недостающий файл CY скачивает сначала через зеркало, если оно задано, затем по исходному адресу; на каждый адрес — две попытки, каждая не дольше 300 секунд и не больше 4 GiB. Адреса зеркал и токены Hugging Face описаны в [установке](../installation.md). Заранее скачать веса на GPU-хосте можно командой [`cy-download-weights`](../commands/cy-download-weights.md).
+Подготовка выполняется только для тех весов, которые нужны текущему запуску, и использует уже скачанные файлы из кэшей. Недостающий файл CY скачивает сначала через зеркало весов ([weight mirror](../../GLOSSARY.md#weight-mirror)), если оно задано, затем по исходному адресу; на каждый адрес — две попытки, каждая не дольше 300 секунд и не больше 4 GiB. Адреса зеркал весов и токены Hugging Face описаны в [установке](../installation.md). Заранее скачать веса на GPU-хосте можно командой [`cy-download-weights`](../commands/cy-download-weights.md).
 
 ### Если весов нет
 

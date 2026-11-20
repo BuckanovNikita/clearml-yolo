@@ -10,9 +10,9 @@
 
 | Файл | Содержимое |
 | --- | --- |
-| `metrics_best_confidences_val.csv` | Порог уверенности для каждого класса, подобранный на `val`: колонки `class_name`, `confidence`. Один файл на запуск |
-| `full_dashboard_<split>.xlsx` | Полная таблица метрик по классам |
-| `метрики_дтрк_<split>.xlsx` | Таблица метрик ДТРК, которую строит digital-metrics |
+| `metrics_best_confidences_val.csv` | Подобранные пороги ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)): порог уверенности для каждого класса, подобранный на `val` (при `confidence_optimization=global` в [группе `evaluation`](../configuration/evaluation.md) у всех классов одно значение); колонки `class_name`, `confidence`. Один файл на запуск |
+| `full_dashboard_<split>.xlsx` | Дашборд ([dashboard](../../GLOSSARY.md#dashboard)): полная таблица метрик по классам |
+| `метрики_дтрк_<split>.xlsx` | Дашборд ДТРК, который строит digital-metrics |
 | `matrix_<split>.xlsx` | Матрица ошибок (confusion matrix) |
 | `recall_confidence_intervals_<split>.png`, `precision_confidence_intervals_<split>.png`, `perebrak_confidence_intervals_<split>.png`, `nedobrak_confidence_intervals_<split>.png` | Графики доверительных интервалов |
 | `metrics_evaluation_<split>.xlsx` | Сводная книга, листы описаны ниже |
@@ -54,7 +54,7 @@
 
 | Файл | Содержимое |
 | --- | --- |
-| `full_dashboard_baseline_<split>.xlsx`, `full_dashboard_candidate_<split>.xlsx` | Таблицы метрик каждой модели; рядом такие же `метрики_дтрк_...`, `matrix_...` и графики с суффиксом `baseline_<split>` или `candidate_<split>` |
+| `full_dashboard_baseline_<split>.xlsx`, `full_dashboard_candidate_<split>.xlsx` | Дашборды каждой модели; рядом такие же `метрики_дтрк_...`, `matrix_...` и графики с суффиксом `baseline_<split>` или `candidate_<split>` |
 | `baseline_predictions_<split>_<хэш>.csv`, `candidate_predictions_<split>_<хэш>.csv` | [Предсказания](predictions.md) каждой модели |
 | `compare_workbook_<split>.xlsx` | Статистическое сравнение моделей |
 | `compare_workbook_<split>_excluded.csv` | Классы, исключённые из сравнения, и причины |
@@ -65,17 +65,17 @@
 
 Поля `comparison_manifest.json`: `split`, `baseline_dashboard`, `candidate_dashboard`, `baseline_predictions`, `candidate_predictions`, `statistical_workbook` (имена файлов в том же каталоге), `baseline_identity`, `candidate_identity`.
 
-Сравнение пропускается, если [baseline](../../GLOSSARY.md#baseline) задан только тегом `prod` (без task ID, проекта, имени задачи и весов) и в проекте нет завершённой задачи с этим тегом. Тогда `cy-compare` оценивает только кандидата: пишет `full_dashboard_candidate_<split>.xlsx` с соседними файлами и `candidate_predictions_<split>_<хэш>.csv`, а вместо `compare_workbook_<split>.xlsx` и `comparison_manifest.json` — книгу кандидата `compare_evaluation_candidate_<split>.xlsx` с листами `Classes`, `Summary` и `Dataset counts`. Рядом лежат `compare_evaluation_candidate_<split>_thresholds.csv` (`class_name`, `confidence`) и `compare_evaluation_candidate_<split>_methodology.csv` с колонками `status` (`skipped`), `reason` и описанием модели-кандидата ([candidate model](../../GLOSSARY.md#candidate-model)). Без манифеста ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) `cy-report` по такому каталогу не запускается.
+Сравнение пропускается, если [baseline](../../GLOSSARY.md#baseline) задан только тегом `prod` (без task ID, проекта, имени задачи и весов) и в проекте нет завершённой задачи ClearML (task) с этим тегом. Тогда `cy-compare` оценивает только модель-кандидат ([candidate model](../../GLOSSARY.md#candidate-model)): пишет `full_dashboard_candidate_<split>.xlsx` с соседними файлами и `candidate_predictions_<split>_<хэш>.csv`, а вместо `compare_workbook_<split>.xlsx` и `comparison_manifest.json` — книгу кандидата `compare_evaluation_candidate_<split>.xlsx` с листами `Classes`, `Summary` и `Dataset counts`. Рядом лежат `compare_evaluation_candidate_<split>_thresholds.csv` (`class_name`, `confidence`) и `compare_evaluation_candidate_<split>_methodology.csv` с колонками `status` (`skipped`), `reason` и описанием модели-кандидата. Без манифеста сравнения ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) `cy-report` по такому каталогу не запускается.
 
 ## Отчёт: `cy-report`
 
-[`cy-report`](../commands/cy-report.md) читает `comparison_manifest.json` из каталога `comparison_dir` и две книги `full_dashboard_...`, на которые он ссылается. Без манифеста команда останавливается: `Comparison directory <каталог> has no comparison_manifest.json; run cy-compare first`. Если книги из манифеста нет в каталоге: `Comparison candidate dashboard does not exist: <путь>` (или `baseline dashboard`). Вместо таблиц метрик нельзя подать `compare_workbook_<split>.xlsx`: `The candidate input is not a per-model metrics dashboard: ... Use the candidate and baseline dashboards, not the statistical comparison workbook.`
+[`cy-report`](../commands/cy-report.md) читает `comparison_manifest.json` из каталога `comparison_dir` и две книги `full_dashboard_...`, на которые он ссылается. Без манифеста команда останавливается: `Comparison directory <каталог> has no comparison_manifest.json; run cy-compare first`. Если книги из манифеста нет в каталоге: `Comparison candidate dashboard does not exist: <путь>` (или `baseline dashboard`). Вместо дашбордов нельзя подать `compare_workbook_<split>.xlsx`: `The candidate input is not a per-model metrics dashboard: ... Use the candidate and baseline dashboards, not the statistical comparison workbook.`
 
 Команда пишет две книги:
 
 | Файл | Листы по умолчанию |
 | --- | --- |
-| `report_dev_<split>.xlsx` | `Новая модель` (кандидат), `Прод модель` (baseline), `Сравнение`, `Удаленные классы` |
+| `report_dev_<split>.xlsx` | `Новая модель` (модель-кандидат), `Прод модель` (baseline), `Сравнение`, `Удаленные классы` |
 | `report_business_<split>.xlsx` | `Новая модель`, `Прод модель`, `Сравнение`, `Вердикт`, `Удаленные классы` |
 
 Имена листов можно переопределить в разделе `sheet_names` YAML-файла, путь к которому задаёт ключ `report_config_path`.
@@ -97,8 +97,8 @@ candidate: my-run
 Training task: open in ClearML
 ```
 
-- Первая строка — роль и имя модели. Если модель зарегистрирована в ClearML и ссылка на неё известна, строка — ссылка.
-- Вторая строка — ссылка `Training task: open in ClearML` на задачу ClearML (task) обучения, если известны её ID и ссылка. Если ID известен, а ссылки нет, — `Training source: recorded`, если ID неизвестен, — `Training source: unavailable`.
+- Первая строка — роль и подпись модели. Если модель зарегистрирована в ClearML и ссылка на неё известна, строка — ссылка.
+- Вторая строка — ссылка `Training task: open in ClearML` на задачу ClearML обучения, если известны её ID и ссылка. Если ID известен, а ссылки нет, — `Training source: recorded`, если ID неизвестен, — `Training source: unavailable`.
 
 В нижний колонтитул для печати попадает та же подпись в одну строку, роли разделены `|`:
 

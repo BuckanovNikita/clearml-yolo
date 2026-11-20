@@ -44,7 +44,7 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 
 ## Как это работает
 
-1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, пути `dataset_cache_dir`, `ultralytics.project`, `ultralytics.name` и `ultralytics.save_dir` внутри `CY_HOME` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home) ([workspace](../../GLOSSARY.md#workspace))). Ошибка на этом шаге останавливает команду до создания задачи ClearML. Пустой `ultralytics.model`, `ultralytics.resume` и список `required_splits` проверяются позже, уже после создания задачи.
+1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) для `dataset_cache_dir`, `ultralytics.project`, `ultralytics.name` и `ultralytics.save_dir` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Ошибка на этом шаге останавливает команду до создания задачи ClearML. Пустой `ultralytics.model`, `ultralytics.resume` и список `required_splits` проверяются позже, уже после создания задачи.
 2. CY создаёт задачу ClearML, публикует в неё конфигурацию (см. [Публикация](../publication.md)) и готовит веса (weights) выбранной модели, как описано в [Как выбираются веса](../configuration/model.md#как-выбираются-веса). В отличие от `cy`, остальные модели из списка CY не готовятся.
 3. CY выбирает каталог обучения ([training directory](../../GLOSSARY.md#training-directory)):
    - если задан `ultralytics.project` — этот каталог;
@@ -71,7 +71,7 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 
 Без `ultralytics.project` и `ultralytics.name` для YOLO это `runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt`. Если обучение не оставило этого файла, команда завершается ошибкой.
 
-В checkpoint DEIMv2, RF-DETR, Faster R-CNN и FCOS CY встраивает описание модели: семейство, preset, классы и параметры предобработки. Рядом CY пишет `<имя checkpoint>.model.json` с тем же описанием и SHA-256 файла. Если этот файл лежит рядом, он должен совпадать с checkpoint, иначе команда, которая читает веса, останавливается: `Checkpoint hash disagrees with its stored descriptor`. Изменив checkpoint, удалите старый `.model.json`.
+В checkpoint DEIMv2, RF-DETR, Faster R-CNN и FCOS CY встраивает описание модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)): семейство, preset, классы и параметры предобработки. Рядом CY пишет `<имя checkpoint>.model.json` с тем же описанием и SHA-256 файла. Если этот файл лежит рядом, он должен совпадать с checkpoint, иначе команда, которая читает веса, останавливается: `Checkpoint hash disagrees with its stored descriptor`. Изменив checkpoint, удалите старый `.model.json`.
 
 Что публикуется в ClearML, описано в [Публикации](../publication.md).
 
@@ -89,8 +89,8 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 | `Missing mandatory value: ground_truth` | Не задан `ground_truth` |
 | `Changed ultralytics settings ['epochs'] are inactive for deimv2/s; use model.train instead` | Для семейства, отличного от Ultralytics, изменён ключ `ultralytics`; задайте его в `model.train` |
 | `Legacy queue/autogpu controls are removed from direct cy commands. ...` | Заданы `queue`, `autogpu` или `auto_gpu`. Уберите их; постановка в очередь описана в [Очереди](../queue.md) |
-| `Project write destination /etc/x must be contained beneath CY_HOME=/workspace/project; ...` | `ultralytics.project`, `dataset_cache_dir` или другой путь записи вне рабочего каталога |
-| `dataset_cache_dir must be outside the run-owned training project` | Кэш датасета внутри каталога обучения |
+| `Project write destination /etc/x must be contained beneath CY_HOME=/workspace/project; ...` | `ultralytics.project`, `dataset_cache_dir` или другой путь записи вне рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) |
+| `dataset_cache_dir must be outside the run-owned training project` | `dataset_cache_dir` внутри каталога обучения |
 | `Changed model.train settings ['epochs'] are inactive for ultralytics; use ultralytics instead` | Для семейства Ultralytics изменён ключ `model.train`; задайте его в группе `ultralytics` |
 | `Global training batch must be positive and divisible by GPU count` | Для семейства, отличного от Ultralytics, batch size в `model.train.batch` не делится на число GPU в `model.train.device` |
 | `Unsupported required split(s): foo; expected train, val, or test` | В `required_splits` указан неизвестный split |

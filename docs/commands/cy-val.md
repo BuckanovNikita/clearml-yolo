@@ -36,9 +36,9 @@ cy-val [--config-dir configs] [ключ=значение ...]
 | `ultralytics` | см. страницу группы | Источник значений, которые наследует `ultralytics_predict`. См. [группа `ultralytics`](../configuration/ultralytics.md). |
 | `ultralytics_predict` | см. страницу группы | Параметры предсказания Ultralytics YOLO. См. [группа `ultralytics_predict`](../configuration/ultralytics-predict.md). |
 | `weights` | `null` | Веса: путь, ID задачи ClearML или `clearml://<ID модели>`. Выбираются так же, как в [`cy-predict`](cy-predict.md#как-выбираются-веса). |
-| `model_label` | `null` | Имя модели, если происхождение весов неизвестно, см. [`cy-predict`](cy-predict.md#model_label). |
+| `model_label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)), если происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)) неизвестно, см. [`cy-predict`](cy-predict.md#model_label). |
 | `ground_truth` | обязателен | Разметка, см. [Разметка](../formats/ground-truth.md). |
-| `output_dir` | `null` | Каталог результатов. `null` — подкаталог `val` каталога запуска ([run directory](../../GLOSSARY.md#run-directory)) задачи: `runs/<проект>/<имя задачи>-<ID задачи>/val`, где имя задачи — `<clearml.task_name>/val` (см. [Рабочий каталог](../workspace.md#runs) ([workspace](../../GLOSSARY.md#workspace)) и [Публикация](../publication.md#задача-clearml)). Должен лежать внутри `CY_HOME`. |
+| `output_dir` | `null` | Каталог результатов. `null` — подкаталог `val` каталога запуска ([run directory](../../GLOSSARY.md#run-directory)) задачи: `runs/<проект>/<имя задачи>-<ID задачи>/val`, где имя задачи — `<clearml.task_name>/val` (см. [Рабочий каталог](../workspace.md#runs) и [Публикация](../publication.md#задача-clearml)). Должен лежать внутри `CY_HOME`. |
 | `splits` | `[train,val,test]` | Split, для которых считаются метрики. Каждый должен быть в разметке. |
 | `evaluation` | см. страницу группы | Правила сопоставления и метрик. См. [группа `evaluation`](../configuration/evaluation.md). |
 | `clearml` | см. страницу группы | Задача ClearML. См. [группа `clearml`](../configuration/clearml.md). |
@@ -50,7 +50,7 @@ cy-val [--config-dir configs] [ключ=значение ...]
 1. Hydra собирает конфигурацию, команда проверяет ключи и пути записи, затем создаёт задачу ClearML. Если `output_dir` не задан, он выбирается по имени и ID задачи.
 2. Если `ground_truth` ссылается на датасет ClearML, он скачивается.
 3. Выполняется предсказание как в [`cy-predict`](cy-predict.md#как-это-работает) для split `val` и всех split из `splits` (повторы убираются, `val` идёт первым). Результат — `<output_dir>/predictions.csv`.
-4. Пороги уверенности подбираются на `val` и с ними считаются метрики для каждого split из `splits`, как в [`cy-metrics`](cy-metrics.md). Результаты пишутся в `<output_dir>/metrics/`.
+4. Пороги уверенности подбираются на `val`, и с подобранными порогами ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)) считаются метрики для каждого split из `splits`, как в [`cy-metrics`](cy-metrics.md). Результаты пишутся в `<output_dir>/metrics/`.
 
 ### Чем `cy-val` отличается от `cy-predict` + `cy-metrics`
 

@@ -51,7 +51,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 | `run_id` | `null` | Имя каталога запуска: `runs/<run_id>` в рабочем каталоге ([workspace](../../GLOSSARY.md#workspace)) |
 | `run_dir` | `null` | Путь к каталогу запуска внутри `CY_HOME`. Имеет приоритет над `run_id` |
 | `weights` | `null` | Checkpoint для этапов после обучения. Допустим только вместе с `skip_train=true` |
-| `model_label` | `null` | Имя модели для предсказаний и метрик, когда CY не знает происхождения checkpoint (например, файла `weights`, обученного вне CY) |
+| `model_label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)) для предсказаний и метрик, когда происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)) неизвестно (например, файла `weights`, обученного вне CY) |
 | `skip_train` | `false` | Пропустить обучение |
 | `skip_predict` | `false` | Пропустить предсказания |
 | `skip_metrics` | `false` | Пропустить метрики |
@@ -67,7 +67,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 
 ## Как это работает
 
-1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, пути записи внутри `CY_HOME` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Ошибка на этом шаге останавливает команду до создания задачи ClearML.
+1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Ошибка на этом шаге останавливает команду до создания задачи ClearML.
 2. CY создаёт задачу ClearML и публикует в неё конфигурацию (см. [Публикация](../publication.md)).
 3. CY готовит предобученные веса всех моделей из своего списка в кэше рабочего каталога. Попытка запоминается в `.cache/clearml-yolo/preparation/`, и следующие запуски её не повторяют. Ошибка подготовки не останавливает запуск: CY пишет предупреждение `Model preparation <модель>: <сообщение>`. Повторить подготовку можно командой [`cy-download-weights`](cy-download-weights.md). Затем CY готовит веса выбранной модели, как описано в [Как выбираются веса](../configuration/model.md#как-выбираются-веса); здесь ошибка останавливает команду.
 4. CY выбирает каталог запуска:
@@ -78,9 +78,9 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
    Здесь же, уже после создания задачи ClearML, CY проверяет `weights` без `skip_train=true`, `dataset_cache_dir` внутри каталога запуска и ключи `project`, `name`, `save_dir` групп Ultralytics. Затем каталог создаётся, и ссылка `runs/latest` переводится на него, если каталог лежит в рабочем каталоге.
 5. **Обучение** (если не `skip_train`). Разметка проверяется и собирается в рабочую копию датасета (см. [Датасеты](../formats/datasets.md)). Обучение требует изображений в split `train` и `val`; если включены предсказания или метрики — ещё во всех split из `splits`; если включено сравнение — ещё в `test`. Результат пишется в `<каталог запуска>/detect/train/`. Имя лучшего checkpoint зависит от семейства моделей (см. [`cy-train`](cy-train.md#результат)); для YOLO это `detect/train/weights/best.pt`. Если файла нет или он пустой, команда завершается ошибкой.
 6. **Предсказания** (если не `skip_predict`) для split `val` и всех split из `splits` пишутся в `<каталог запуска>/predictions.csv` (формат — [Предсказания](../formats/predictions.md)). Используется checkpoint из шага 5, а при `skip_train=true` — `weights` или, без него, `detect/train/weights/best.pt` каталога запуска.
-7. **Метрики** (если не `skip_metrics`) по `predictions.csv` пишутся в `<каталог запуска>/metrics/`. Пороги уверенности подбираются на `val` (см. [`evaluation`](../configuration/evaluation.md#пороги-уверенности)), и подобранные пороги сохраняются в `metrics/frozen_thresholds.json`.
+7. **Метрики** (если не `skip_metrics`) по `predictions.csv` пишутся в `<каталог запуска>/metrics/`. Пороги уверенности подбираются на `val` (см. [`evaluation`](../configuration/evaluation.md#пороги-уверенности)), и подобранные пороги ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)) сохраняются в `metrics/frozen_thresholds.json`.
 8. **Сравнение** (если не `skip_compare`) на split `test` пишется в `<каталог запуска>/comparison/`. Модель-кандидат ([candidate model](../../GLOSSARY.md#candidate-model)) — эта задача ClearML, если обучение было в этом запуске, иначе локальный checkpoint с порогами из шага 7 (или из `metrics/frozen_thresholds.json` при `skip_metrics=true`). Предсказания сравнения строятся с `conf`, `iou`, `imgsz`, `batch` и `device` из настроек предсказания. Baseline:
-   - по умолчанию — последняя завершённая задача ClearML с тегом `prod` в проекте `clearml.project_name`, кроме текущей. Если такой нет, сравнение пропускается: кандидат оценивается на `test` один, отчёт не строится, команда продолжается;
+   - по умолчанию — последняя завершённая задача ClearML с тегом `prod` в проекте `clearml.project_name`, кроме текущей. Если такой нет, сравнение пропускается: модель-кандидат оценивается на `test` одна, отчёт не строится, команда продолжается;
    - если `compare.baseline_model` задан иначе и модель не найдена, этап сравнения завершается ошибкой `No completed ClearML task in project 'my-project' tagged ['my-tag']`.
 9. **Отчёт** (если не `skip_report`) строится по `comparison/` и пишется в `<каталог запуска>/reports/` (см. [Книги Excel](../formats/workbooks.md)). Он требует успешного сравнения в этом же запуске; исключение — `skip_train=true skip_compare=true`: тогда отчёт строится по `comparison/`, оставшемуся в каталоге запуска от прошлого запуска.
 10. **Визуализация**: если предсказания доступны, CY публикует разметку, предсказания и оценки в FiftyOne (см. [Публикация](../publication.md#fiftyone)).
@@ -107,7 +107,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 | `skip_compare=true` | Обучение, предсказания и метрики, без сравнения и отчёта |
 | `skip_report=true` | Всё, кроме отчёта |
 
-При `skip_train=true` без `weights` нужен `run_id` или `run_dir` прошлого запуска: в новом каталоге checkpoint нет, и этап предсказаний завершается ошибкой.
+При `skip_train=true` без `weights` нужен `run_id` или `run_dir` прошлого запуска: в новом каталоге checkpoint нет, и этап предсказания завершается ошибкой.
 
 ### Семейства моделей
 
@@ -180,12 +180,12 @@ visualization: failed — <сообщение ошибки>
 | `Project write destination /etc/x must be contained beneath CY_HOME=/workspace/project; ...` | `run_dir`, `dataset_cache_dir` или каталог Ultralytics вне рабочего каталога |
 | `Changed ultralytics settings ['epochs'] are inactive for deimv2/s; use model.train instead` | Для семейства, отличного от Ultralytics, изменён ключ `ultralytics`; задайте его в `model.train` |
 | `weights is only valid with skip_train=true; training chooses its model` | `weights` без `skip_train=true`. Модель для обучения задаёт `ultralytics.model` или `model` |
-| `dataset_cache_dir must be outside run_dir` | Кэш датасета внутри каталога запуска |
+| `dataset_cache_dir must be outside run_dir` | `dataset_cache_dir` внутри каталога запуска |
 | `project='other' conflicts with pipeline run_dir; expected /workspace/project/runs/my-run/detect` | Задан `ultralytics.project` или `ultralytics_predict.project` (аналогично `name`). Уберите ключ; путь задаёт `run_dir` |
 | `save_dir conflicts with pipeline run_dir; use run_dir to route outputs` | Задан `save_dir` в группе Ultralytics |
 | `<путь>: required split(s) contain no images: test` | В разметке нет изображений split, который нужен включённым этапам (см. шаг 5). Добавьте split в разметку, уберите его из `splits` или отключите этап, например `skip_compare=true` для `test` |
 | `Training did not produce a usable checkpoint: <путь>` | Обучение не оставило `best.pt` или он пустой |
-| `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Веса без известного происхождения; задайте `model_label` |
+| `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Происхождение модели неизвестно; задайте `model_label` |
 | `No completed ClearML task in project 'my-project' tagged ['my-tag']` | Явно заданный `compare.baseline_model` не найден |
 
 ## См. также

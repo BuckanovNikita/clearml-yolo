@@ -33,7 +33,7 @@ cy-init-config [-h]
 
 | Аргумент | По умолчанию | Описание |
 | --- | --- | --- |
-| `directory` | — | Каталог, в который записываются файлы. Должен лежать внутри `CY_HOME` (см. [правило записи](../workspace.md#правило-записи-внутри-cy_home)). |
+| `directory` | — | Каталог, в который записываются файлы. Должен лежать внутри `CY_HOME` (см. [правило записи внутри `CY_HOME`](../workspace.md#правило-записи-внутри-cy_home) ([write containment rule](../../GLOSSARY.md#write-containment-rule))). |
 | `--command` | `cy` | Команда, для которой создаётся дерево: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-report`, `cy-compare`, `cy-ground-truth`, `cy-export`. |
 | `--model` | `ultralytics`; для `cy-export` — `fasterrcnn/resnet50_fpn` | Модель вида `backend/preset` (см. [Модель](../configuration/model.md)). Другая модель, кроме `ultralytics`, допустима только для команд, которые запускают модель: `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-compare`, `cy-export`. Для `cy-export` — только пресеты Faster R-CNN. |
 | `--force` | выключен | Разрешает заменить существующие файлы примеров. |
@@ -113,7 +113,7 @@ cy-init-config: error: Cannot initialize configuration directory configs: ValueE
 cy-init-config: error: Cannot initialize configuration directory configs: ValueError: cy-export supports only Faster R-CNN presets
 ```
 
-Для `cy-export` укажите пресет `fasterrcnn/...` или не указывайте `--model`.
+Для `cy-export` укажите preset `fasterrcnn/...` или не указывайте `--model`.
 
 ```text
 cy-init-config: error: Cannot initialize configuration directory configs: MissingConfigException: In 'pipeline': Could not find 'model/nope/x'

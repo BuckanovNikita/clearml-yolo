@@ -14,18 +14,18 @@
 
 | Команда | Назначение |
 | --- | --- |
-| `cy` | Пайплайн ([pipeline](../GLOSSARY.md#pipeline)): обучение, предсказания, метрики, отчёт и сравнение в одном запуске |
+| `cy` | Пайплайн ([pipeline](../GLOSSARY.md#pipeline)): обучение (training), предсказания (predictions), метрики, отчёт (report) и сравнение (comparison) в одном запуске |
 | `cy-train` | Обучение |
 | `cy-predict` | Предсказания |
-| `cy-val` | Валидация |
+| `cy-val` | Валидация (validation) |
 | `cy-metrics` | Метрики |
 | `cy-report` | Отчёт |
 | `cy-compare` | Сравнение моделей |
 | `cy-ground-truth` | Подготовка разметки ([ground truth](../GLOSSARY.md#ground-truth)) |
-| `cy-export` | Экспорт |
-| `cy-init-config` | Создание локального дерева конфигурации |
-| `cy-dedup` | Дедупликация файлов кэша |
-| `cy-download-weights` | Заранее скачивает веса и исходники моделей |
+| `cy-export` | Экспорт (export) |
+| `cy-init-config` | Создание локального дерева конфигурации (configuration) |
+| `cy-dedup` | Дедупликация файлов кэша (cache) |
+| `cy-download-weights` | Заранее скачивает веса (weights) и исходники моделей |
 | `cy-batch-estimate` | Оценка batch size |
 
 Первые девять команд — приложения Hydra, они настраиваются через override вида `key=value`; см. [Конфигурация](configuration/README.md). Остальные четыре принимают обычные флаги.
@@ -34,7 +34,7 @@
 
 Команды CY во время работы ничего не устанавливают. Драйверы GPU и TensorRT (нужен только для [`cy-export`](commands/cy-export.md)) ставятся отдельно.
 
-На Linux CY следит за процессами обучения и других тяжёлых этапов через pidfd, поэтому ядро и сборка Python должны поддерживать `os.pidfd_open`, `signal.pidfd_send_signal` и `os.waitid` с `P_PIDFD`. Без этого этап останавливается до начала работы:
+На Linux CY следит за процессами обучения и других тяжёлых этапов ([stage](../GLOSSARY.md#stage)) через pidfd, поэтому ядро и сборка Python должны поддерживать `os.pidfd_open`, `signal.pidfd_send_signal` и `os.waitid` с `P_PIDFD`. Без этого этап останавливается до начала работы:
 
 ```text
 RuntimeError: Process supervision unavailable in /usr/bin/python3: os.pidfd_open failed ([Errno 38] Function not implemented); native work has not started
@@ -64,9 +64,9 @@ WARNING | Git working tree could not be verified for launch directory '/workspac
 | Переменная | По умолчанию | Описание |
 | --- | --- | --- |
 | `CY_HOME` | текущий каталог | Рабочий каталог. |
-| `CY_RUNTIME_TEMP_ROOT` | `CY_HOME/.tmp` | Каталог для временных каталогов `cy-runtime-*`. Относительный путь считается от `CY_HOME`; путь вне `CY_HOME` отклоняется ошибкой `Project write destination ... must be contained beneath CY_HOME=...`, и команда завершается с кодом 1. |
+| `CY_RUNTIME_TEMP_ROOT` | `CY_HOME/.tmp` | Каталог для временных каталогов ([runtime scratch directory](../GLOSSARY.md#runtime-scratch-directory)) `cy-runtime-*`. Относительный путь считается от `CY_HOME`; путь вне `CY_HOME` отклоняется ошибкой `Project write destination ... must be contained beneath CY_HOME=...`, и команда завершается с кодом 1. |
 | `CY_WEIGHTS_DOWNLOAD_TIMEOUT` | `1800` | Лимит в секундах на одну попытку скачать архив весов проекта. Значение должно быть положительным конечным числом, иначе команда завершается с ошибкой `CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds`. |
-| `GHR` | не задана | Корень зеркала GitHub release (например, Files remote в Artifactory). См. [Зеркала весов](#зеркала-весов) ([weight mirror](../GLOSSARY.md#weight-mirror)). |
+| `GHR` | не задана | Корень зеркала весов ([weight mirror](../GLOSSARY.md#weight-mirror)) для файлов GitHub release (например, Files remote в Artifactory). См. [Зеркала весов](#зеркала-весов). |
 | `GH` | не задана | Корень VCS-репозитория Artifactory для скачивания исходников DEIMv2. |
 | `CY_PROGRESS_FILE` | не задана | Путь к JSON-файлу, в который команда записывает текущий прогресс (например, шаг обучения). Путь должен быть внутри `CY_HOME`. |
 | `LOGURU_LEVEL` | `DEBUG` | Наименьший уровень сообщений журнала; например, `INFO` скрывает сообщения `DEBUG`. Значение `TRACE` также включает трассировку операций CY: записи `START`, `DONE`, `FAILED` или `INTERRUPTED` для каждой операции, а в stderr — сообщение `TRACE ACTIVE` о текущей операции каждые 30 секунд и снимок стеков `TRACE STACK snapshot` не чаще раза в 60 секунд, если он изменился. Помогает разобрать зависание. |
@@ -98,7 +98,7 @@ FiftyOne берёт адрес базы данных из своей конфи�
 
 ### Зеркала весов
 
-Веса и исходники моделей по умолчанию скачиваются с GitHub и Hugging Face. Если прямой доступ закрыт, задайте зеркало:
+Веса и исходники моделей по умолчанию скачиваются с GitHub и Hugging Face. Если прямой доступ закрыт, задайте зеркало весов:
 
 ```bash
 export GHR=https://artifactory.example/artifactory/github-files
@@ -106,7 +106,7 @@ export GHR=https://artifactory.example/artifactory/github-files
 
 - `GHR` применяется к ссылкам вида `https://github.com/<owner>/<repo>/releases/download/<tag>/<file>`: CY сначала пробует `GHR` с тем же путём `<owner>/<repo>/releases/download/<tag>/<file>`, затем исходную ссылку GitHub.
 - `GH` применяется только к исходникам DEIMv2: CY запрашивает архив коммита через `<префикс>/api/vcs/downloadCommit/<ключ репозитория>/<owner>/<repo>/<revision>?ext=tar.gz`, где `<ключ репозитория>` — последний сегмент пути в `GH`. Если в `GH` нет такого сегмента, команда завершается ошибкой `GH must identify an Artifactory VCS repository root`.
-- Логин и пароль для зеркала берутся из `~/.netrc` (по хосту) или из адреса вида `https://user:password@host/...`. Прокси задаются стандартными `HTTP_PROXY` и `HTTPS_PROXY`.
+- Логин и пароль для зеркала весов берутся из `~/.netrc` (по хосту) или из адреса вида `https://user:password@host/...`. Прокси задаются стандартными `HTTP_PROXY` и `HTTPS_PROXY`.
 - Для Hugging Face используется `HF_TOKEN` и переменные из таблицы выше. Адрес зеркала Hugging Face (`HF_ENDPOINT`) читает сама библиотека `huggingface_hub`. Если он отличается от `https://huggingface.co`, CY сначала обращается к зеркалу, а при неудаче — к `https://huggingface.co` без токена.
 
 Подробнее о заранее подготовленных весах — на странице [`cy-download-weights`](commands/cy-download-weights.md).

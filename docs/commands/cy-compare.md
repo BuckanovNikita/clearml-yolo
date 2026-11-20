@@ -1,6 +1,6 @@
 # cy-compare
 
-`cy-compare` заново прогоняет две модели — [baseline](../../GLOSSARY.md#baseline) и модель-кандидат ([candidate model](../../GLOSSARY.md#candidate-model)) — на изображениях одного split текущей разметки ([ground truth](../../GLOSSARY.md#ground-truth)), оценивает обе с их собственными порогами уверенности (confidence threshold) и проверяет по каждому классу, значимо ли изменились precision и recall. Команда нужна, чтобы решить, лучше ли новая модель той, что уже работает.
+`cy-compare` заново прогоняет две модели — [baseline](../../GLOSSARY.md#baseline) и модель-кандидат ([candidate model](../../GLOSSARY.md#candidate-model)) — на изображениях одного split текущей разметки ([ground truth](../../GLOSSARY.md#ground-truth)), оценивает обе с их собственными порогами уверенности (confidence threshold) и проверяет по каждому классу, значимо ли изменились precision и recall. Команда нужна, чтобы решить, лучше ли модель-кандидат, чем baseline.
 
 Сравнение (comparison) внутри полного пайплайна ([pipeline](../../GLOSSARY.md#pipeline)) выполняет этап ([stage](../../GLOSSARY.md#stage)) сравнения [`cy`](cy.md); его ключ `compare.baseline_model` устроен так же, как `baseline_model` на этой странице.
 
@@ -38,7 +38,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 | --- | --- | --- |
 | `baseline_model` | см. [ссылку на модель](#ссылка-на-модель-baseline_model-и-candidate_model) ([model reference](../../GLOSSARY.md#model-reference)) | Модель baseline. |
 | `candidate_model` | см. [ссылку на модель](#ссылка-на-модель-baseline_model-и-candidate_model) | Модель-кандидат. |
-| `ground_truth` | `???` (обязателен) | Разметка: путь к CSV ([формат](../formats/ground-truth.md)) или ссылка на датасет ClearML. |
+| `ground_truth` | `???` (обязателен) | Разметка: путь к CSV ([формат](../formats/ground-truth.md)) или ссылка на ClearML Dataset ([ClearML dataset reference](../../GLOSSARY.md#clearml-dataset-reference)). |
 | `output_dir` | `null` | Каталог результатов. При `null` — `runs/<проект>/<задача>-<ID>/compare` в рабочем каталоге ([workspace](../../GLOSSARY.md#workspace), см. [рабочий каталог](../workspace.md)). |
 | `split` | `test` | Split, на котором сравниваются модели. |
 | `model` | `ultralytics` | Семейство моделей ([detector family](../../GLOSSARY.md#detector-family)), которым запускаются обе модели. См. [`model`](../configuration/model.md). |
@@ -77,9 +77,9 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 - `backend` и `preset` задаются вместе или не задаются вовсе. `source_dir`, `class_names` и `preprocessing` без них запрещены.
 - `source=local`: нужны `weights` и непустые `thresholds`; `task_id` запрещён. Пороги должны покрывать все классы, по которым оценивается модель.
 - `source=clearml`: `weights` запрещён.
-- `backend` и `preset` проверяют checkpoint, созданный CY: если они расходятся с описанием, сохранённым в checkpoint, команда завершается ошибкой. То же для `class_names` и `preprocessing`, если они заданы.
-- Сырой checkpoint семейства, отличного от Ultralytics, без сохранённого CY описания требует `backend`, `preset`, `class_names` и `preprocessing`.
-- Не переносите пороги модели baseline на кандидата: у каждой модели свои пороги, подобранные для её checkpoint.
+- `backend` и `preset` проверяют checkpoint, созданный CY: если они расходятся с описанием модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)) в checkpoint, команда завершается ошибкой. То же для `class_names` и `preprocessing`, если они заданы.
+- Сырой checkpoint семейства, отличного от Ultralytics, без описания модели требует `backend`, `preset`, `class_names` и `preprocessing`.
+- Не переносите пороги модели baseline на кандидата: у каждой модели свои подобранные пороги ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)) для её checkpoint.
 
 ## Как это работает
 
@@ -103,9 +103,9 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
     - precision — bootstrap по изображениям: `bootstrap_iterations` выборок с seed `seed`, p-value и доверительный интервал;
     - recall — точный тест Макнемара по рамкам разметки (p-value) и bootstrap (интервал).
 
-    Поправка Benjamini-Hochberg применяется ко всем гипотезам split сразу (precision и recall всех классов). Изменение класса значимо, если скорректированный p-value не больше `q` и изменение не равно нулю: тогда вердикт — улучшение или деградация ([degraded class](../../GLOSSARY.md#degraded-class)) по знаку изменения, иначе — не значимо. Если p-value вычислить нельзя, вердикта нет (`NA` в книге Excel). Строка итога по всем сравниваемым классам в поправку не входит и оценивается по своему p-value.
+    Поправка Benjamini-Hochberg применяется ко всем гипотезам split сразу (precision и recall всех классов). Изменение класса значимо, если скорректированный p-value не больше `q` и изменение не равно нулю: тогда вердикт — улучшение или деградация ([degraded class](../../GLOSSARY.md#degraded-class)) по знаку изменения, иначе — не значимо. Если p-value вычислить нельзя, вердикта нет (`NA` в книге Excel (workbook)). Строка итога по всем сравниваемым классам в поправку не входит и оценивается по своему p-value.
 11. Класс исключается из сравнения, если его не знает хотя бы одна модель, если в split нет его разметки или если ни одна модель его не предсказала. Исключённые классы и причины попадают в отдельную таблицу.
-12. Команда пишет книгу Excel (workbook) сравнения, таблицы и манифест ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) и публикует их в ClearML.
+12. Команда пишет книгу Excel сравнения, таблицы и манифест сравнения ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) и публикует их в ClearML.
 
 ## Результат
 
@@ -122,9 +122,9 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 
 Если сравнение пропущено (шаг 5), команда пишет только файлы кандидата и книгу `compare_evaluation_candidate_<split>.xlsx` вместо `compare_workbook_<split>.xlsx`; рядом лежат `compare_evaluation_candidate_<split>_thresholds.csv` и `compare_evaluation_candidate_<split>_methodology.csv`; манифеста нет (см. [форматы книг Excel](../formats/workbooks.md#сравнение-cy-compare)). В объекте конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `run` задачи записывается `comparison_status` со статусом `skipped` и причиной.
 
-Что попадает в ClearML — артефакты, графики, scalars и объект `run` с разделом `comparison`, — описано в [публикации](../publication.md).
+Что попадает в ClearML — артефакты, графики, скаляры и объект `run` с разделом `comparison`, — описано в [публикации](../publication.md).
 
-Деградация отдельных классов — это результат сравнения, а не ошибка: команда завершается успешно, пишет предупреждение `Split 'test': 2 class(es) significantly degraded` (с вашим split и числом классов), а вердикты видны в книге Excel и в scalars задачи (`degraded_precision`, `degraded_recall`, `improved_precision`, `improved_recall`).
+Деградация отдельных классов — это результат сравнения, а не ошибка: команда завершается успешно, пишет предупреждение `Split 'test': 2 class(es) significantly degraded` (с вашим split и числом классов), а вердикты видны в книге Excel и в скалярах задачи (`degraded_precision`, `degraded_recall`, `improved_precision`, `improved_recall`).
 
 ### Коды завершения
 
@@ -150,8 +150,8 @@ Hydra печатает трассировку; смысл ошибки — в п
 - `Confidence thresholds are missing required class(es): [...]` — в `thresholds` нет порога для класса, по которому оценивается модель.
 - `Prediction ['model'] are owned by comparison; use baseline_model/candidate_model and output_dir` — задан `ultralytics_predict.model` (то же для `project` и `name`). Верните `null`.
 - `Cached prediction provenance refers to a different checkpoint` и `Cached prediction source identity does not match the selected model` — сохранённые предсказания получены другой моделью. Удалите файл или запустите с `inference.reuse_existing=false`.
-- `Raw detector checkpoints require explicit class_names and preprocessing` — сырой checkpoint без описания CY; задайте `class_names` и `preprocessing`.
-- `Model reference disagrees with the checkpoint descriptor` — `backend` или `preset` не совпадают с описанием в checkpoint.
+- `Raw detector checkpoints require explicit class_names and preprocessing` — сырой checkpoint без описания модели; задайте `class_names` и `preprocessing`.
+- `Model reference disagrees with the checkpoint descriptor` — `backend` или `preset` не совпадают с описанием модели в checkpoint.
 - `q must be a finite probability in [0, 1]` — неверный `q`.
 - `Confidence thresholds must be within [0, 1] for class(es): [...]` — порог в `thresholds` вне диапазона от 0 до 1.
 - `A native detector reference requires the detector dispatcher` — в `baseline_model.backend` или `candidate_model.backend` задано семейство, отличное от Ultralytics, а `model` осталось `ultralytics`. Выберите то же семейство в `model`.

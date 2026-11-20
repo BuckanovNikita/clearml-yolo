@@ -80,6 +80,12 @@ What CY knows about where a checkpoint came from: the ClearML task or model it w
 _Russian_: происхождение модели
 _Avoid_: источник весов
 
+<a id="checkpoint-descriptor"></a>
+**Checkpoint descriptor**:
+The detector family, preset, class names and preprocessing that training embeds in a DEIMv2, RF-DETR, Faster R-CNN or FCOS checkpoint, and writes with the checkpoint's SHA-256 to `<checkpoint>.model.json` beside it. Commands that read such a checkpoint require it and check the `model` selection against it.
+_Russian_: описание модели
+_Avoid_: дескриптор, метаданные checkpoint
+
 <a id="model-identity"></a>
 **Model identity**:
 The label of a model and its training source that CY writes into the footer and the hidden metadata of a workbook, and reads back to check that the workbook was not changed.

@@ -47,7 +47,7 @@ ValueError: Unsupported wrapper settings: ['foo']
 cy-train model=rfdetr/small ground_truth=data/ground_truth.csv
 ```
 
-Список доступных вариантов печатает `--help` в разделе `== Configuration groups ==` (строки `model/<backend>: ...`), а описание — страница [model.md](model.md). Профиль аугментаций выбирается так же: `transforms=default` или `transforms=albumentations`, см. [transforms.md](transforms.md).
+Список доступных вариантов печатает `--help` в разделе `== Configuration groups ==` (строки `model/<backend>: ...`), а описание — страница [model.md](model.md). Профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) аугментации выбирается так же: `transforms=default` или `transforms=albumentations`, см. [transforms.md](transforms.md).
 
 ## Какие ключи действуют для какого backend
 
@@ -117,7 +117,7 @@ cy-train --config-dir configs --config-name cy-train ground_truth=data/ground_tr
 | `--cfg hydra` | Настройки Hydra, в том числе каталоги вывода |
 | `--info` | Пути поиска конфигурации и выбранные значения по умолчанию |
 
-`--cfg` ничего не запускает и не создаёт задачу ClearML. Интерполяции вида `${ultralytics.save_txt}` печатаются как есть. Hydra не позволяет сочетать `--cfg` с `-m`.
+`--cfg` ничего не запускает и не создаёт задачу ClearML (task). Интерполяции вида `${ultralytics.save_txt}` печатаются как есть. Hydra не позволяет сочетать `--cfg` с `-m`.
 
 ## Multirun
 
@@ -135,14 +135,14 @@ cy-train -m ground_truth=data/ground_truth.csv ultralytics.epochs=50,100
 
 ## Каталоги Hydra
 
-Hydra не меняет текущий каталог (`hydra.job.chdir=false`). Свои файлы она пишет в:
+Hydra не меняет текущий каталог (`hydra.job.chdir=false`). Свои файлы она пишет в каталоги Hydra ([Hydra output directory](../../GLOSSARY.md#hydra-output-directory)):
 
 | Режим | Каталог |
 | --- | --- |
 | Обычный запуск | `CY_HOME/outputs/<ГГГГ-ММ-ДД>/<ЧЧ-ММ-СС>-<host>-<pid>` |
 | Sweep | `CY_HOME/multirun/<ГГГГ-ММ-ДД>/<ЧЧ-ММ-СС>-<host>-<pid>/<номер задания>` |
 
-Внутри — `.hydra/config.yaml`, `.hydra/hydra.yaml`, `.hydra/overrides.yaml` и журнал `common.log`; для sweep рядом с заданиями лежит `multirun.yaml`. Каталоги можно переопределить через `hydra.run.dir` и `hydra.sweep.dir`, но они, как и любой путь записи, должны быть внутри `CY_HOME` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home) ([workspace](../../GLOSSARY.md#workspace))). Результаты команд пишутся не сюда, а в каталог запуска ([run directory](../../GLOSSARY.md#run-directory)) в `runs/`.
+Внутри — `.hydra/config.yaml`, `.hydra/hydra.yaml`, `.hydra/overrides.yaml` и журнал `common.log`; для sweep рядом с заданиями лежит `multirun.yaml`. Каталоги можно переопределить через `hydra.run.dir` и `hydra.sweep.dir`, но они, как и любой путь записи, должны быть внутри рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) `CY_HOME`: так требует [правило записи внутри `CY_HOME`](../workspace.md#правило-записи-внутри-cy_home) ([write containment rule](../../GLOSSARY.md#write-containment-rule)). Результаты команд пишутся не сюда, а в каталог запуска ([run directory](../../GLOSSARY.md#run-directory)) в `runs/`.
 
 ## Отклонённые ключи очереди
 

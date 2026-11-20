@@ -24,11 +24,11 @@ clearml-yolo (CY) — набор консольных команд для обу
 
 ## Установка
 
-Пакет называется `clearml-yolo` и требует Python `>=3.12.13,<3.14`. Все семейства моделей входят в стандартную установку. Зависимости `digital-metrics` и `report-generator` должны быть доступны в индексе пакетов, из которого вы ставите `clearml-yolo`. Рабочий каталог ([workspace](GLOSSARY.md#workspace), `CY_HOME`), переменные окружения и учётные данные ClearML и FiftyOne описаны в разделе [Установка и окружение](docs/installation.md).
+Пакет называется `clearml-yolo` и требует Python `>=3.12.13,<3.14`. Все семейства моделей входят в стандартную установку. Зависимости `digital-metrics` и `report-generator` должны быть доступны в индексе пакетов, из которого вы ставите `clearml-yolo`. Рабочий каталог ([workspace](GLOSSARY.md#workspace), `CY_HOME`), переменные окружения (environment variable) и учётные данные ClearML и FiftyOne описаны в разделе [Установка и окружение](docs/installation.md).
 
 ## Первый запуск
 
-Нужны YOLO-датасет, описанный файлом `data/dataset.yaml`, и доступ к серверу ClearML: ключи доступа задаются в `~/clearml.conf` или переменными окружения (environment variable), см. [Установка и окружение](docs/installation.md#учётные-данные).
+Нужны YOLO-датасет, описанный файлом `data/dataset.yaml`, и доступ к серверу ClearML: ключи доступа задаются в `~/clearml.conf` или переменными окружения, см. [Установка и окружение](docs/installation.md#учётные-данные).
 
 ```bash
 export CY_HOME=/workspace/project CLEARML_API_HOST=https://clearml.example.com

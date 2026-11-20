@@ -28,7 +28,7 @@ cy-predict weights=<task-id> ground_truth=data/ground_truth.csv output=runs/my-r
 cy-predict [--config-dir configs] [ключ=значение ...]
 ```
 
-Команда — приложение Hydra: она принимает переопределения (override) `ключ=значение` поверх собранной конфигурации. Синтаксис переопределений, `--config-dir`, `--cfg job` и `--multirun` описаны в разделе [Конфигурация](../configuration/README.md).
+Команда — приложение Hydra: она принимает override `ключ=значение` поверх собранной конфигурации. Синтаксис override, `--config-dir`, `--cfg job` и `--multirun` описаны в разделе [Конфигурация](../configuration/README.md).
 
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ cy-predict [--config-dir configs] [ключ=значение ...]
 | `ultralytics` | см. страницу группы | Параметры обучения Ultralytics. В `cy-predict` нужны только как источник значений, которые `ultralytics_predict` наследует через `${ultralytics.…}`, например `imgsz`. См. [группа `ultralytics`](../configuration/ultralytics.md). |
 | `ultralytics_predict` | см. страницу группы | Параметры предсказания Ultralytics YOLO. См. [группа `ultralytics_predict`](../configuration/ultralytics-predict.md). |
 | `weights` | `null` | Веса для предсказания: путь к файлу, ID задачи ClearML или ссылка `clearml://<ID модели>`. См. [Как выбираются веса](#как-выбираются-веса). |
-| `model_label` | `null` | Имя модели в результатах, если происхождение весов неизвестно. См. [`model_label`](#model_label). |
+| `model_label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)) в результатах, если происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)) неизвестно. См. [`model_label`](#model_label). |
 | `ground_truth` | обязателен | Разметка: путь к CSV или ссылка на датасет ClearML. Формат — [Разметка](../formats/ground-truth.md). |
 | `output` | `null` | Путь CSV с предсказаниями. `null` — `predict.csv` в каталоге запуска, см. [Результат](#результат). Путь должен лежать внутри `CY_HOME`. |
 | `splits` | `null` | Список split, для изображений которых строятся предсказания, например `splits=[val,test]`. `null` — все изображения разметки. |
@@ -60,13 +60,13 @@ cy-predict [--config-dir configs] [ключ=значение ...]
 3. `clearml://<ID модели>` — модель из реестра моделей ClearML. CY скачивает её и, если в модели записан SHA-256, сверяет его с файлом.
 4. Иное значение (например имя `yolo11n.pt`) передаётся Ultralytics, который ищет или скачивает веса сам.
 
-Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит своё семейство и preset. При `model=` такого семейства checkpoint обязан содержать это описание, и оно должно совпадать с выбранными семейством и preset (см. [группа `model`](../configuration/model.md)). При `model=ultralytics` checkpoint без такого описания обрабатывается Ultralytics.
+Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит описание модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)): семейство, preset, классы и предобработку. При `model=` такого семейства checkpoint обязан содержать описание модели, и оно должно совпадать с выбранными семейством и preset (см. [группа `model`](../configuration/model.md)). При `model=ultralytics` checkpoint без такого описания обрабатывается Ultralytics.
 
 ### `model_label`
 
-Каждый результат привязывается к происхождению модели ([model provenance](../../GLOSSARY.md#model-provenance)). Происхождение известно, если веса взяты из задачи или модели ClearML, или если рядом с локальным файлом лежит `<имя файла>.identity.json`, который CY пишет при публикации весов обучения. В этих случаях `model_label` не используется.
+Каждый результат привязывается к происхождению модели. Происхождение известно, если веса взяты из задачи или модели ClearML, или если рядом с локальным файлом лежит `<имя файла>.identity.json`, который CY пишет при публикации весов обучения. В этих случаях `model_label` не используется.
 
-Для любого другого файла `model_label` обязателен, иначе команда останавливается: `Model provenance is unavailable; supply a custom model_label (comparison model references use label)`. Тогда имя модели — значение `model_label`, а в провенанс записывается SHA-256 файла.
+Для любого другого файла `model_label` обязателен, иначе команда останавливается: `Model provenance is unavailable; supply a custom model_label (comparison model references use label)`. Тогда подпись модели — значение `model_label`, а в происхождение модели записывается SHA-256 файла.
 
 ### Параметры предсказания по семействам
 
@@ -77,7 +77,7 @@ Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит �
 
 ## Как это работает
 
-1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет ключи, форму значения `ground_truth`, неактивные группы семейства и что все пути записи лежат внутри `CY_HOME` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home) ([workspace](../../GLOSSARY.md#workspace))).
+1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет ключи, форму значения `ground_truth`, неактивные группы семейства и пути записи по правилу записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)).
 2. Создаётся задача ClearML. Если `output` не задан, путь CSV выбирается после этого, по имени и ID задачи.
 3. Если `ground_truth` ссылается на датасет ClearML, он скачивается.
 4. Веса разрешаются (см. выше) и для них определяется происхождение модели.
@@ -135,7 +135,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 ValueError: Project write destination /elsewhere/x.csv must be contained beneath CY_HOME=/workspace/project; choose a destination inside CY_HOME or select the intended project workspace. External input and library configuration paths remain supported.
 ```
 
-`output` лежит вне рабочего каталога. Укажите путь внутри `CY_HOME`.
+`output` лежит вне рабочего каталога ([workspace](../../GLOSSARY.md#workspace)). Укажите путь внутри `CY_HOME`.
 
 ```text
 ValueError: No ground-truth rows for splits ['test']
@@ -147,13 +147,13 @@ ValueError: No ground-truth rows for splits ['test']
 ValueError: Model provenance is unavailable; supply a custom model_label (comparison model references use label)
 ```
 
-Происхождение локального файла весов неизвестно. Добавьте `model_label=my-model`.
+Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`.
 
 ```text
 ValueError: Native detector weights require a bound checkpoint descriptor; raw comparison weights require explicit ModelRef metadata
 ```
 
-Выбрано семейство, кроме Ultralytics YOLO, а checkpoint не содержит описания семейства и preset. Используйте checkpoint, записанный обучением CY для этого семейства.
+Выбрано семейство, кроме Ultralytics YOLO, а checkpoint не содержит описания модели. Используйте checkpoint, записанный обучением CY для этого семейства.
 
 ```text
 ValueError: Explicit model selection disagrees with the checkpoint descriptor

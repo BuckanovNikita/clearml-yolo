@@ -9,7 +9,7 @@
 ## Кто пишет и кто читает
 
 - Пишет: [`cy-batch-estimate`](../commands/cy-batch-estimate.md) после измерения на GPU, а также вы сами.
-- Читают: обучение в [`cy-train`](../commands/cy-train.md) и [`cy`](../commands/cy.md), когда batch равен `null`: ключ `ultralytics.batch` для Ultralytics (см. [Ultralytics](../configuration/ultralytics.md)), `model.train.batch` для остальных семейств (см. [Модель](../configuration/model.md)). По умолчанию оба ключа заданы числом, поэтому таблица не используется, пока вы не передадите, например, `ultralytics.batch=null`. Ещё таблицу читает `cy-batch-estimate --list` для отчёта о покрытии.
+- Читают: обучение в [`cy-train`](../commands/cy-train.md) и [`cy`](../commands/cy.md), когда batch равен `null`: ключ `ultralytics.batch` для Ultralytics (см. [Ultralytics](../configuration/ultralytics.md)), `model.train.batch` для остальных семейств моделей ([detector family](../../GLOSSARY.md#detector-family)) (см. [Модель](../configuration/model.md)). По умолчанию оба ключа заданы числом, поэтому таблица не используется, пока вы не передадите, например, `ultralytics.batch=null`. Ещё таблицу читает `cy-batch-estimate --list` для отчёта о покрытии.
 
 Рядом `cy-batch-estimate` хранит `batch-estimates.json` с подробными результатами измерений. Это не таблица для правки: обучение его не читает.
 
@@ -50,7 +50,7 @@ NVIDIA GeForce RTX 4090 [24 GiB]:
 
 ## Как обучение выбирает batch
 
-Модель берётся из конфигурации: для Ultralytics из `ultralytics.model` (`yolo11n.pt` соответствует `ultralytics/yolo11n`), для остальных семейств из `model.backend` и `model.preset`. Если `device` не задан, обучение использует GPU с индексом 0. Для каждой выбранной GPU обучение ищет запись с тем же размером изображения и той же моделью:
+Модель берётся из конфигурации: для Ultralytics из `ultralytics.model` (`yolo11n.pt` соответствует `ultralytics/yolo11n`), для остальных семейств моделей из `model.backend` и `model.preset`. Если `device` не задан, обучение использует GPU с индексом 0. Для каждой выбранной GPU обучение ищет запись с тем же размером изображения и той же моделью:
 
 1. Точное совпадение: то же имя GPU и тот же объём памяти. Если таких записей несколько, берётся наименьший batch.
 2. Если точной записи нет, а в метаданных записано, что модель не помещается на эту GPU, обучение останавливается: `No training batch table entry: Confirmed no_capacity for ultralytics/yolo11n at 640 on NVIDIA GeForce RTX 4090; remeasure or add an exact entry. Run cy-batch-estimate --imgsz 640 --models ultralytics/yolo11n using the assigned GPUs, or set an explicit training batch.` Ваша ручная точная запись снимает этот запрет.

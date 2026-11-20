@@ -1,6 +1,6 @@
 # Группа `transforms`
 
-Группа конфигурации (config group) `transforms` выбирает, какая аугментация (augmentation) применяется при обучении: встроенная аугментация семейства моделей ([detector family](../../GLOSSARY.md#detector-family)) или ваш пайплайн (pipeline) Albumentations из JSON-файла. Группа есть только у команд, которые обучают модель: [`cy`](../commands/cy.md) и [`cy-train`](../commands/cy-train.md). Остальные команды отвергают `transforms=...` ошибкой Hydra `Could not override 'transforms'. No match in the defaults list.`
+Группа конфигурации (config group) `transforms` выбирает, какая аугментация (augmentation) применяется при обучении: встроенная аугментация семейства моделей ([detector family](../../GLOSSARY.md#detector-family)) или ваш пайплайн аугментаций Albumentations из JSON-файла. Группа есть только у команд, которые обучают модель: [`cy`](../commands/cy.md) и [`cy-train`](../commands/cy-train.md). Остальные команды отвергают `transforms=...` ошибкой Hydra `Could not override 'transforms'. No match in the defaults list.`
 
 ## Примеры
 
@@ -48,7 +48,7 @@ Value error, Select transforms=albumentations before providing a pipeline
 
 ## Что отключается при `transforms=albumentations`
 
-Чтобы аугментация не применялась дважды, профиль `albumentations` переписывает встроенные настройки выбранного семейства. Значения подставляются автоматически отдельной группой `transform_overrides` (её выбирает CY по `model` и `transforms`; вручную её не задают).
+Чтобы аугментация не применялась дважды, профиль `albumentations` переписывает встроенные настройки выбранного семейства. Значения подставляются автоматически отдельной группой `transform_overrides` (её выбирает CY по `model` и `transforms`; вручную её не задавайте).
 
 | Семейство | Куда пишется | Значения |
 | --- | --- | --- |

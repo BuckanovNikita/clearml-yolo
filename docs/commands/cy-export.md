@@ -37,15 +37,15 @@ cy-export [ключ=значение ...]
 | `model` | `fasterrcnn/resnet50_fpn` | Семейство моделей ([detector family](../../GLOSSARY.md#detector-family)) и preset, см. [`model`](../configuration/model.md). Допустимы только варианты `fasterrcnn/*`. Из группы используются `model.predict.conf`, `model.predict.iou` и `model.predict.max_det`: при `export.operation=onnx` они встраиваются в граф. |
 | `export.operation` | `onnx` | Операция: `onnx`, `build` или `verify`, см. [Как это работает](#как-это-работает). |
 | `export.device` | `cpu` | Устройство. Для `onnx` — только `cpu`. Для `build` и `verify` — ровно один GPU: `0`, `cuda:0`, `cuda` или `-1` (последние два означают GPU 0), список из одного элемента (`[0]`). |
-| `export.precision` | `fp32` | `fp32` или `fp16`. Для `onnx` — только `fp32`. Для `build` — точность движка. Для `verify` должна совпадать с точностью, записанной в метаданных движка. |
+| `export.precision` | `fp32` | `fp32` или `fp16`. Для `onnx` — только `fp32`. Для `build` — точность движка. Для `verify` должна совпадать с точностью, записанной в метаданных экспорта ([export metadata](../../GLOSSARY.md#export-metadata)) движка. |
 | `export.onnx` | `null` | Путь к графу ONNX. Обязателен для `build`. |
 | `export.engine` | `null` | Путь к движку TensorRT. Обязателен для `verify`. |
-| `export.metadata` | `null` | Путь к файлу метаданных экспорта ([export metadata](../../GLOSSARY.md#export-metadata)) для `build` и `verify`. `null` — файл рядом с источником: `<export.onnx>.json` для `build`, `<export.engine>.json` для `verify`. При `onnx` не используется. |
+| `export.metadata` | `null` | Путь к файлу метаданных экспорта для `build` и `verify`. `null` — файл рядом с источником: `<export.onnx>.json` для `build`, `<export.engine>.json` для `verify`. При `onnx` не используется. |
 | `export.workspace_gib` | `4.0` | Объём рабочей памяти TensorRT при сборке, GiB. Должен быть больше нуля. Используется только при `build`. |
 | `export.split` | `test` | Split разметки, на котором `verify` проверяет качество: `train`, `val` или `test`. |
 | `weights` | `null` | Веса модели: путь к checkpoint, ID задачи ClearML (task) с обученной моделью или `clearml://<model-id>`. Обязательны для `onnx` и `verify`, для `build` не нужны. |
-| `ground_truth` | `null` | Разметка: CSV или ссылка на датасет ClearML, формат — в [разметке](../formats/ground-truth.md). Обязательна для `verify`, для `onnx` и `build` не нужна. |
-| `output_dir` | `null` | Каталог результатов. `null` — каталог запуска ([run directory](../../GLOSSARY.md#run-directory)) `runs/<проект>/<задача>-<ID>/export`, см. [рабочий каталог](../workspace.md) ([workspace](../../GLOSSARY.md#workspace)). |
+| `ground_truth` | `null` | Разметка: CSV или ссылка на ClearML Dataset ([ClearML dataset reference](../../GLOSSARY.md#clearml-dataset-reference)), формат — в [разметке](../formats/ground-truth.md). Обязательна для `verify`, для `onnx` и `build` не нужна. |
+| `output_dir` | `null` | Каталог результатов. `null` — `runs/<проект>/<задача>-<ID>/export` в каталоге запуска ([run directory](../../GLOSSARY.md#run-directory)) внутри рабочего каталога ([workspace](../../GLOSSARY.md#workspace)), см. [Рабочий каталог](../workspace.md). |
 | `clearml` | см. страницу группы | Проект, имя и теги задачи ClearML, см. [`clearml`](../configuration/clearml.md). |
 
 Других ключей в группе `export` нет: override вида `export.foo=1` Hydra отклоняет (`Could not override 'export.foo'`).
@@ -58,11 +58,11 @@ cy-export [ключ=значение ...]
 2. Допустимы ли значения `export.*` и их сочетание: `onnx` — только `cpu` и `fp32`; `build` и `verify` — ровно один GPU; `export.workspace_gib` больше нуля; `export.split` из списка.
 3. Если задан `ground_truth`, корректна ли форма ссылки на разметку.
 
-Затем команда создаёт задачу ClearML и проверяет, что для операции заданы нужные входы: `onnx` — `weights`; `build` — `export.onnx`; `verify` — `export.engine`, `weights` и `ground_truth`. Ссылку на разметку в ClearML команда разрешает в локальный файл, `weights` — в локальный checkpoint. Сведения об источнике весов (модель ClearML, задача обучения или SHA-256 файла) записываются в конфигурацию задачи как `source_model`.
+Затем команда создаёт задачу ClearML и проверяет, что для операции заданы нужные входы: `onnx` — `weights`; `build` — `export.onnx`; `verify` — `export.engine`, `weights` и `ground_truth`. Ссылку на ClearML Dataset команда разрешает в локальный файл, `weights` — в локальный checkpoint. Происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)) — модель ClearML, задача обучения или SHA-256 файла — записывается в объект конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `run` задачи как раздел `source_model`.
 
 ### `export.operation=onnx`
 
-1. Читает checkpoint и описание модели, сохранённое при обучении. Выбор `model=` должен совпадать с семейством и preset checkpoint.
+1. Читает checkpoint и описание модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)), сохранённое при обучении. Выбор `model=` должен совпадать с семейством и preset checkpoint.
 2. Строит детектор на CPU, загружает веса и экспортирует его в `model.onnx` (opset 17). Предобработку изображения (letterbox до холста, нормализация) граф не содержит. RPN, ROIAlign, декодирование рамок (bounding box), порог уверенности (confidence threshold) `model.predict.conf`, NMS с порогом `model.predict.iou` и предел `model.predict.max_det` встроены в граф.
 3. Записывает рядом `model.onnx.json` — метаданные экспорта: описание модели (preset, классы, предобработка), SHA-256 графа, встроенные пороги, профили размеров ([optimization profile](../../GLOSSARY.md#optimization-profile)) для TensorRT, версии `torch`, `torchvision`, `timm`, `onnx`.
 
@@ -106,7 +106,7 @@ cy-export [ключ=значение ...]
 | `build` | `model.engine`, `model.engine.json` | `export_engine`, `export_metadata` |
 | `verify` | `corpus.json`, `verification.json` | `export_corpus`, `export_verification` |
 
-Каждый файл выгружается артефактом сразу после записи. Итог операции (метаданные или отчёт проверки) записывается в конфигурацию задачи как `export_result`. Что ещё остаётся в ClearML, описано в [публикации](../publication.md).
+Каждый файл выгружается артефактом сразу после записи. Итог операции (метаданные или отчёт проверки) записывается в объект конфигурации `run` задачи как раздел `export_result`. Что ещё остаётся в ClearML, описано в [публикации](../publication.md).
 
 Если `verify` выполнилась, но проверка не пройдена, оба артефакта выгружаются, а команда завершается ошибкой `Export verification failed; inspect the retained verification report`.
 

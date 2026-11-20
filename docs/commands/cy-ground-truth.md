@@ -28,7 +28,7 @@ cy-ground-truth [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE .
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
 | `data_yaml` | обязателен | Путь к YAML-описанию YOLO-датасета. Что в нём допускается, описано в [Датасеты](../formats/datasets.md#вход-cy-ground-truth-yaml-yolo-датасета). |
-| `output` | `null` | Путь CSV. При `null` — `ground_truth.csv` в каталоге запуска (см. [Рабочий каталог](../workspace.md) ([workspace](../../GLOSSARY.md#workspace))). Путь должен быть внутри `CY_HOME`. |
+| `output` | `null` | Путь CSV. При `null` — `ground_truth.csv` в каталоге запуска. Путь должен быть внутри рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) `CY_HOME`, см. [Рабочий каталог](../workspace.md). |
 | `test_fraction` | `0.5` | Доля изображений `val`, которая переносится в `test`, если в датасете нет split `test` или он пуст. Допустимо от `0` включительно до `1` не включая. |
 | `seed` | `0` | Seed для выбора изображений, переносимых в `test`. Одинаковый seed даёт одинаковое разбиение. |
 | `clearml` | см. группу | Проект, имя и теги задачи ClearML (task): [`clearml`](../configuration/clearml.md). Без override задача попадает в проект `clearml-yolo` с именем `yolo-run`, поэтому задавайте `clearml.project_name` и `clearml.task_name` явно. |
@@ -61,7 +61,7 @@ cy-ground-truth [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE .
 | Сообщение | Причина и решение |
 | --- | --- |
 | `Missing mandatory value: data_yaml` | Не задан `data_yaml`. Добавьте `data_yaml=data/dataset.yaml`. |
-| `Project write destination /etc/ground_truth.csv must be contained beneath CY_HOME=/workspace/project; choose a destination inside CY_HOME or select the intended project workspace.` | `output` вне рабочего каталога (см. [Правило записи](../workspace.md#правило-записи-внутри-cy_home)). Укажите путь внутри `CY_HOME`. |
+| `Project write destination /etc/ground_truth.csv must be contained beneath CY_HOME=/workspace/project; choose a destination inside CY_HOME or select the intended project workspace.` | `output` вне рабочего каталога: нарушено правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)), см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home). Укажите путь внутри `CY_HOME`. |
 | `Unrecognized Authentication Error: ...` | Сервер ClearML недоступен или не настроены учётные данные (см. [Установка](../installation.md#clearml)). |
 
 ## См. также

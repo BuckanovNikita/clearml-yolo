@@ -38,18 +38,18 @@ cy-metrics [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 | `predictions` | обязателен | CSV предсказаний (см. [Предсказания](../formats/predictions.md)). |
 | `model_label` | `null` | Подпись модели. Нужна, только если рядом с CSV предсказаний нет файла `<predictions>.provenance.json` (например, `runs/my-run/predict.csv.provenance.json`, его пишет [`cy-predict`](cy-predict.md)) или в нём не записана модель; если модель записана, `model_label` не используется. |
 | `ground_truth` | обязателен | CSV разметки (см. [Разметка](../formats/ground-truth.md)) или ссылка на ClearML Dataset ([ClearML dataset reference](../../GLOSSARY.md#clearml-dataset-reference)): `{dataset_id: ...}` либо `{project_name: ..., name: ..., version: ...}` (`version` необязателен). `dataset_id` не совмещается с остальными полями. |
-| `output_dir` | `null` | Каталог результатов. При `null` — `runs/<проект>/<задача>-<ID>/metrics` (см. [Рабочий каталог](../workspace.md) ([workspace](../../GLOSSARY.md#workspace))). Должен быть внутри `CY_HOME`. |
+| `output_dir` | `null` | Каталог результатов. При `null` — `runs/<проект>/<задача>-<ID>/metrics` в каталоге запуска ([run directory](../../GLOSSARY.md#run-directory)). Должен быть внутри рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) `CY_HOME`, см. [Рабочий каталог](../workspace.md). |
 | `splits` | `[train,val,test]` | Split, для которых считаются метрики, в этом порядке. Повторы убираются. |
 | `calibration_split` | `val` | Split для подбора порогов. Допустимо только `val`. |
-| `evaluation` | см. группу | Сопоставление рамок и расчёт метрик: [`evaluation`](../configuration/evaluation.md). |
+| `evaluation` | см. группу | Сопоставление рамок (bounding box) и расчёт метрик: [`evaluation`](../configuration/evaluation.md). |
 | `clearml` | см. группу | Задача ClearML (task): [`clearml`](../configuration/clearml.md). |
 | `fiftyone` | см. группу | Публикация в FiftyOne: [`fiftyone`](../configuration/fiftyone.md). |
 
 ## Как это работает
 
 1. Команда создаёт задачу ClearML и находит разметку. Локальный CSV используется как есть, с предупреждением `Using local ground-truth CSV ...; prefer a ClearML dataset reference for versioned annotations.`; ссылка на ClearML Dataset разрешается в CSV этого датасета.
-2. Если `fiftyone.enabled=true`, проверяет доступность FiftyOne (см. [FiftyOne](../publication.md#fiftyone)).
-3. Определяет модель: из `<predictions>.provenance.json`, иначе из `model_label`. Если этот файл есть, он должен соответствовать текущему содержимому CSV предсказаний: после правки CSV команда завершается ошибкой.
+2. Если `fiftyone.enabled=true`, выполняет предварительную проверку ([FiftyOne preflight](../../GLOSSARY.md#fiftyone-preflight)) FiftyOne (см. [FiftyOne](../publication.md#fiftyone)).
+3. Определяет происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)): из `<predictions>.provenance.json`, иначе из `model_label`. Если этот файл есть, он должен соответствовать текущему содержимому CSV предсказаний: после правки CSV команда завершается ошибкой.
 4. Проверяет правила split:
    - `calibration_split` равен `val`;
    - в `splits` нет `all`;
@@ -59,10 +59,10 @@ cy-metrics [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 5. Загружает разметку и предсказания в задачу (артефакты `gt_csv` и `predicts_csv`, см. [Публикация](../publication.md#артефакты)).
 6. Готовит данные по ключам группы `evaluation`: отбрасывает предсказания с некорректной геометрией, при `evaluation.preprocess=true` убирает дубликаты рамок разметки, применяет фильтры `preprocess_preds_*`. Список классов — объединение классов разметки и предсказаний.
 7. Подбирает пороги уверенности только на `val` и записывает их в `metrics_best_confidences_val.csv`. Этот файл загружается в задачу как артефакт `metrics_best_confidences_val`; его читает [`cy-compare`](cy-compare.md).
-8. Для каждого split из `splits` считает метрики при подобранных порогах, записывает книги Excel (workbook) и соседние файлы, публикует таблицу и скаляры в ClearML.
+8. Для каждого split из `splits` считает метрики при подобранных порогах ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)), записывает книги Excel (workbook) и соседние файлы, публикует таблицу и скаляры в ClearML.
 9. Если FiftyOne включён, публикует разметку, предсказания и результаты сопоставления.
 
-Пороги, подобранные на `val`, применяются к `test` без изменений: `test` никогда не влияет на пороги.
+Подобранные пороги применяются к `test` без изменений: `test` никогда не влияет на пороги.
 
 ### Недоступные значения
 
@@ -98,7 +98,7 @@ cy-metrics [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 | `Prediction provenance does not match prediction CSV bytes` | CSV предсказаний изменён после записи `<predictions>.provenance.json`. Верните исходный CSV или повторите предсказание. |
 | `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Рядом с CSV предсказаний нет `<predictions>.provenance.json` или в нём не записана модель. Задайте `model_label`. |
 | `Ground truth contains no labelled objects to evaluate` | Ни в разметке, ни в предсказаниях нет ни одного класса. |
-| `Project write destination ... must be contained beneath CY_HOME=...` | `output_dir` вне рабочего каталога (см. [Правило записи](../workspace.md#правило-записи-внутри-cy_home)). |
+| `Project write destination ... must be contained beneath CY_HOME=...` | `output_dir` вне рабочего каталога: нарушено правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)), см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home). |
 | `Unrecognized Authentication Error: ...` | Сервер ClearML недоступен или не настроены учётные данные (см. [Установка](../installation.md#clearml)). |
 
 ## См. также

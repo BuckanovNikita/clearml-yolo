@@ -1,6 +1,6 @@
 # Датасеты
 
-На этой странице описано, какой датасет принимает `cy-ground-truth` и какую рабочую копию ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)) датасета CY собирает для обучения. Обучение читает не YOLO-датасет, а CSV [разметки (ground truth)](ground-truth.md) ([ground truth](../../GLOSSARY.md#ground-truth)); из этого CSV CY сам строит датасет в формате, который нужен семейству моделей ([detector family](../../GLOSSARY.md#detector-family)).
+На этой странице описано, какой датасет принимает `cy-ground-truth` и какую рабочую копию датасета ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)) CY собирает для обучения. Обучение читает не YOLO-датасет, а CSV [разметки](ground-truth.md) ([ground truth](../../GLOSSARY.md#ground-truth)); из этого CSV CY сам строит датасет в формате, который нужен семейству моделей ([detector family](../../GLOSSARY.md#detector-family)).
 
 ## Вход `cy-ground-truth`: YAML YOLO-датасета
 

@@ -16,7 +16,7 @@
 
 У `cy-metrics`, `cy-report`, `cy-ground-truth` и `cy-export` этой группы нет.
 
-Группа действует только при `model.backend=ultralytics` (по умолчанию). Для другого семейства моделей ([detector family](../../GLOSSARY.md#detector-family)) параметры предсказания задаются в `model.predict.*` (см. [`model`](model.md)). Если при другом backend изменить любой ключ этой группы, команда завершается до запуска задачи ClearML:
+Группа действует только при `model.backend=ultralytics` (по умолчанию). Для другого семейства моделей ([detector family](../../GLOSSARY.md#detector-family)) параметры предсказания задаются в `model.predict.*` (см. [`model`](model.md)). Если при другом backend изменить любой ключ этой группы, команда завершается до запуска задачи ClearML (task):
 
 ```text
 ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdetr/nano; use model.predict instead
@@ -28,7 +28,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 
 Ключи из таблицы меняются обычным override: `ultralytics_predict.batch=8`. Синтаксис override описан на странице [Конфигурация](README.md). Нативный ключ Ultralytics, которого нет в собранной группе, добавляется через `+`. Правила те же, что у группы [`ultralytics`](ultralytics.md#как-задавать-ключи): неизвестный ключ отклоняется (`Unknown Ultralytics parameters: [...]`), `cfg` должен быть `null`, известный ключ, который к предсказанию детектора не относится, молча отбрасывается. `embed` отклоняется: `embed is unsupported for detection records; remove its override`.
 
-Пути `project` и `name` CY проверяет при запуске команды, ещё до задачи ClearML, даже с `--cfg job`: они должны лежать внутри `CY_HOME`, иначе `Project write destination ... must be contained beneath CY_HOME=...` (см. [правило записи](../workspace.md#правило-записи-внутри-cy_home)).
+Пути `project` и `name` CY проверяет при запуске команды, ещё до задачи ClearML, даже с `--cfg job`: они должны лежать внутри `CY_HOME`, иначе `Project write destination ... must be contained beneath CY_HOME=...` (см. [правило записи внутри `CY_HOME`](../workspace.md#правило-записи-внутри-cy_home) ([write containment rule](../../GLOSSARY.md#write-containment-rule))).
 
 Остальные значения CY проверяет перед предсказанием, после создания задачи ClearML: полноту группы, типы и диапазоны значений. Ошибки имеют вид `ultralytics_predict.conf must be between 0 and 1`.
 
@@ -46,7 +46,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 | `imgsz` | из `ultralytics` (`960`) | Размер входа: положительное целое или `[h, w]`. Другое значение, в том числе `null`, отклоняется: `ultralytics_predict.imgsz must contain positive integer image dimensions`. Если веса обучены на другом размере, CY пишет предупреждение, но использует заданный `imgsz`. |
 | `save` | `false` | Сохранять изображения с результатами. В Ultralytics по умолчанию `true`; CY выключает. |
 | `device` | `[-1]` | Устройство: `0`, `[0,1]`, `cpu`, `mps`; `-1` — Ultralytics выбирает свободную GPU. |
-| `project` | `null` | Корень нативных результатов предсказания. В `cy-predict` и `cy-val` при `null` это `native` рядом с CSV предсказаний (predictions). Путь должен лежать внутри `CY_HOME` (см. [рабочий каталог](../workspace.md) ([workspace](../../GLOSSARY.md#workspace))). В `cy` допустимо только `null` или путь `native` внутри каталога запуска ([run directory](../../GLOSSARY.md#run-directory)); другое значение отклоняется: `project='...' conflicts with pipeline run_dir; expected ...`. Каталог запуска заранее известен только при заданном `run_dir` или `run_id`. В `cy-compare` должен быть `null`, иначе `Prediction ['project'] are owned by comparison; use baseline_model/candidate_model and output_dir`. |
+| `project` | `null` | Корень нативных результатов предсказания. В `cy-predict` и `cy-val` при `null` это `native` рядом с CSV предсказаний (predictions). Путь должен лежать внутри рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) `CY_HOME` (см. [Рабочий каталог](../workspace.md)). В `cy` допустимо только `null` или путь `native` внутри каталога запуска ([run directory](../../GLOSSARY.md#run-directory)); другое значение отклоняется: `project='...' conflicts with pipeline run_dir; expected ...`. Каталог запуска заранее известен только при заданном `run_dir` или `run_id`. В `cy-compare` должен быть `null`, иначе `Prediction ['project'] are owned by comparison; use baseline_model/candidate_model and output_dir`. |
 | `name` | `null` | Подкаталог внутри `project`; при `null` — `predict`. В `cy` допустимо только `null` или `predict`. В `cy-compare` должен быть `null`. |
 | `exist_ok` | из `ultralytics` (`false`) | Писать в существующий каталог `project/name`, а не создавать новый с номером. |
 | `verbose` | `false` | Подробный лог Ultralytics. CY всегда выключает его при предсказании и показывает собственный прогресс; значение не действует. |
