@@ -98,6 +98,7 @@ cy-metrics [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 | `Prediction provenance does not match prediction CSV bytes` | CSV предсказаний изменён после записи `<predictions>.provenance.json`. Верните исходный CSV или повторите предсказание. |
 | `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Рядом с CSV предсказаний нет `<predictions>.provenance.json` или в нём не записана модель. Задайте `model_label`. |
 | `Ground truth contains no labelled objects to evaluate` | Ни в разметке, ни в предсказаниях нет ни одного класса. |
+| `Reconstructed AP50 for class '<класс>' (...) disagrees with authoritative compute_map AP50 (...)` | Проверка согласованности: AP50 класса, восстановленный CY по PR-кривой, отличается от AP50 библиотеки digital-metrics больше, чем на погрешность округления float32. Классы без объектов разметки не проверяются. Оценка останавливается; это ошибка CY, а не входных данных. |
 | `Project write destination ... must be contained beneath CY_HOME=...` | `output_dir` вне рабочего каталога: нарушено правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)), см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home). |
 | `Unrecognized Authentication Error: ...` | Сервер ClearML недоступен или не настроены учётные данные (см. [Установка](../installation.md#clearml)). |
 

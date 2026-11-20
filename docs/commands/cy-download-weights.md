@@ -92,7 +92,7 @@ Details: https://github.com/BuckanovNikita/clearml-yolo/blob/master/docs/command
 
 | Причина | Что делать |
 | --- | --- |
-| `Pinned release <tag> archive <файл> unavailable; GHR Files remote: HTTP 404; GitHub release: ...` | Архив не скачался ни через зеркало весов, ни с GitHub. Проверьте `GHR`, доступ к сети и учётные данные в `~/.netrc`. |
+| `Pinned release <tag> archive <файл> unavailable; GHR Files remote: HTTP 404; GitHub release: ...` | Архив не скачался ни через зеркало весов, ни с GitHub. После `HTTP` стоит код ответа сервера: 401 — сервер не принял учётные данные, 403 — у учётной записи нет прав, 404 — по этому пути файла нет. Проверьте `GHR`, доступ к сети и учётные данные в `~/.netrc`. |
 | `... GitHub release (GHR not configured): ...` | Зеркало весов не задано, а GitHub недоступен. Задайте `GHR`. |
 | `download timeout; increase CY_WEIGHTS_DOWNLOAD_TIMEOUT` | Архив не успел скачаться. Увеличьте `CY_WEIGHTS_DOWNLOAD_TIMEOUT`. |
 | `CY_WEIGHTS_DOWNLOAD_TIMEOUT must be positive finite seconds` | Значение переменной не является положительным конечным числом. |

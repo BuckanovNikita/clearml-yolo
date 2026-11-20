@@ -45,6 +45,24 @@ uv pip install "clearml-yolo @ git+https://github.com/BuckanovNikita/clearml-yol
 
 > В публичном PyPI есть посторонний пакет с именем `report-generator`. CY он не подходит. Убедитесь, что установщик берёт `digital-metrics` и `report-generator` из вашего индекса или из локального каталога.
 
+### Установка из исходного кода
+
+В клоне репозитория пакеты `digital-metrics` и `report-generator` собираются из их исходников:
+
+1. Положите исходники нужных ревизий в `external/digital-metrics` и `external/report-generator`. Без них задача останавливается с сообщением `local-deps: missing approved checkouts: ...`.
+2. Соберите архивы и настройте `uv`:
+
+   ```bash
+   uvx --from go-task-bin task local-deps
+   ```
+
+   Задача кладёт архивы обоих пакетов в `external/wheelhouse` и, если файла `uv.toml` в корне клона нет, создаёт его со строкой `find-links = ["external/wheelhouse"]`. Существующий `uv.toml` не перезаписывается.
+3. Установите окружение по lock-файлу; команды появятся в `.venv/bin`:
+
+   ```bash
+   uv sync --locked
+   ```
+
 После установки проверьте, что команды на месте:
 
 ```bash
@@ -88,7 +106,7 @@ WARNING | Git working tree could not be verified for launch directory '/workspac
 | `GHR` | не задана | Корень зеркала весов ([weight mirror](../GLOSSARY.md#weight-mirror)) для файлов GitHub release (например, Files remote в Artifactory). См. [Зеркала весов](#зеркала-весов). |
 | `GH` | не задана | Корень VCS-репозитория Artifactory для скачивания исходников DEIMv2. |
 | `CY_PROGRESS_FILE` | не задана | Путь к JSON-файлу, в который команда записывает текущий прогресс (например, шаг обучения). Путь должен быть внутри `CY_HOME`. |
-| `LOGURU_LEVEL` | `DEBUG` | Наименьший уровень сообщений журнала; например, `INFO` скрывает сообщения `DEBUG`. Значение `TRACE` также включает трассировку операций CY: записи `START`, `DONE`, `FAILED` или `INTERRUPTED` для каждой операции, а в stderr — сообщение `TRACE ACTIVE` о текущей операции каждые 30 секунд и снимок стеков `TRACE STACK snapshot` не чаще раза в 60 секунд, если он изменился. Помогает разобрать зависание. |
+| `LOGURU_LEVEL` | `DEBUG` | Наименьший уровень сообщений журнала; например, `INFO` скрывает сообщения `DEBUG`. На любом уровне каждая строка журнала содержит модуль, функцию и номер строки кода, где она записана (формат Loguru по умолчанию). Значение `TRACE` также включает трассировку операций CY: записи `START`, `DONE`, `FAILED` или `INTERRUPTED` для каждой операции, а в stderr — сообщение `TRACE ACTIVE` о текущей операции каждые 30 секунд и снимок стеков `TRACE STACK snapshot` не чаще раза в 60 секунд, если он изменился. Помогает разобрать зависание. |
 | `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN` | не заданы | Токен для запросов к `huggingface.co`. |
 | `HF_HOME`, `HF_TOKEN_PATH`, `XDG_CACHE_HOME` | стандарт Hugging Face | Где искать файл токена Hugging Face, если токен не задан переменной: `HF_TOKEN_PATH`, иначе `HF_HOME/token`, иначе `XDG_CACHE_HOME/huggingface/token` (`~/.cache/huggingface/token`). |
 | `SSL_CERT_FILE` | системные сертификаты | CA bundle для HTTPS-скачиваний весов. Проверка TLS не отключается. |

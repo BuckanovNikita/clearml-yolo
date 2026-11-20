@@ -89,7 +89,7 @@ ValueError: Changed ultralytics settings ['epochs'] are inactive for fcos/swin_t
 
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
-| `device` | `null` | Устройство: `cpu`, строка CUDA (`cuda`, `cuda:0`), один индекс GPU или список индексов. `null` — `cuda`, если GPU доступен, иначе `cpu`. DEIMv2 и RF-DETR в одном процессе принимают только одно устройство: `DEIMv2 multi-device execution is unsupported by this adapter`. |
+| `device` | `null` | Устройство: `cpu`, строка CUDA (`cuda`, `cuda:0`), один индекс GPU или список индексов. `null` — `cuda`, если GPU доступен, иначе `cpu`. DEIMv2 и RF-DETR в одном процессе принимают только одно устройство: `DEIMv2 multi-device execution is unsupported by this adapter`. Список из нескольких индексов запускает по одному процессу обучения на GPU; у DEIMv2, Faster R-CNN и FCOS таймаут группы процессов NCCL — 120 секунд. Если процессы не завершились за 30 суток, CY их останавливает и обучение падает с ошибкой `Native distributed training timeout: ...`. |
 | `epochs` | `100` | Число эпох, целое больше 0. |
 | `batch` | `4` | Глобальный batch size, целое больше 0. `null` — значение берётся из [таблицы batch size](../formats/batch-table.md) ([batch size table](../../GLOSSARY.md#batch-size-table)) для текущего GPU. При обучении на нескольких GPU batch size должен делиться на число устройств. |
 | `imgsz` | из preset | Размер входа: целое больше 0 или пара `[высота, ширина]`. RF-DETR: только целое, кратное 32. DEIMv2: обе стороны кратны 32 и не меньше 128, для обучения — квадрат. |
@@ -177,10 +177,11 @@ Missing fcos/swin_tiny asset <file>:
 - `imgsz` задаёт холст: каждая сторона округляется вверх до кратной 32. Изображение масштабируется с сохранением пропорций, чтобы поместиться в холст, а остаток справа и снизу заполняется.
 - Только Faster R-CNN поддерживает [`cy-export`](../commands/cy-export.md): `cy-export supports only Faster R-CNN presets`.
 - Для `dinov3_small` репозиторий весов может требовать принятия лицензии на Hugging Face.
+- Обучение идёт оптимизатором AdamW с `lr` и `weight_decay`, градиент накапливается за `grad_accum_steps` шагов. При `use_ema: true` веса усредняются с коэффициентом 0.999, и оценка после обучения использует усреднённую модель.
 
 ### FCOS
 
-- Те же backbone и правила весов, что у Faster R-CNN.
+- Те же backbone, правила весов и рецепт обучения (AdamW, накопление градиента, EMA), что у Faster R-CNN.
 
 ### Ultralytics YOLO
 

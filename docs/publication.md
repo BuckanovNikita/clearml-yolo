@@ -39,7 +39,9 @@ ClearML Task: created new task id=<task-id>
 ClearML results page: ...
 ```
 
-Вывод команды в терминал публикуется во вкладку Console задачи.
+Вывод команды в терминал публикуется во вкладку Console задачи, а скаляры — в её графики. CY отправляет их в ClearML порциями раз в 2 секунды. Перед тем как отметить задачу завершённой, команда до 8 секунд ждёт подтверждения, что весь вывод доставлен; иначе публикация завершается ошибкой `Console publication barrier deadline expired; logs retained`, а локальные журналы сохраняются (см. [Рабочий каталог](workspace.md)).
+
+При локальном запуске команда записывает в раздел Execution задачи: `entry point` = `-m clearml_yolo.entrypoints.<команда>`, `working dir` = `.`, пустой `diff`, а если CY установлен из Git-checkout — ещё адрес `remote.origin.url` без учётных данных, ветку и commit. Аргументы командной строки и незакоммиченные изменения не записываются. Если CY установлен не из checkout или Git недоступен, полей репозитория нет, а в журнал пишется предупреждение (например `No source checkout; ClearML Git identity is unavailable`). После записи команда перечитывает поля с сервера; если какое-то не сохранилось, она завершается ошибкой `ClearML did not retain script metadata field '<поле>'`.
 
 ## Объекты конфигурации
 
@@ -62,7 +64,7 @@ ClearML results page: ...
 | Артефакт | Кто пишет | Содержимое |
 | --- | --- | --- |
 | `gt_csv` | `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare`, `cy-ground-truth` | Разметка ([ground truth](../GLOSSARY.md#ground-truth)), с которой работал запуск. В `cy-train` и при обучении в `cy` — подготовленная для обучения разметка. |
-| `predicts_csv` | `cy`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare` | Общая таблица строк разметки и предсказаний (predictions); после оценки строки дополнены статусами сопоставления. Загружается, когда все этапы запуска, работающие с предсказаниями, закончили. |
+| `predicts_csv` | `cy`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare` | Общая таблица строк разметки и предсказаний (predictions); после оценки строки дополнены статусами сопоставления (колонка `evaluation_status`, см. [ниже](#статусы-строк-predicts_csv)). Загружается, когда все этапы запуска, работающие с предсказаниями, закончили. |
 | `metrics_best_confidences_val` | `cy-metrics`, `cy-val`, этап метрик `cy` | Подобранные пороги ([selected confidence thresholds](../GLOSSARY.md#selected-confidence-thresholds)) — пороги уверенности (confidence threshold), выбранные на split `val`: столбцы `class_name`, `confidence`. |
 | `metrics_dashboard_full_<split>` | `cy-metrics`, `cy-val`, этап метрик `cy` | Полный дашборд ([dashboard](../GLOSSARY.md#dashboard)) метрик по split. |
 | `metrics_dashboard_dtrk_<split>` | `cy-metrics`, `cy-val`, этап метрик `cy` | Сокращённый дашборд метрик по split. |
@@ -77,6 +79,18 @@ ClearML results page: ...
 | `pipeline_outcome` | `cy` | Итог пайплайна ([pipeline outcome](../GLOSSARY.md#pipeline-outcome)): статус и причина для каждого этапа пайплайна ([pipeline](../GLOSSARY.md#pipeline)). Тот же итог лежит в каталоге запуска в `pipeline_outcome.json` и `pipeline_outcome.txt`. |
 
 Содержимое книг и дашбордов описано в разделе [Книги Excel](formats/workbooks.md).
+
+### Статусы строк `predicts_csv`
+
+Колонка `row_type` равна `gt` для строк разметки и `predict` для предсказаний. Колонка `evaluation_status` принимает значения:
+
+| Статус | Значение |
+| --- | --- |
+| `TP`, `FP`, `FN` | Верное срабатывание, ложное срабатывание, пропущенный объект разметки. |
+| `filtered` | Предсказание отброшено порогом уверенности; `exclusion_reason` = `confidence_threshold`. |
+| `background` | Строка разметки без класса (изображение без объектов). |
+| `excluded` | Строка не участвовала в оценке. Причина в `exclusion_reason`: `invalid_geometry:<причина>` (некорректная рамка), `duplicate_ground_truth` (дубликат рамки разметки), `prediction_preprocessing` (предсказание убрано фильтрами `preprocess_preds_*`), `class_not_evaluated` (для класса нет подобранного порога). |
+| `not_evaluated` | Строка не оценивалась, например предсказания `cy-predict` без этапа метрик. Предсказания по изображениям вне выбранных split получают `exclusion_reason` = `outside_selected_splits`. |
 
 Каждый перечисленный артефакт обязателен: команда загружает его синхронно и до завершения проверяет, что все объявленные артефакты загружены. Если хотя бы один не загружен, задача не считается успешной (см. [Успех и ошибка](#успех-и-ошибка)).
 
@@ -145,6 +159,21 @@ ClearML results page: ...
 
 Ошибки FiftyOne никогда не влияют на статус задачи и код завершения.
 
+Если закрыть задачу не удалось (например, ошибка `ClearML owner remained active after close`), процесс больше не создаёт задач. При multirun (см. [Конфигурация](configuration/README.md)) задания идут по очереди в одном процессе, поэтому следующие задания завершаются ошибкой `Previous ClearML owner did not confirm closure; start a fresh process before another invocation`. Запустите оставшиеся задания новой командой.
+
+### Кэш шагов в контроллере ClearML
+
+Если вы запускаете команды CY как шаги своего пайплайна ClearML с кэшированием, зарегистрируйте в контроллере функцию хеширования CY до поиска в кэше:
+
+```python
+from clearml.automation.job import ClearmlJob
+from clearml_yolo.adapters.clearml.cache import normalize_task_hash
+
+ClearmlJob.register_hashing_callback(normalize_task_hash)
+```
+
+Функция меняет только хеш, не запуск, и только для задач с `entry point` `-m clearml_yolo.entrypoints.<команда>`. Она убирает из хеша объект `run_overrides` и ключи, которые не влияют на результат (имена и маршрутизацию), сводит выбор устройств к типу и числу, а пути датасета внутри подготовленного датасета — к его идентичности. Если у контроллера уже есть своя функция хеширования, вызывайте `normalize_task_hash` из неё.
+
 ## FiftyOne
 
 Публикация в FiftyOne выполняется в `cy`, `cy-predict` и `cy-metrics`, если `fiftyone.enabled=true` (по умолчанию). Ключи описаны на странице [`fiftyone`](configuration/fiftyone.md).
@@ -191,13 +220,37 @@ ClearML results page: ...
 
 Рамки в полях сопоставления несут атрибуты `dm_index`, `dm_status`, `dm_gt_indices`, `dm_pred_indices`, `dm_ious` и `dm_matches`.
 
-Для каждого split с результатами оценки создаётся оценка FiftyOne (evaluation) с ключом `eval_<ключ запуска>_<SHA-256 имени split>`. При повторной публикации той же задачи её прежние оценки удаляются и пишутся заново.
+Для каждого split с результатами оценки создаётся оценка FiftyOne (evaluation) с ключом `eval_<ключ запуска>_<SHA-256 имени split>` и методом `digital_metrics`; сопоставления в ней берутся из оценки CY, FiftyOne их не пересчитывает. При повторной публикации той же задачи её прежние оценки удаляются и пишутся заново.
 
 Сведения о запуске (ID задачи, имена полей, пороги и параметры оценки) хранятся в `info` датасета под `cy_runs`.
 
 ### Что остаётся после публикации
 
 Команда записывает квитанцию ([publication receipt](../GLOSSARY.md#publication-receipt)) `fiftyone_publication.json` в свой каталог вывода и добавляет в объект конфигурации `run` задачи раздел `fiftyone_result`: имя датасета, ключ запуска, был ли датасет использован повторно, число образцов, имена полей и ключи оценок.
+
+### Просмотр в FiftyOne App
+
+Откройте датасет из той же базы данных FiftyOne и с той же конфигурацией FiftyOne, что и у команды; пути к изображениям из `image_path` должны читаться на этой машине. Имя датасета — поле `dataset_name` квитанции:
+
+```python
+import json
+
+import fiftyone as fo
+
+receipt = json.load(open("runs/my-run/fiftyone_publication.json"))
+session = fo.launch_app(fo.load_dataset(receipt["dataset_name"]))
+session.wait()
+```
+
+Панели оценок CY (`Imported Model Evaluation` и `Imported AP / PR Reports`, плагин `@clearml-yolo/evaluation`) устанавливаются один раз в каталог плагинов FiftyOne (`fo.config.plugins_dir`) того окружения, где работает FiftyOne App:
+
+```python
+from clearml_yolo.adapters.fiftyone.panel import install_evaluation_plugin
+
+install_evaluation_plugin()
+```
+
+Повторная установка без `overwrite=True` завершается ошибкой `Plugin '@clearml-yolo/evaluation' already exists`. Если App уже запущен, перезапустите его после установки.
 
 ## См. также
 
