@@ -5,13 +5,13 @@
 ## Примеры
 
 ```bash
-cy-predict weights=weights/best.pt ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
+cy-predict weights=weights/best.pt model_label=my-model ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
 ```
 
-Предсказания Ultralytics YOLO для всех изображений разметки; CSV пишется в каталог запуска ([run directory](../../GLOSSARY.md#run-directory)).
+Предсказания Ultralytics YOLO локальным файлом весов для всех изображений разметки ([`model_label`](#model_label) нужен, когда рядом с файлом нет `.identity.json`); CSV пишется в каталог запуска ([run directory](../../GLOSSARY.md#run-directory)).
 
 ```bash
-cy-predict model=rfdetr/small weights=weights/best.pt ground_truth=data/ground_truth.csv 'splits=[val,test]' model.predict.conf=0.01 fiftyone.enabled=false clearml.project_name=my-project clearml.task_name=my-run
+cy-predict model=rfdetr/small weights=weights/best.pt model_label=my-model ground_truth=data/ground_truth.csv 'splits=[val,test]' model.predict.conf=0.01 fiftyone.enabled=false clearml.project_name=my-project clearml.task_name=my-run
 ```
 
 Предсказания RF-DETR только для split `val` и `test`, без публикации в FiftyOne.
@@ -147,7 +147,7 @@ ValueError: No ground-truth rows for splits ['test']
 ValueError: Model provenance is unavailable; supply a custom model_label (comparison model references use label)
 ```
 
-Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`.
+Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`. То же сообщение команда печатает, когда файла весов по указанному пути нет: проверьте путь.
 
 ```text
 ValueError: Native detector weights require a bound checkpoint descriptor; raw comparison weights require explicit ModelRef metadata

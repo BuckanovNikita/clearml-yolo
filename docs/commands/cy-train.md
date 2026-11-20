@@ -87,6 +87,7 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 | Сообщение | Причина и решение |
 | --- | --- |
 | `Missing mandatory value: ground_truth` | Не задан `ground_truth` |
+| `FileNotFoundError: [Errno 2] No such file or directory: '/workspace/project/data/ground_truth.csv'` | Файла разметки по указанному пути нет. Ошибка появляется после создания задачи ClearML (task), задача получает статус `failed` |
 | `Changed ultralytics settings ['epochs'] are inactive for deimv2/s; use model.train instead` | Для семейства, отличного от Ultralytics, изменён ключ `ultralytics`; задайте его в `model.train` |
 | `Legacy queue/autogpu controls are removed from direct cy commands. ...` | Заданы `queue`, `autogpu` или `auto_gpu`. Уберите их; постановка в очередь описана в [Очереди](../queue.md) |
 | `Project write destination /etc/x must be contained beneath CY_HOME=/workspace/project; ...` | `ultralytics.project`, `dataset_cache_dir` или другой путь записи вне рабочего каталога ([workspace](../../GLOSSARY.md#workspace)) |

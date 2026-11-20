@@ -21,7 +21,7 @@ cy-compare ground_truth=data/ground_truth.csv baseline_model.task_id=<task-id> c
 Сравнить локальный checkpoint кандидата с моделью из ClearML; для локального файла пороги задаются явно:
 
 ```bash
-cy-compare ground_truth=data/ground_truth.csv baseline_model.task_id=<task-id> candidate_model.source=local candidate_model.weights=weights/best.pt 'candidate_model.thresholds={defect: 0.35}' clearml.project_name=my-project clearml.task_name=my-run
+cy-compare ground_truth=data/ground_truth.csv baseline_model.task_id=<task-id> candidate_model.source=local candidate_model.weights=weights/best.pt candidate_model.label=my-model 'candidate_model.thresholds={defect: 0.35}' clearml.project_name=my-project clearml.task_name=my-run
 ```
 
 Синтаксис override описан в [конфигурации](../configuration/README.md).
@@ -65,7 +65,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 | `baseline_model.tags`, `candidate_model.tags` | `[prod]` | Теги поиска: у найденной задачи должны быть все перечисленные теги. |
 | `baseline_model.weights`, `candidate_model.weights` | `null` | Путь к локальному checkpoint. Обязателен при `source=local`, запрещён при `source=clearml`. |
 | `baseline_model.thresholds`, `candidate_model.thresholds` | `null` | Пороги уверенности по именам классов, например `{defect: 0.35}`; каждое значение от 0 до 1. Обязательны и не могут быть пустыми при `source=local`. При `source=clearml` и `null` берутся из задачи модели. |
-| `baseline_model.label`, `candidate_model.label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)) в результатах. При `null` используется имя, под которым модель известна. |
+| `baseline_model.label`, `candidate_model.label` | `null` | Подпись модели ([model identity](../../GLOSSARY.md#model-identity)) в результатах. При `null` используется имя, под которым модель известна. Для локального файла без `<имя файла>.identity.json` рядом подпись обязательна, иначе команда останавливается: `Model provenance is unavailable; supply a custom model_label (comparison model references use label)`. |
 | `baseline_model.backend`, `candidate_model.backend` | `null` | Семейство моделей, к которому относится checkpoint. Задаётся только вместе с `preset`. |
 | `baseline_model.preset`, `candidate_model.preset` | `null` | Архитектура checkpoint из списка preset выбранного `backend` (см. [`model`](../configuration/model.md)). |
 | `baseline_model.source_dir`, `candidate_model.source_dir` | `null` | Каталог исходников DEIMv2. Требует `backend` и `preset` и допустим только для DEIMv2. |

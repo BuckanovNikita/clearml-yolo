@@ -23,10 +23,10 @@ cy ground_truth=data/ground_truth.csv run_id=my-run skip_train=true
 Повторяет предсказания, метрики, сравнение и отчёт для checkpoint `runs/my-run/detect/train/weights/best.pt`, обученного ранее.
 
 ```bash
-cy ground_truth=data/ground_truth.csv skip_train=true weights=weights/best.pt model_label=my-model skip_compare=true
+cy ground_truth=data/ground_truth.csv skip_train=true weights=weights/best.pt model_label=my-model skip_compare=true skip_report=true
 ```
 
-Оценивает готовые веса (weights) без обучения и без сравнения.
+Оценивает готовые веса (weights) без обучения, сравнения и отчёта. Без `skip_report=true` этап отчёта при `skip_train=true skip_compare=true` ищет `comparison/` прошлого запуска и в новом каталоге запуска завершается ошибкой.
 
 ## Синтаксис и аргументы
 
@@ -105,6 +105,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 | `skip_train=true skip_predict=true skip_metrics=true` | Сравнение с порогами из `metrics/frozen_thresholds.json` и отчёт |
 | `skip_train=true skip_predict=true skip_metrics=true skip_compare=true` | Отчёт по `comparison/` из каталога запуска |
 | `skip_compare=true` | Обучение, предсказания и метрики, без сравнения и отчёта |
+| `skip_train=true skip_compare=true` | Предсказания, метрики и отчёт по `comparison/` из каталога запуска; если `comparison/` там нет, этап отчёта завершается ошибкой, поэтому для новых весов добавляйте `skip_report=true` |
 | `skip_report=true` | Всё, кроме отчёта |
 
 При `skip_train=true` без `weights` нужен `run_id` или `run_dir` прошлого запуска: в новом каталоге checkpoint нет, и этап предсказания завершается ошибкой.
