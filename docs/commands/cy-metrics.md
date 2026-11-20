@@ -107,3 +107,4 @@ cy-metrics [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 - [Книги Excel](../formats/workbooks.md), [Разметка](../formats/ground-truth.md), [Предсказания](../formats/predictions.md)
 - [`cy-predict`](cy-predict.md), [`cy-val`](cy-val.md), [`cy-compare`](cy-compare.md), [`cy`](cy.md)
 - [Публикация в ClearML и FiftyOne](../publication.md), [Рабочий каталог](../workspace.md)
+- [Сценарии](../scenarios.md)

@@ -134,3 +134,4 @@ cy-init-config: error: Cannot initialize configuration directory ../outside: Val
 - [Конфигурация](../configuration/README.md)
 - [Модель](../configuration/model.md)
 - [Рабочий каталог](../workspace.md)
+- [Сценарии](../scenarios.md)

@@ -17,7 +17,7 @@ cy-train ground_truth=data/ground_truth.csv ultralytics.model=yolo11s.pt ultraly
 Другая модель YOLO, число эпох и GPU.
 
 ```bash
-cy-train ground_truth=data/ground_truth.csv model=fasterrcnn/resnet50_fpn model.train.epochs=50 required_splits=[train,val,test]
+cy-train ground_truth=data/ground_truth.csv model=fasterrcnn/resnet50_fpn model.train.epochs=50 'required_splits=[train,val,test]'
 ```
 
 Другое семейство моделей ([detector family](../../GLOSSARY.md#detector-family)); обучение требует изображений и в split `test`.
@@ -69,7 +69,7 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 | RF-DETR | `checkpoint_best_total.pth` |
 | Faster R-CNN, FCOS | `best.pth` |
 
-Без `ultralytics.project` и `ultralytics.name` для YOLO это `runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt`. Если обучение не оставило этого файла, команда завершается ошибкой.
+Без `ultralytics.project` и `ultralytics.name` для YOLO это `runs/my-project/my-run%2Ftrain-<task-id>/detect/my-run%2Ftrain/weights/best.pt` (задача называется `my-run/train`, `/` в путях записывается как `%2F`). Если обучение не оставило этого файла, команда завершается ошибкой.
 
 В checkpoint DEIMv2, RF-DETR, Faster R-CNN и FCOS CY встраивает описание модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)): семейство, preset, классы и параметры предобработки. Рядом CY пишет `<имя checkpoint>.model.json` с тем же описанием и SHA-256 файла. Если этот файл лежит рядом, он должен совпадать с checkpoint, иначе команда, которая читает веса, останавливается: `Checkpoint hash disagrees with its stored descriptor`. Изменив checkpoint, удалите старый `.model.json`.
 
@@ -105,3 +105,4 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 - [Конфигурация](../configuration/README.md)
 - [Датасеты](../formats/datasets.md)
 - [Рабочий каталог](../workspace.md)
+- [Сценарии](../scenarios.md)

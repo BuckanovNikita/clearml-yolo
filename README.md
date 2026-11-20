@@ -24,7 +24,14 @@ clearml-yolo (CY) — набор консольных команд для обу
 
 ## Установка
 
-Пакет называется `clearml-yolo` и требует Python `>=3.12.13,<3.14`. Все семейства моделей входят в стандартную установку. Зависимости `digital-metrics` и `report-generator` должны быть доступны в индексе пакетов, из которого вы ставите `clearml-yolo`. Рабочий каталог ([workspace](GLOSSARY.md#workspace), `CY_HOME`), переменные окружения (environment variable) и учётные данные ClearML и FiftyOne описаны в разделе [Установка и окружение](docs/installation.md).
+Пакет называется `clearml-yolo` и требует Python `>=3.12.13,<3.14`. Все семейства моделей входят в стандартную установку. Зависимости `digital-metrics` и `report-generator` должны быть доступны в индексе пакетов, из которого вы ставите `clearml-yolo`. В публичном PyPI пакета нет, он ставится по Git-ссылке:
+
+```bash
+uv venv --python 3.12
+uv pip install "clearml-yolo @ git+https://github.com/BuckanovNikita/clearml-yolo"
+```
+
+Рабочий каталог ([workspace](GLOSSARY.md#workspace), `CY_HOME`), переменные окружения (environment variable) и учётные данные ClearML и FiftyOne описаны в разделе [Установка и окружение](docs/installation.md).
 
 ## Первый запуск
 
@@ -38,6 +45,12 @@ cy --config-dir configs --config-name cy ground_truth=data/ground_truth.csv clea
 ```
 
 Команды создают локальное дерево конфигурации, строят CSV разметки из YOLO-датасета и запускают весь пайплайн. Что делает каждый шаг и что он оставляет, описано в разделе [Сценарии](docs/scenarios.md#1-первый-запуск).
+
+## Лицензии весов
+
+Предобученные веса распространяются под лицензиями своих авторов: Ultralytics YOLO — AGPL-3.0, DEIMv2 — только некоммерческое использование, DINOv3 — отдельное соглашение Meta. Подробнее — в разделе [Лицензии весов](docs/configuration/model.md#лицензии-весов).
+
+**Built with DINOv3.**
 
 ## Документация
 

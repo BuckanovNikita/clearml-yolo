@@ -11,7 +11,7 @@ cy-val weights=weights/best.pt model_label=my-model ground_truth=data/ground_tru
 Валидация локальных весов YOLO на `train`, `val` и `test`.
 
 ```bash
-cy-val weights=<task-id> ground_truth=data/ground_truth.csv splits=[val,test] clearml.project_name=my-project clearml.task_name=my-run clearml.tags=[my-tag]
+cy-val weights=<task-id> ground_truth=data/ground_truth.csv 'splits=[val,test]' clearml.project_name=my-project clearml.task_name=my-run 'clearml.tags=[my-tag]'
 ```
 
 Валидация весов задачи обучения ClearML только на `val` и `test`.
@@ -117,3 +117,4 @@ ValueError: Model provenance is unavailable; supply a custom model_label (compar
 - [`cy-predict`](cy-predict.md), [`cy-metrics`](cy-metrics.md), [`cy`](cy.md)
 - [Группа `evaluation`](../configuration/evaluation.md), [группа `model`](../configuration/model.md)
 - [Книги Excel](../formats/workbooks.md), [Публикация](../publication.md), [Рабочий каталог](../workspace.md)
+- [Сценарии](../scenarios.md)

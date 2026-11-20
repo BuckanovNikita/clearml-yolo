@@ -32,6 +32,25 @@
 
 Все семейства моделей ([detector family](../GLOSSARY.md#detector-family)) входят в стандартную установку: PyTorch, Ultralytics, RF-DETR, ONNX и ONNX Runtime — прямые зависимости пакета, отдельных extras нет. Среди зависимостей есть пакеты `digital-metrics` и `report-generator`; они должны быть доступны в индексе пакетов, из которого вы ставите `clearml-yolo`.
 
+### Как установить
+
+В публичном PyPI пакета `clearml-yolo` нет. Установите его по Git-ссылке в окружение с поддерживаемой версией Python, например через `uv`:
+
+```bash
+uv venv --python 3.12
+uv pip install "clearml-yolo @ git+https://github.com/BuckanovNikita/clearml-yolo"
+```
+
+Пакеты `digital-metrics` и `report-generator` установщик берёт из вашего индекса пакетов. Если они лежат архивами в локальном каталоге, добавьте его к команде установки: `--find-links wheels`.
+
+> В публичном PyPI есть посторонний пакет с именем `report-generator`. CY он не подходит. Убедитесь, что установщик берёт `digital-metrics` и `report-generator` из вашего индекса или из локального каталога.
+
+После установки проверьте, что команды на месте:
+
+```bash
+cy-dedup --help
+```
+
 Команды CY во время работы ничего не устанавливают. Драйверы GPU и TensorRT (нужен только для [`cy-export`](commands/cy-export.md)) ставятся отдельно.
 
 На Linux CY следит за процессами обучения и других тяжёлых этапов ([stage](../GLOSSARY.md#stage)) через pidfd, поэтому ядро и сборка Python должны поддерживать `os.pidfd_open`, `signal.pidfd_send_signal` и `os.waitid` с `P_PIDFD`. Без этого этап останавливается до начала работы:

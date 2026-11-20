@@ -69,3 +69,4 @@ cy-ground-truth [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE .
 - [Датасеты](../formats/datasets.md) и [Разметка (ground truth)](../formats/ground-truth.md)
 - [`cy-train`](cy-train.md), [`cy-metrics`](cy-metrics.md)
 - [Рабочий каталог](../workspace.md), [Публикация в ClearML и FiftyOne](../publication.md)
+- [Сценарии](../scenarios.md)

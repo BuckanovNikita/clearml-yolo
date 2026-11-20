@@ -13,13 +13,13 @@ cy-export model=fasterrcnn/resnet50_fpn weights=weights/best.pt clearml.project_
 Собрать движок TensorRT FP16 на GPU 0 из графа предыдущего шага:
 
 ```bash
-cy-export model=fasterrcnn/resnet50_fpn export.operation=build export.device=0 export.precision=fp16 export.onnx=runs/my-project/my-run-<task-id>/export/model.onnx clearml.project_name=my-project clearml.task_name=my-run
+cy-export model=fasterrcnn/resnet50_fpn export.operation=build export.device=0 export.precision=fp16 export.onnx=runs/my-project/my-run%2Fexport-<task-id>/export/model.onnx clearml.project_name=my-project clearml.task_name=my-run
 ```
 
 Проверить движок на split `test` разметки ([ground truth](../../GLOSSARY.md#ground-truth)):
 
 ```bash
-cy-export model=fasterrcnn/resnet50_fpn export.operation=verify export.device=0 export.precision=fp16 export.engine=runs/my-project/my-run-<task-id>/export/model.engine weights=weights/best.pt ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
+cy-export model=fasterrcnn/resnet50_fpn export.operation=verify export.device=0 export.precision=fp16 export.engine=runs/my-project/my-run%2Fexport-<task-id>/export/model.engine weights=weights/best.pt ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
 ```
 
 Пути `runs/...` в примерах — каталог по умолчанию предыдущего запуска; подставьте свой.
@@ -154,3 +154,4 @@ pydantic_core._pydantic_core.ValidationError: 1 validation error for ExportSetti
 - [Рабочий каталог](../workspace.md)
 - [Публикация](../publication.md)
 - [Установка](../installation.md)
+- [Сценарии](../scenarios.md)

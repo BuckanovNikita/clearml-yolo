@@ -11,13 +11,13 @@ cy-predict weights=weights/best.pt ground_truth=data/ground_truth.csv clearml.pr
 Предсказания Ultralytics YOLO для всех изображений разметки; CSV пишется в каталог запуска ([run directory](../../GLOSSARY.md#run-directory)).
 
 ```bash
-cy-predict model=rfdetr/small weights=weights/best.pt ground_truth=data/ground_truth.csv splits=[val,test] model.predict.conf=0.01 fiftyone.enabled=false clearml.project_name=my-project clearml.task_name=my-run
+cy-predict model=rfdetr/small weights=weights/best.pt ground_truth=data/ground_truth.csv 'splits=[val,test]' model.predict.conf=0.01 fiftyone.enabled=false clearml.project_name=my-project clearml.task_name=my-run
 ```
 
 Предсказания RF-DETR только для split `val` и `test`, без публикации в FiftyOne.
 
 ```bash
-cy-predict weights=<task-id> ground_truth=data/ground_truth.csv output=runs/my-run/predict.csv clearml.project_name=my-project clearml.task_name=my-run clearml.tags=[my-tag]
+cy-predict weights=<task-id> ground_truth=data/ground_truth.csv output=runs/my-run/predict.csv clearml.project_name=my-project clearml.task_name=my-run 'clearml.tags=[my-tag]'
 ```
 
 Веса берутся из задачи ClearML (task) обучения, CSV пишется по заданному пути.
@@ -173,3 +173,4 @@ ValueError: Ultralytics returned no result for 1 of 10 images; they are undecoda
 - [Группа `model`](../configuration/model.md), [`ultralytics_predict`](../configuration/ultralytics-predict.md)
 - [Предсказания](../formats/predictions.md), [Разметка](../formats/ground-truth.md)
 - [Рабочий каталог](../workspace.md), [Публикация](../publication.md)
+- [Сценарии](../scenarios.md)

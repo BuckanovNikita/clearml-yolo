@@ -61,6 +61,12 @@ cy-train --cfg job model=rfdetr/nano
 | `fcos/dinov2_small` | 800 | FCOS, backbone DINOv2-Small |
 | `fcos/dinov3_small` | 800 | FCOS, backbone DINOv3-Small |
 
+## Лицензии весов
+
+Лицензии у предобученных весов разные: Ultralytics YOLO — AGPL-3.0, DEIMv2 — только некоммерческое использование, DINOv3 — отдельное соглашение Meta с ограничениями. Тексты лицензий лежат в архивах весов, которые скачивает [`cy-download-weights`](../commands/cy-download-weights.md), в каталоге `LICENSES/`.
+
+**Built with DINOv3.** Backbone DINOv3 распространяется в неизменённом формате конвертации timm, с исходной конфигурацией и метаданными ревизии.
+
 ## Ultralytics YOLO: настройки в других группах
 
 При `model=ultralytics` ключи `model.train` и `model.predict` не действуют. Обучение настраивается в группе [`ultralytics`](ultralytics.md), предсказание — в [`ultralytics_predict`](ultralytics-predict.md). Изменённый ключ не в той группе останавливает команду до запуска:

@@ -48,7 +48,7 @@
    cy-train ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Checkpoint лежит в каталоге обучения ([training directory](../GLOSSARY.md#training-directory)): `runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt`; ID этой задачи нужен на следующих шагах.
+   Checkpoint лежит в каталоге обучения ([training directory](../GLOSSARY.md#training-directory)): `runs/my-project/my-run%2Ftrain-<task-id>/detect/my-run%2Ftrain/weights/best.pt`. Задача `cy-train` называется `my-run/train`, и `/` в путях записывается как `%2F`. ID этой задачи нужен на следующих шагах.
 
 2. Постройте предсказания весами (weights) задачи обучения ([`cy-predict`](commands/cy-predict.md)):
 
@@ -69,7 +69,7 @@
 4. Отчёт строится по результату сравнения, поэтому сначала сравните обученную модель с [baseline](../GLOSSARY.md#baseline) ([`cy-compare`](commands/cy-compare.md)). Пороги уверенности (confidence threshold) локального checkpoint задаются явно, по одному на каждый класс, по которому оценивается модель; возьмите их из `metrics_best_confidences_val.csv`:
 
    ```bash
-   cy-compare ground_truth=data/ground_truth.csv candidate_model.source=local candidate_model.weights=runs/my-project/my-run-<task-id>/detect/my-run/weights/best.pt 'candidate_model.thresholds={defect: 0.35}' output_dir=runs/my-run/compare clearml.project_name=my-project clearml.task_name=my-run
+   cy-compare ground_truth=data/ground_truth.csv candidate_model.source=local candidate_model.weights=runs/my-project/my-run%2Ftrain-<task-id>/detect/my-run%2Ftrain/weights/best.pt 'candidate_model.thresholds={defect: 0.35}' output_dir=runs/my-run/compare clearml.project_name=my-project clearml.task_name=my-run
    ```
 
    Baseline по умолчанию — последняя завершённая задача проекта с тегом `prod`. В `runs/my-run/compare/` появляются книга сравнения и `comparison_manifest.json`. Если baseline не найден, сравнение пропускается и манифеста сравнения ([comparison manifest](../GLOSSARY.md#comparison-manifest)) нет; тогда следующий шаг завершается ошибкой `Comparison directory <каталог> has no comparison_manifest.json; run cy-compare first`.
@@ -98,12 +98,12 @@
    cy-compare ground_truth=data/ground_truth.csv baseline_model.task_id=<task-id> candidate_model.task_id=<task-id> clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Первый `<task-id>` — задача baseline, второй — модели-кандидата ([candidate model](../GLOSSARY.md#candidate-model)). Пороги каждой модели берутся из её задачи. Результат — книга `compare_workbook_test.xlsx`, предсказания обеих моделей и `comparison_manifest.json` в `runs/my-project/my-run-<task-id>/compare/` ([Книги Excel](formats/workbooks.md#сравнение-cy-compare)). Деградация ([degraded class](../GLOSSARY.md#degraded-class)) классов — результат, а не ошибка: код завершения `0`.
+   Первый `<task-id>` — задача baseline, второй — модели-кандидата ([candidate model](../GLOSSARY.md#candidate-model)). Пороги каждой модели берутся из её задачи. Результат — книга `compare_workbook_test.xlsx`, предсказания обеих моделей и `comparison_manifest.json` в `runs/my-project/my-run%2Fcompare-<task-id>/compare/`, где `<task-id>` — задача самого сравнения ([Книги Excel](formats/workbooks.md#сравнение-cy-compare)). Деградация ([degraded class](../GLOSSARY.md#degraded-class)) классов — результат, а не ошибка: код завершения `0`.
 
 2. Постройте отчёты по этому сравнению; `<task-id>` в пути — задача шага 1 ([`cy-report`](commands/cy-report.md)):
 
    ```bash
-   cy-report comparison_dir=runs/my-project/my-run-<task-id>/compare clearml.project_name=my-project clearml.task_name=my-run
+   cy-report comparison_dir=runs/my-project/my-run%2Fcompare-<task-id>/compare clearml.project_name=my-project clearml.task_name=my-run
    ```
 
 3. Чтобы сравнение шло внутри пайплайна с выбранным baseline, задайте его в `compare.baseline_model` ([`cy`](commands/cy.md)):
@@ -209,12 +209,12 @@
    cy-export model=fasterrcnn/resnet50_fpn weights=weights/best.pt clearml.project_name=my-project clearml.task_name=my-run
    ```
 
-   Граф и метаданные экспорта ([export metadata](../GLOSSARY.md#export-metadata)) пишутся в `runs/my-project/my-run-<task-id>/export/`: `model.onnx` и `model.onnx.json`.
+   Граф и метаданные экспорта ([export metadata](../GLOSSARY.md#export-metadata)) пишутся в `runs/my-project/my-run%2Fexport-<task-id>/export/`: `model.onnx` и `model.onnx.json`.
 
 2. Соберите движок TensorRT ([TensorRT engine](../GLOSSARY.md#tensorrt-engine)) FP16 на GPU 0 из этого графа:
 
    ```bash
-   cy-export model=fasterrcnn/resnet50_fpn export.operation=build export.device=0 export.precision=fp16 export.onnx=runs/my-project/my-run-<task-id>/export/model.onnx clearml.project_name=my-project clearml.task_name=my-run
+   cy-export model=fasterrcnn/resnet50_fpn export.operation=build export.device=0 export.precision=fp16 export.onnx=runs/my-project/my-run%2Fexport-<task-id>/export/model.onnx clearml.project_name=my-project clearml.task_name=my-run
    ```
 
    `<task-id>` в пути — задача шага 1. Результат — `model.engine` и `model.engine.json` в каталоге `export` каталога запуска новой задачи.
@@ -222,7 +222,7 @@
 3. Проверьте движок на split `test` разметки:
 
    ```bash
-   cy-export model=fasterrcnn/resnet50_fpn export.operation=verify export.device=0 export.precision=fp16 export.engine=runs/my-project/my-run-<task-id>/export/model.engine weights=weights/best.pt ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
+   cy-export model=fasterrcnn/resnet50_fpn export.operation=verify export.device=0 export.precision=fp16 export.engine=runs/my-project/my-run%2Fexport-<task-id>/export/model.engine weights=weights/best.pt ground_truth=data/ground_truth.csv clearml.project_name=my-project clearml.task_name=my-run
    ```
 
    `<task-id>` в пути — задача шага 2. `export.precision` должна совпадать с точностью движка. Результат — `corpus.json` и `verification.json`; если проверка не пройдена, команда завершается ошибкой.

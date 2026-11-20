@@ -74,3 +74,4 @@ cy-report [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 - [`cy-compare`](cy-compare.md), [`cy`](cy.md)
 - [Книги Excel](../formats/workbooks.md)
 - [Публикация в ClearML и FiftyOne](../publication.md), [Рабочий каталог](../workspace.md)
+- [Сценарии](../scenarios.md)

@@ -165,3 +165,4 @@ Hydra печатает трассировку; смысл ошибки — в п
 - [Конфигурация](../configuration/README.md), [`model`](../configuration/model.md), [`evaluation`](../configuration/evaluation.md), [`ultralytics_predict`](../configuration/ultralytics-predict.md), [`clearml`](../configuration/clearml.md)
 - [Формат разметки](../formats/ground-truth.md), [книги Excel](../formats/workbooks.md)
 - [Рабочий каталог](../workspace.md), [публикация](../publication.md), [установка](../installation.md)
+- [Сценарии](../scenarios.md)
