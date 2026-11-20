@@ -3,11 +3,13 @@
 `clearml-yolo` (CY) provides Hydra/hydra-zen commands (`cy`, `cy-train`, `cy-predict`, `cy-val`,
 `cy-metrics`, `cy-compare`, `cy-report`, `cy-ground-truth`, `cy-export` and tools) that train,
 predict, evaluate, compare, report and export detectors (YOLO, DEIMv2, RF-DETR, Faster R-CNN,
-FCOS) with ClearML publication. [README.md](README.md) is the Russian user manual;
-[DOCS.md](DOCS.md) holds architecture, behavior contracts, config keys and operations. Read the
-affected DOCS.md section before changing behavior or configuration. A behavior or configuration
-change updates its DOCS.md and README.md sections in the same change; README states nothing that
-DOCS.md and the code do not.
+FCOS) with ClearML publication. The Russian user documentation is [README.md](README.md) (entry
+page) and [docs/](docs/README.md): one page per command, config group and file format, where each
+shared fact has one owning page and other pages link to it. [GLOSSARY.md](GLOSSARY.md) defines the
+user-facing terms in English with their Russian wording. [DOCS.md](DOCS.md) holds architecture,
+behavior contracts, config keys and operations. Read the affected DOCS.md section before changing
+behavior or configuration. A behavior or configuration change updates its DOCS.md section and the
+user page that owns the fact in the same change; user pages state only what the code does.
 
 ## Layout
 
@@ -200,5 +202,5 @@ means deferred; `infra-check` exit 1 is a configuration error.
 - Changes to behavior, interfaces, dependencies, security or operational policy need a fresh independent review after integration and verification. Small wording edits may be self-reviewed.
 - Split large work into independent delegated tasks with explicit write ownership and acceptance evidence; delegated agents do not delegate further.
 - Use Conventional Commits. Commit automatic formatting separately from logic. Local commits within the task scope need no approval.
-- README.md is Russian; AGENTS.md and DOCS.md are English. Keep observed counts, timings and deployment status out of both files.
+- README.md and docs/ are Russian; AGENTS.md, DOCS.md and GLOSSARY.md are English. Keep observed counts, timings and deployment status out of all of them.
 - Keep machine-specific paths, endpoints and settings in local configuration, not in these files.
