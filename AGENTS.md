@@ -9,18 +9,20 @@ changing behavior or configuration.
 
 ## User documentation
 
-- The Russian user documentation is [README.md](README.md) (entry page) and [docs/](docs/README.md):
-  one page per command, config group and file format, plus topic pages. `docs/README.md` lists
-  every page.
-- Each fact has one owning page: the page `docs/README.md` lists for its command, config group,
-  file format or topic. Other pages link to the owner; `README.md` and `docs/README.md` also
-  restate a few facts (the command list, Python range, install command, weight licences).
+- The user documentation is [README.md](README.md) (entry page) and the pages that
+  [docs/README.md](docs/README.md) lists. Each fact has one owning page: the page that index lists
+  for its command, config group, file format or topic. Other pages link to the owner; `README.md`,
+  `docs/README.md` and `GLOSSARY.md` also restate some facts (for example the command list and
+  counts, Python range, install command, weight licences, defaults quoted in glossary entries).
 - A behavior or configuration change updates, in the same change, its DOCS.md section, the owning
-  user page and every user page that restates the fact (search `README.md` and `docs/`). A fact
-  with no owning page goes on the page of its command or config group. Adding or removing a
-  command or page also updates the `README.md` command table and `docs/README.md`.
-- User pages describe current behavior: every behavior claim matches the code and agrees with
-  DOCS.md, and a mismatch is fixed in the same change.
+  user page and every place that restates the fact (search `README.md`, `docs/` and
+  `GLOSSARY.md`). Every behavior claim on a page the change edits matches the code and agrees with
+  DOCS.md; record a mismatch found on another page in the Linear issue. A fact with no owning page
+  goes on the page of its command or config group.
+- Adding or removing a command updates the `README.md` command table and the command counts in
+  `README.md` and `docs/README.md`; adding, renaming or removing a page updates `docs/README.md`.
+  `cy-download-weights` prints the URL of `docs/commands/cy-download-weights.md`: moving that page
+  updates the message and its test.
 - [GLOSSARY.md](GLOSSARY.md) defines the user-facing terms in English with their Russian wording
   and lists the terms the pages keep in English; developer and contract terms stay in the DOCS.md
   glossary section. User pages use the glossary's Russian wording. A change that introduces,
