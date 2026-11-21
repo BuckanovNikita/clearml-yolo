@@ -10,6 +10,7 @@ from openpyxl import load_workbook  # type: ignore[import-untyped]
 from report_generator.config import Config
 
 from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.adapters.reporting.reports import build_reports
 from clearml_yolo.adapters.reporting.workbook_identity import workbook_identities
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.compare import MANIFEST_NAME, ComparisonManifest
@@ -265,4 +266,36 @@ def test_business_workbook_from_dashboards_with_the_historical_top_identity_bloc
     assert workbook_identities(business) == identities
     workbook = load_workbook(business)
     _assert_fixed_layout(workbook, Config.load())
+    workbook.close()
+
+
+def test_business_workbook_follows_a_custom_report_configuration(tmp_path: Path) -> None:
+    candidate, baseline = tmp_path / "candidate.xlsx", tmp_path / "baseline.xlsx"
+    _dashboard(CANDIDATE).to_excel(candidate)
+    _dashboard(BASELINE).to_excel(baseline)
+    settings = tmp_path / "report.yaml"
+    settings.write_text(
+        "colors:\n  header: AABBCC\n"
+        "sheet_names:\n  model1: Candidate\n  model2: Baseline\n"
+        "  comparison: Difference\n  excluded: Excluded\n  verdict: Verdict\n"
+        "business:\n  target_perebrak: 0.45\n  target_nedobrak: 0.15\n"
+        "  column_translations:\n    f1_score: F1 custom\n    ap50: AP custom\n",
+        encoding="utf-8",
+    )
+    business = tmp_path / "business.xlsx"
+    build_reports(candidate, baseline, tmp_path / "dev.xlsx", business, settings)
+    workbook = load_workbook(business)
+    assert workbook.sheetnames == ["Candidate", "Baseline", "Difference", "Verdict", "Excluded"]
+    expected = [header if header != "f1_score" else "F1 custom" for header in HEADERS]
+    for title in ("Candidate", "Baseline", "Difference"):
+        sheet = workbook[title]
+        assert [cell.value for cell in sheet[2]] == expected
+        assert sheet["A2"].fill.fgColor.rgb.endswith("AABBCC")
+    goals = HEADERS[10:14]  # perebrak goal, nedobrak goal, perebrak gross, nedobrak gross
+    # shared: candidate perebrak 0.2 and nedobrak 0.2, baseline 0.4 and 0.4.
+    # The bundled targets 0.3 and 0.2 would give 1, 1, 0, 0 and 0, 0, 0, 0.
+    assert _values(_table(workbook["Candidate"])["shared"], goals) == [1, 0, 0, 0]
+    assert _values(_table(workbook["Baseline"])["shared"], goals) == [1, 0, 0, 1]
+    assert _values(_table(workbook["Difference"])["shared"], goals) == [0, 0, 0, -1]
+    assert _table(workbook["Difference"])["shared"]["F1 custom"].value == pytest.approx(0.2)
     workbook.close()

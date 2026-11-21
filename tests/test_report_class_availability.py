@@ -202,7 +202,15 @@ def test_report_count_summary_preserves_values_and_custom_headers(
                     "Число примеров train",
                 ]
                 assert not any(str(label).endswith("-valid-class-count") for label in rows)
-                if expected != "0/0" and sheet_name != config.sheet_names.comparison:
+                if expected == "0/0":
+                    # No class has enough training examples: nothing is aggregated.
+                    assert sheet.cell(rows["Среднее"], 2).value == "NA"
+                    assert sheet.cell(rows["Среднее"], len(headers)).value == "NA"
+                elif sheet_name == config.sheet_names.comparison:
+                    # Both inputs are the same dashboard, so every difference is zero.
+                    assert sheet.cell(rows["A"], 2).value == 0
+                    assert sheet.cell(rows["Среднее"], len(headers)).value == 0
+                else:
                     assert sheet.cell(rows["A"], 2).value == pytest.approx(0.8)
                     assert sheet.cell(rows["Среднее"], len(headers)).value == 60
                 continue

@@ -748,6 +748,7 @@ forbidden_modules =
     test_readable_output
     test_release_config
     test_report
+    test_report_business_layout
     test_report_class_availability
     test_report_count_issues
     test_result_export
