@@ -181,13 +181,14 @@ means deferred; `infra-check` exit 1 is a configuration error.
   the existing SSH remote and open PRs; humans squash-merge. Never push to or merge into `master`.
   Explicit no-commit or no-push limits take precedence.
 - Team `SIP` holds one project per repository and one number space across them: pass `team: SIP`
-  and `project: clearml-yolo` on every Linear create and list. Issues start from the Linear
-  template `default`.
+  and `project: clearml-yolo` on every Linear create and list. This project is what a skill calls
+  the issue tracker. Issues start from the Linear template `default`, with an explicit `state`:
+  `In Progress` for work that starts now, otherwise the triage role.
 - The Linear status is the triage role. Where a skill names a role, set the status:
 
   | Role              | Status                                | Meaning                           |
   | ----------------- | ------------------------------------- | --------------------------------- |
-  | `needs-triage`    | `Triage`                              | Maintainer evaluates the issue    |
+  | `needs-triage`    | `Triage`, no `ready-for-human` label  | Maintainer evaluates the issue    |
   | `needs-info`      | `Backlog`                             | Waiting on the reporter           |
   | `ready-for-agent` | `Todo`                                | Fully specified for an agent      |
   | `ready-for-human` | `Triage` + label `ready-for-human`    | Requires human implementation     |
@@ -195,7 +196,7 @@ means deferred; `infra-check` exit 1 is a configuration error.
 
   `ready-for-human` is the only role with a label; remove it when the issue leaves the role. An
   issue with no role yet goes to `Triage`. `In Progress`, `In Review`, `Done` and `Duplicate` are
-  past triage. Category labels: `Bug`, and `Feature` for an enhancement.
+  past triage. Category roles are labels: `bug` = `Bug`, `enhancement` = `Feature`.
 - Dependencies are Linear relations (`blockedBy` / `blocks`). Merge a duplicate with `duplicateOf`
   on the absorbed issue: Linear moves it to `Duplicate`, and setting that status directly fails.
 - Evidence (counts, timings, SHAs, IDs, commands) lives only in the issue and PR.
