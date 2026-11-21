@@ -1,6 +1,57 @@
 # CHANGELOG
 
 
+## v0.51.0 (2026-11-21)
+
+### Code Style
+
+- Drop the trailing blank line from the Claude workflow files
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+### Documentation
+
+- Make the Linear status carry the triage role (SIP-234)
+  ([#17](https://github.com/BuckanovNikita/clearml-yolo/pull/17),
+  [`8191015`](https://github.com/BuckanovNikita/clearml-yolo/commit/819101573418bc32b9b22c648d991581619d1862))
+
+- Record the approved report-generator revision for 0.3.0
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+- State the issue status on create and the triage query (SIP-234)
+  ([#17](https://github.com/BuckanovNikita/clearml-yolo/pull/17),
+  [`8191015`](https://github.com/BuckanovNikita/clearml-yolo/commit/819101573418bc32b9b22c648d991581619d1862))
+
+- **report**: State which example-count columns cy-report shows
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+### Features
+
+- **report**: Write the business workbook in the fixed-column layout
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+- **report**: Write the fixed-column business workbook on report-generator 0.3.0 (SIP-242)
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+### Testing
+
+- **report**: Cover the custom report configuration and the comparison sheet
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+- **report**: Pass the dashboards to build_reports explicitly
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+- **report**: Pin business number formats, comparison colours and legend fills
+  ([#18](https://github.com/BuckanovNikita/clearml-yolo/pull/18),
+  [`c0eb1f5`](https://github.com/BuckanovNikita/clearml-yolo/commit/c0eb1f539422a95792de54f516a8b1df109192a1))
+
+
 ## v0.50.2 (2026-11-21)
 
 ### Bug Fixes
