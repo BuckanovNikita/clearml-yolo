@@ -316,3 +316,25 @@ def test_business_workbook_follows_a_custom_report_configuration(tmp_path: Path)
     assert _values(_table(workbook["Difference"])["shared"], goals) == [0, 0, 0, -1]
     assert _table(workbook["Difference"])["shared"]["F1 custom"].value == pytest.approx(0.2)
     workbook.close()
+
+
+def test_business_workbook_always_has_the_train_count_and_never_the_unsplit_count(tmp_path: Path) -> None:
+    split = ["Количество примеров train", "Количество примеров test", "Количество примеров val"]
+    paths = []
+    for name, rows in (("candidate", CANDIDATE), ("baseline", BASELINE)):
+        frame = _dashboard(rows).drop(columns=split)
+        frame["Количество примеров"] = 100
+        paths.append(tmp_path / f"{name}.xlsx")
+        frame.to_excel(paths[-1])
+    business = tmp_path / "business.xlsx"
+    issues = build_reports(*paths, tmp_path / "dev.xlsx", business, None)
+    # Without a training count every class is an unknown-count row, not a table row.
+    assert len(issues) == 6
+    workbook = load_workbook(business)
+    config = Config.load()
+    for title in (config.sheet_names.model1, config.sheet_names.model2, config.sheet_names.comparison):
+        sheet = workbook[title]
+        assert [cell.value for cell in sheet[2]] == [*HEADERS[:14], "Число примеров train"]
+        assert list(_table(sheet)) == ["Среднее"]
+    assert {"Unknown training count", "Report issues"} <= set(workbook.sheetnames)
+    workbook.close()
