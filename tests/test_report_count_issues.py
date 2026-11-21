@@ -56,8 +56,15 @@ def test_real_reports_preserve_unknown_rows_without_counting_them(tmp_path: Path
         assert not any("zero" in row for row in rows)
         metrics = workbook[config.sheet_names.model1]
         assert not any(cell.value == "unknown" for cell in metrics["A"])
-        summary = next(row for row in metrics.iter_rows(values_only=True) if row[0] == "AP50-valid-class-count")
-        assert summary[1] == ("0/0" if all_unknown else "1/1")
+        if path == business:
+            # No availability rows; the train count is summed over count-valid eligible classes.
+            assert not any(str(cell.value).endswith("-valid-class-count") for cell in metrics["A"])
+            headers = [cell.value for cell in metrics[2]]
+            mean = next(row for row in metrics.iter_rows(values_only=True) if row[0] == "Среднее")
+            assert mean[headers.index("Число примеров train")] == ("NA" if all_unknown else 30)
+        else:
+            summary = next(row for row in metrics.iter_rows(values_only=True) if row[0] == "AP50-valid-class-count")
+            assert summary[1] == ("0/0" if all_unknown else "1/1")
         workbook.close()
 
 

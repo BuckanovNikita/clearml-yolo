@@ -186,7 +186,6 @@ ignore_imports =
     clearml_yolo.adapters.reporting.evaluation -> digital_metrics
     clearml_yolo.adapters.reporting.comparison_workbook -> report_generator
     clearml_yolo.adapters.reporting.metrics_reader -> report_generator
-    clearml_yolo.adapters.reporting.report_layout -> report_generator
     clearml_yolo.adapters.reporting.reports -> report_generator
     clearml_yolo.adapters.reporting.count_issues -> report_generator
     clearml_yolo.adapters.reporting.workbook_identity -> report_generator
@@ -749,6 +748,7 @@ forbidden_modules =
     test_readable_output
     test_release_config
     test_report
+    test_report_business_layout
     test_report_class_availability
     test_report_count_issues
     test_result_export

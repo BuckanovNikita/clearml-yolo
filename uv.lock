@@ -680,7 +680,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10.0" },
     { name = "pytorch-lightning", specifier = "==2.6.6" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "report-generator", specifier = ">=0.2.0" },
+    { name = "report-generator", specifier = ">=0.3.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "rfdetr", extras = ["train"], specifier = "==1.11.2" },
     { name = "ruamel-yaml", specifier = ">=0.18.0,<0.19" },
@@ -3726,7 +3726,7 @@ wheels = [
 
 [[package]]
 name = "report-generator"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "external/wheelhouse" }
 dependencies = [
     { name = "click" },
@@ -3734,7 +3734,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pyyaml" },
 ]
-sdist = { path = "report_generator-0.2.0.tar.gz" }
+sdist = { path = "report_generator-0.3.0.tar.gz" }
 
 [[package]]
 name = "requests"
