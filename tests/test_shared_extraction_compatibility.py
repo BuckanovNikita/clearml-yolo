@@ -337,7 +337,9 @@ def _reports_observation(directory: Path, custom: bool) -> dict[str, Any]:
         )
     dev, business = directory / "dev.xlsx", directory / "business.xlsx"
     build_reports(candidate, baseline, dev, business, config_path)
-    return {"dev": _workbook_observation(dev), "business": _workbook_observation(business)}
+    # Only the developer workbook is frozen: the business workbook has the fixed-column
+    # layout of report-generator 0.3.0 and its own tests (test_report_business_layout.py).
+    return {"dev": _workbook_observation(dev)}
 
 
 @pytest.mark.parametrize("custom", [False, True])

@@ -95,7 +95,11 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
             assert not any(str(header).endswith(" coverage") for header in headers)
             column = headers.index(metric) + 1
             rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
-            assert sheet.cell(rows["AP50-valid-class-count"], 2).value == ("2/2" if shared else "1/1")
+            if business:
+                # The business workbook shows no availability counts.
+                assert not any(str(label).endswith("-valid-class-count") for label in rows)
+            else:
+                assert sheet.cell(rows["AP50-valid-class-count"], 2).value == ("2/2" if shared else "1/1")
             assert {"new", "deleted"} <= rows.keys()
             assert sheet.cell(rows[available], column).value == pytest.approx(expected)
             assert sheet.cell(rows[absent], column).value == "NA"
@@ -104,7 +108,10 @@ def test_report_preserves_one_sided_metrics_with_real_builders(
         headers = [cell.value for cell in sheet[2]]
         column = headers.index(metric) + 1
         rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
-        assert sheet.cell(rows["AP50-valid-class-count"], 2).value == ("1/1" if shared else "0/0")
+        if business:
+            assert not any(str(label).endswith("-valid-class-count") for label in rows)
+        else:
+            assert sheet.cell(rows["AP50-valid-class-count"], 2).value == ("1/1" if shared else "0/0")
         for label in ("new", "deleted"):
             cell = sheet.cell(rows[label], column)
             assert cell.value == "NA"
@@ -180,12 +187,28 @@ def test_report_count_summary_preserves_values_and_custom_headers(
             sheet = workbook[sheet_name]
             headers = [cell.value for cell in sheet[2]]
             assert "AP availability" not in headers
+            assert not any(str(header).endswith(" coverage") for header in headers)
+            assert sheet.freeze_panes == "B3"
+            assert all(column_index_from_string(key) <= len(headers) for key in sheet.column_dimensions)
+            rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
+            if path == business:
+                # Only the fixed business columns appear; availability is not shown.
+                assert headers == [
+                    "Класс",
+                    "f1_score",
+                    "Перебраковка, %",
+                    "Недобраковка, %",
+                    *config.business.goal_cols,
+                    "Число примеров train",
+                ]
+                assert not any(str(label).endswith("-valid-class-count") for label in rows)
+                if expected != "0/0" and sheet_name != config.sheet_names.comparison:
+                    assert sheet.cell(rows["A"], 2).value == pytest.approx(0.8)
+                    assert sheet.cell(rows["Среднее"], len(headers)).value == 60
+                continue
             custom_present = expected != "0/0" or sheet_name != config.sheet_names.comparison
             assert ("Availability custom" in headers) == custom_present
-            assert not any(str(header).endswith(" coverage") for header in headers)
-            metric = "AP custom" if path == business else "ap50"
-            column = headers.index(metric) + 1
-            rows = {sheet.cell(row, 1).value: row for row in range(3, sheet.max_row + 1)}
+            column = headers.index("ap50") + 1
             assert sheet.cell(rows["AP50-valid-class-count"], 2).value == expected
             assert sheet.cell(rows["f1_score-valid-class-count"], 2).value == ("0/0" if expected == "0/0" else "2/2")
             if custom_present:
@@ -193,8 +216,6 @@ def test_report_count_summary_preserves_values_and_custom_headers(
                     "0/0" if expected == "0/0" else "2/2"
                 )
             assert rows["AP50-valid-class-count"] > rows["Среднее"]
-            assert sheet.freeze_panes == "B3"
-            assert all(column_index_from_string(key) <= len(headers) for key in sheet.column_dimensions)
             if expected != "0/0":
                 assert sheet.cell(rows["A"], column).value == ("NA" if ap50[0] is None else ap50[0])
                 if ap50[0] is not None:
@@ -236,12 +257,17 @@ def test_real_reports_preserve_lexical_classes_and_exclude_numeric_threshold_row
             assert {"0001", "1", "NA", " 1 "} <= rows.keys()
             assert "0002" not in rows
             assert 0.5 not in rows
-            assert sheet.cell(rows["AP50-valid-class-count"], 2).value == "4/4"
-            metric = "ap50"
+            headers = [cell.value for cell in sheet[2]]
             if path == business:
-                metric = config.business.column_translations.get("ap50", "ap50")
-            column = [cell.value for cell in sheet[2]].index(metric) + 1
-            expected = 0.0 if sheet_name == config.sheet_names.comparison else 0.1
+                # AP is not a business column and availability is not shown.
+                assert "ap50" not in headers
+                assert not any(str(label).endswith("-valid-class-count") for label in rows)
+                metric, value = "f1_score", 0.2
+            else:
+                assert sheet.cell(rows["AP50-valid-class-count"], 2).value == "4/4"
+                metric, value = "ap50", 0.1
+            column = headers.index(metric) + 1
+            expected = 0.0 if sheet_name == config.sheet_names.comparison else value
             assert sheet.cell(rows["0001"], column).value == pytest.approx(expected)
         excluded = workbook[config.sheet_names.excluded]
         assert any(cell.value == "0002" for row in excluded for cell in row)

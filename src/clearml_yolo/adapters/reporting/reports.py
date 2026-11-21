@@ -6,9 +6,11 @@ metric layout is recovered before any value is read. A statistical comparison wo
 not a valid input. Rows whose training count is missing or invalid are partitioned out
 before the builders run, because the builders treat the training-count column as an
 eligibility filter; those rows are kept for the ``Unknown training count`` and
-``Report issues`` sheets appended afterwards. Both builders present counts below each table.
-Reporting never chooses a statistical protocol or recalculates values. Identity annotation
-happens in the caller, after this module has finished writing both files.
+``Report issues`` sheets appended afterwards. The developer builder presents availability
+counts below each table. The business builder writes its one fixed-column layout, which
+shows no availability counts. Reporting never chooses a statistical protocol or
+recalculates values. Identity annotation happens in the caller, after this module has
+finished writing both files.
 """
 
 from pathlib import Path
@@ -72,12 +74,7 @@ def build_reports(
                 presentation=PresentationOptions(counts="below_table"),
             ).build(dev_path)
         with trace_operation("report.business.build", context={"path": str(business_path)}):
-            BusinessReportBuilder(
-                candidate_reader,
-                baseline_reader,
-                config,
-                presentation=PresentationOptions(counts="below_table"),
-            ).build(business_path)
+            BusinessReportBuilder(candidate_reader, baseline_reader, config).build(business_path)
     issues = tuple(issue for partition in partitions for issue in partition.issues)
     for path in (dev_path, business_path):
         annotate_count_issues(path, partitions)
