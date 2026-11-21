@@ -176,6 +176,23 @@ def _assert_fixed_layout(workbook: Any, config: Any) -> None:
     assert differences["Среднее"]["recall"].value == pytest.approx(-0.025)
     assert _values(differences["Среднее"], ["tp", "fp", "fn", "Порог"]) == ["NA"] * 4
     assert _values(differences["Среднее"], COUNTS) == [0, -20, 0]
+    # One number format per column on every metric sheet.
+    formats = {
+        **dict.fromkeys(["tp", "fp", "fn", *COUNTS], "0"),
+        **dict.fromkeys(["Порог", "precision", "recall", "f1_score"], "0.0000"),
+        **dict.fromkeys(HEADERS[8:14], "0.00"),
+    }
+    for row in (_table(candidate)["shared"], _table(baseline)["shared"], differences["shared"]):
+        assert {name: row[name].number_format for name in HEADERS[1:]} == formats
+    # Only quality and percentage differences are coloured; the legend explains the colours.
+    colors = config.colors
+    assert differences["shared"]["precision"].fill.fgColor.rgb.endswith(colors.positive)
+    assert differences["weak"]["recall"].fill.fgColor.rgb.endswith(colors.negative)
+    assert differences["shared"]["tp"].fill.patternType is None
+    assert differences["weak"]["Число примеров train"].fill.patternType is None
+    assert comparison["A10"].fill.fgColor.rgb.endswith(colors.positive)
+    assert comparison["A11"].fill.fgColor.rgb.endswith(colors.negative)
+    assert comparison["A12"].fill.patternType is None
     # Title, header, four classes and the mean row end at row 7.
     assert _column_a(candidate)[7:13] == [None, *NOTE]
     assert _column_a(baseline)[7:13] == [None, *NOTE]
