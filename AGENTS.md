@@ -176,15 +176,32 @@ means deferred; `infra-check` exit 1 is a configuration error.
 ## Delivery and release
 
 - Every change: a Linear issue in team `SIP`, project `clearml-yolo`, a task branch and a GitHub PR
-  in `BuckanovNikita/clearml-yolo`, linked both ways. Agents push task branches over the existing
-  SSH remote and open PRs; humans squash-merge. Never push to or merge into `master`. Explicit
-  no-commit or no-push limits take precedence.
-- Linear states: Backlog, Todo, In Progress, In Review, Done, Canceled, Duplicate; readiness labels
-  `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` are separate.
-  Evidence (counts, timings, SHAs, IDs, commands) lives only in the issue and PR.
-- Issues start from the Linear template `clearml-yolo task`. Done = merged to `master` with
-  acceptance criteria met. Dependent work starts only after its prerequisite is verified on its
-  base branch; a canceled prerequisite means replanning, never a bypass.
+  in `BuckanovNikita/clearml-yolo`. End the PR title with the issue identifier, `... (SIP-123)`:
+  Linear links the PR and moves the issue to Done when it merges. Agents push task branches over
+  the existing SSH remote and open PRs; humans squash-merge. Never push to or merge into `master`.
+  Explicit no-commit or no-push limits take precedence.
+- Team `SIP` holds one project per repository and one number space across them: pass `team: SIP`
+  and `project: clearml-yolo` on every Linear create and list. Issues start from the Linear
+  template `default`.
+- The Linear status is the triage role. Where a skill names a role, set the status:
+
+  | Role              | Status                                | Meaning                           |
+  | ----------------- | ------------------------------------- | --------------------------------- |
+  | `needs-triage`    | `Triage`                              | Maintainer evaluates the issue    |
+  | `needs-info`      | `Backlog`                             | Waiting on the reporter           |
+  | `ready-for-agent` | `Todo`                                | Fully specified for an agent      |
+  | `ready-for-human` | `Triage` + label `ready-for-human`    | Requires human implementation     |
+  | `wontfix`         | `Canceled`, after a comment says why  | Will not be actioned              |
+
+  `ready-for-human` is the only role with a label; remove it when the issue leaves the role. An
+  issue with no role yet goes to `Triage`. `In Progress`, `In Review`, `Done` and `Duplicate` are
+  past triage. Category labels: `Bug`, and `Feature` for an enhancement.
+- Dependencies are Linear relations (`blockedBy` / `blocks`). Merge a duplicate with `duplicateOf`
+  on the absorbed issue: Linear moves it to `Duplicate`, and setting that status directly fails.
+- Evidence (counts, timings, SHAs, IDs, commands) lives only in the issue and PR.
+- Done = merged to `master` with acceptance criteria met. Dependent work starts only after its
+  prerequisite is verified on its base branch; a canceled prerequisite means replanning, never a
+  bypass.
 - Stacked PRs target their parent branch; humans merge bottom-up; `--force-with-lease` only on
   task-owned branches.
 - A squash-merge into `master` releases automatically (semantic-release). No CI check runs on PRs,
