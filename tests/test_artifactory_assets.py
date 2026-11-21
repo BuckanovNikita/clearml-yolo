@@ -294,7 +294,11 @@ def test_manual_failure_prints_static_setup_and_retry_only_when_needed(
         assert "Files remote of https://github.com" in output
         assert "GH (VCS) and HF_ENDPOINT apply only to standalone" in output
         assert "CY_WEIGHTS_DOWNLOAD_TIMEOUT=3600" in output
-        assert output.endswith("Retry: cy-download-weights\nDetails: DOCS.md, section Model assets\n")
+        assert output.endswith(
+            "Retry: cy-download-weights\n"
+            "Details: https://github.com/BuckanovNikita/clearml-yolo/blob/master/"
+            "docs/commands/cy-download-weights.md\n"
+        )
         assert "pinned release only" in output
         assert "per-host ~/.netrc" in output
         assert "Retry: cy-download-weights" in output

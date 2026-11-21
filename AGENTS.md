@@ -3,11 +3,30 @@
 `clearml-yolo` (CY) provides Hydra/hydra-zen commands (`cy`, `cy-train`, `cy-predict`, `cy-val`,
 `cy-metrics`, `cy-compare`, `cy-report`, `cy-ground-truth`, `cy-export` and tools) that train,
 predict, evaluate, compare, report and export detectors (YOLO, DEIMv2, RF-DETR, Faster R-CNN,
-FCOS) with ClearML publication. [README.md](README.md) is the Russian user manual;
-[DOCS.md](DOCS.md) holds architecture, behavior contracts, config keys and operations. Read the
-affected DOCS.md section before changing behavior or configuration. A behavior or configuration
-change updates its DOCS.md and README.md sections in the same change; README states nothing that
-DOCS.md and the code do not.
+FCOS) with ClearML publication. [DOCS.md](DOCS.md) holds architecture, behavior contracts, config
+keys and operations. Read the affected DOCS.md section and the user page that owns the fact before
+changing behavior or configuration.
+
+## User documentation
+
+- The user documentation is [README.md](README.md) (entry page) and the pages that
+  [docs/README.md](docs/README.md) lists. Each fact has one owning page: the page that index lists
+  for its command, config group, file format or topic. Other pages link to the owner; `README.md`,
+  `docs/README.md` and `GLOSSARY.md` also restate some facts (for example the command list and
+  counts, Python range, install command, weight licences, defaults quoted in glossary entries).
+- A behavior or configuration change updates, in the same change, its DOCS.md section, the owning
+  user page and every place that restates the fact (search `README.md`, `docs/` and
+  `GLOSSARY.md`). Every behavior claim on a page the change edits matches the code and agrees with
+  DOCS.md; record a mismatch found on another page in the Linear issue. A fact with no owning page
+  goes on the page of its command or config group.
+- Adding or removing a command updates the `README.md` command table and the command counts in
+  `README.md` and `docs/README.md`; adding, renaming or removing a page updates `docs/README.md`.
+  `cy-download-weights` prints the URL of `docs/commands/cy-download-weights.md`: moving that page
+  updates the message and its test.
+- [GLOSSARY.md](GLOSSARY.md) defines the user-facing terms in English with their Russian wording
+  and lists the terms the pages keep in English; developer and contract terms stay in the DOCS.md
+  glossary section. User pages use the glossary's Russian wording. A change that introduces,
+  renames or narrows a user-facing term updates GLOSSARY.md in the same change.
 
 ## Layout
 
@@ -200,5 +219,5 @@ means deferred; `infra-check` exit 1 is a configuration error.
 - Changes to behavior, interfaces, dependencies, security or operational policy need a fresh independent review after integration and verification. Small wording edits may be self-reviewed.
 - Split large work into independent delegated tasks with explicit write ownership and acceptance evidence; delegated agents do not delegate further.
 - Use Conventional Commits. Commit automatic formatting separately from logic. Local commits within the task scope need no approval.
-- README.md is Russian; AGENTS.md and DOCS.md are English. Keep observed counts, timings and deployment status out of both files.
+- README.md and docs/ are Russian; AGENTS.md, DOCS.md and GLOSSARY.md are English. Keep observed counts, timings and deployment status out of all of them.
 - Keep machine-specific paths, endpoints and settings in local configuration, not in these files.

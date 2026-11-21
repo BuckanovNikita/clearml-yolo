@@ -1,6 +1,6 @@
 # clearml-yolo reference
 
-Behavior and contracts that the code does not make obvious. Usage is in [README.md](README.md);
+Behavior and contracts that the code does not make obvious. Usage is in [README.md](README.md) and [docs/](docs/README.md);
 rules for changing the code are in [AGENTS.md](AGENTS.md).
 
 ## Architecture and data flow
@@ -189,3 +189,5 @@ The full pre-compression documents are in git at commit `4c5a9d5`; read one with
 top-level paths: `CLAUDE.md`, `GLOSSARY.md`, `docs/` (`docs/feature/*.md`,
 `docs/development.md`, `docs/architecture.md`, `docs/agents/`), `.agents/skills/`,
 `.claude/skills`, `.pre-commit-config.yaml`, `scripts/git-hook.sh`, `scripts/install-hooks.sh`.
+The current `GLOSSARY.md` and `docs/` are the user glossary and user documentation written after
+that commit, not the removed files.
