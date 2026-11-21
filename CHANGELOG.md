@@ -1,6 +1,115 @@
 # CHANGELOG
 
 
+## v0.50.2 (2026-11-21)
+
+### Bug Fixes
+
+- **download-weights**: Point the failure hint at the user documentation (SIP-189)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+### Chores
+
+- Remove git hook configuration and installers
+  ([#14](https://github.com/BuckanovNikita/clearml-yolo/pull/14),
+  [`7aeef60`](https://github.com/BuckanovNikita/clearml-yolo/commit/7aeef60dbf030951b7a4f8aee4bbb7d9637ee0ed))
+
+### Documentation
+
+- Add evaluation, ClearML and FiftyOne configuration and the publication page (SIP-182)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add installation, configuration basics and workspace pages (SIP-180)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add scenarios, queue page and index, shorten the README, update the documentation rules (SIP-191)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the cy and cy-train command pages (SIP-185)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the cy-compare command page (SIP-190)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the cy-export command page (SIP-188)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the cy-metrics, cy-report and cy-ground-truth command pages (SIP-187)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the cy-predict and cy-val command pages (SIP-186)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the file format pages (SIP-183)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the model and transforms configuration reference (SIP-181)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the native Ultralytics configuration reference (SIP-184)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the Russian user documentation tree (SIP-178)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the user-facing glossary (SIP-179)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Add the utility command pages (SIP-189)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Align page terminology with the verified glossary (SIP-179)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Close the gaps the second review found in the documentation rules (SIP-191)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Compress agent instructions and docs into AGENTS.md and DOCS.md
+  ([#14](https://github.com/BuckanovNikita/clearml-yolo/pull/14),
+  [`7aeef60`](https://github.com/BuckanovNikita/clearml-yolo/commit/7aeef60dbf030951b7a4f8aee4bbb7d9637ee0ed))
+
+- Compress agent instructions and docs into AGENTS.md and DOCS.md (SIP-159)
+  ([#14](https://github.com/BuckanovNikita/clearml-yolo/pull/14),
+  [`7aeef60`](https://github.com/BuckanovNikita/clearml-yolo/commit/7aeef60dbf030951b7a4f8aee4bbb7d9637ee0ed))
+
+- Correct examples that failed in the live pass (SIP-192)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Correct standalone run-directory paths, add the install command and licence notices (SIP-192)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Point DOCS.md at the current user documentation (SIP-191)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Restore the facts the comparison pass dropped, verified against the code (SIP-192)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+- Tighten the documentation rules after independent review (SIP-191)
+  ([#15](https://github.com/BuckanovNikita/clearml-yolo/pull/15),
+  [`c729409`](https://github.com/BuckanovNikita/clearml-yolo/commit/c729409e2b6b0ef5848aecf383dd91bbe443a568))
+
+
 ## v0.50.1 (2026-11-17)
 
 ### Bug Fixes
