@@ -24,7 +24,6 @@ def fingerprint() -> str:
         "uv.lock",
         "Taskfile.yml",
         "Taskfile.ops.yml",
-        ".pre-commit-config.yaml",
         ".python-version",
         ".importlinter",
         "ruff.toml",

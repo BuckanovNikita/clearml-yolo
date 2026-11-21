@@ -31,7 +31,7 @@ os.environ["USERPROFILE"] = str(_FAKE_HOME)
 os.environ["XDG_CONFIG_HOME"] = str(_FAKE_HOME / ".config")
 os.environ["XDG_CACHE_HOME"] = str(_FAKE_HOME / ".cache")
 
-# Under the pre-commit hook git exports GIT_INDEX_FILE (and may export GIT_DIR or
+# Under a git hook git exports GIT_INDEX_FILE (and may export GIT_DIR or
 # GIT_WORK_TREE). Tests that build throwaway repositories must not touch the commit
 # in progress.
 for _name in [name for name in os.environ if name.startswith("GIT_")]:

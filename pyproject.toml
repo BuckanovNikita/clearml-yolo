@@ -36,7 +36,7 @@ dependencies = [
     "scipy>=1.14.1",
     "openpyxl>=3.1.5",
     "tqdm>=4.66.0",
-    # Local dependency copies live in external/; see docs/development.md.
+    # Local dependency copies live in external/; see DOCS.md (Installation and dependencies).
     "digital-metrics>=0.6.1",
     "report-generator>=0.2.0",
     "ruamel-yaml>=0.18.0,<0.19",
@@ -85,7 +85,6 @@ dev = [
     "pandas-stubs",
     "types-PyYAML",
     "types-requests>=2.32.0",
-    "prek>=0.5.10",
     "pytest>=8.0",
     "ruff>=0.16.1,<0.17",
     "scipy-stubs==1.18.0.1",
@@ -143,10 +142,10 @@ module = [
 ignore_missing_imports = true
 
 [tool.vulture]
-# Cross-file uses matter; never reduce this to pre-commit's staged filename list.
+# Cross-file uses matter; never reduce this to a staged filename list.
 paths = ["src", "scripts", "tests"]
 # Include unused arguments/unreachable code (100%) and imports (90%). Dynamic
-# framework members (60%) remain an advisory audit; see docs/development.md.
+# framework members (60%) remain an advisory audit; see DOCS.md (Static analysis).
 min_confidence = 80
 
 [tool.pytest.ini_options]
