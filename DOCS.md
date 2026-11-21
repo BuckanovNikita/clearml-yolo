@@ -161,7 +161,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 ## Installation and dependencies
 
 - Python `>=3.12.13,<3.14`, Linux with pidfd APIs; ClearML server with remote storage is required; no extras; not on PyPI. Commands never install packages at run time.
-- `digital-metrics` (`6e801be1564dce458294eb23592cc1aa0939c4d9`, github.com/Wasilkas/digital-metrics) and `report-generator` (`7339ef864b4ff1b1db499a08d647193128088e80`, github.com/Wasilkas/report-generator) are ignored copies under `external/`. `pyproject.toml` declares them by version; `uv.lock` records `source = { registry = "external/wheelhouse" }` and does not enforce revisions. Git-link installs resolve both from the user's index.
+- `digital-metrics` (`6e801be1564dce458294eb23592cc1aa0939c4d9`, github.com/Wasilkas/digital-metrics) and `report-generator` (`4fd58628670da7f98a896d41eb149e7bf6a9b110`, github.com/Wasilkas/report-generator) are ignored copies under `external/`. `pyproject.toml` declares them by version; `uv.lock` records `source = { registry = "external/wheelhouse" }` and does not enforce revisions. Git-link installs resolve both from the user's index.
 - `task local-deps` builds sdists into `external/wheelhouse` and creates `uv.toml` with `find-links = ["external/wheelhouse"]`; it never overwrites `uv.toml` and fails if the entry is missing.
 - Changing a dependency floor: test an isolated `lowest-direct` resolution on each supported minor, separate from `uv.lock`.
 
