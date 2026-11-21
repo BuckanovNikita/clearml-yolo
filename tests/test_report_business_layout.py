@@ -327,7 +327,7 @@ def test_business_workbook_always_has_the_train_count_and_never_the_unsplit_coun
         paths.append(tmp_path / f"{name}.xlsx")
         frame.to_excel(paths[-1])
     business = tmp_path / "business.xlsx"
-    issues = build_reports(*paths, tmp_path / "dev.xlsx", business, None)
+    issues = build_reports(paths[0], paths[1], tmp_path / "dev.xlsx", business, None)
     # Without a training count every class is an unknown-count row, not a table row.
     assert len(issues) == 6
     workbook = load_workbook(business)
