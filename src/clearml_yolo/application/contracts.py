@@ -483,6 +483,12 @@ def validate_dataset_format(dataset_format: str) -> None:
         raise ValueError("dataset_format must be one of: ndjson, flat, coco")
 
 
+def require_ultralytics_dataset_format(dataset_format: str) -> None:
+    """Reject the COCO copy for Ultralytics training, which reads ndjson or flat only."""
+    if dataset_format == "coco":
+        raise ValueError("Ultralytics training requires ndjson or flat dataset_format")
+
+
 def validate_test_fraction(test_fraction: float) -> None:
     """Reject a share of val images that cannot leave both val and test usable."""
     if not 0.0 <= test_fraction < 1.0:

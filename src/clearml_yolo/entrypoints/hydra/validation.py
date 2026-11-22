@@ -30,6 +30,7 @@ from clearml_yolo.application.contracts import (
     ClearMLConfig,
     ModelRef,
     require_specified_candidate,
+    require_ultralytics_dataset_format,
     validate_dataset_format,
     validate_test_fraction,
 )
@@ -463,6 +464,7 @@ def _validate_prediction_model(values: dict[str, Any]) -> None:
 
 def _validate_train(values: dict[str, Any]) -> None:
     if _uses_ultralytics(values):
+        require_ultralytics_dataset_format(values["dataset_format"])
         settings = execution_settings(values["ultralytics"], "train")
         require_training_model(settings)
         reject_csv_resume(settings)

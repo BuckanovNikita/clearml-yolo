@@ -154,6 +154,18 @@ INVALID = [
         id="train-dataset-format",
     ),
     pytest.param(
+        "train",
+        ["ground_truth=truth.csv", "dataset_format=coco"],
+        "Ultralytics training requires ndjson or flat dataset_format",
+        id="train-yolo-coco",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "skip_train=true", "weights=w.pt", "dataset_format=coco"],
+        "Ultralytics training requires ndjson or flat dataset_format",
+        id="pipeline-yolo-coco-without-training",
+    ),
+    pytest.param(
         "pipeline",
         ["ground_truth=truth.csv", "+ultralytics.save_dir=null"],
         "Native pipeline output overrides require an explicit run_dir",
@@ -307,6 +319,10 @@ VALID = [
     ),
     pytest.param("train", ["ground_truth=truth.csv"], id="train"),
     pytest.param("train", ["ground_truth=truth.csv", "model=rfdetr/small"], id="train-detector"),
+    # A detector run always prepares a COCO dataset copy, whatever dataset_format says.
+    pytest.param(
+        "train", ["ground_truth=truth.csv", "model=rfdetr/small", "dataset_format=flat"], id="train-detector-format"
+    ),
     pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt"], id="predict"),
     # A removed fiftyone group stays absent: the run published with defaults, as on the base commit.
     pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt", "~fiftyone"], id="predict-removed-fiftyone"),
