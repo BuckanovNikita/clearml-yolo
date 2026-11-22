@@ -53,8 +53,10 @@ b.jpg,images/train/b.jpg,,,,,,train
 Строку с `instance_label`, равным `background`, команды обрабатывают по-разному:
 
 - `cy-train`, этап обучения `cy` и проверка модели в `cy-export` отклоняют файл при чтении CSV, до открытия изображений и до начала обучения. Сообщение: `Invalid raw_ground_truth dataframe: instance_label at 2: reserved_background_label`.
-- `cy-metrics`, `cy-compare` и `cy-val` отклоняют файл при подсчёте метрик, если такая строка есть в `val` или в оцениваемом split. Сообщение: `'background' is a reserved class label for unmatched detections.` `cy-val` отклоняет файл уже после предсказаний.
+- `cy-metrics` и `cy-val` отклоняют файл при подсчёте метрик, в каком бы split ни была такая строка. Сообщение зависит от split: `'background' is a reserved class label for unmatched detections.` или `'background' is reserved for unmatched detections.` `cy-val` отклоняет файл уже после предсказаний.
+- `cy-compare` отклоняет файл, только если такая строка есть в сравниваемом split (ключ `split`, по умолчанию `test`). Сообщение: `'background' is a reserved class label for unmatched detections.` В других split имя не проверяется.
 - `cy-predict` имена классов в разметке не проверяет и строит предсказания для такого файла.
+- В `cy` с `skip_train=true` этапы метрик и сравнения ведут себя как `cy-metrics` и `cy-compare`.
 
 ## Правила split
 
@@ -118,6 +120,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `data/ground_truth.csv: required split(s) contain no images: val` | Нет изображений в обязательном split |
 | `data/ground_truth.csv: at least one valid training box is required` | В `train` не осталось ни одной корректной рамки |
 | `Unsupported required split(s): dev; expected train, val, or test` | В `required_splits` указан недопустимый split |
+| `Dataset cache entry records the reserved class label 'background': <каталог>` | Среди классов рабочей копии есть `background`, но в CSV строки с этим именем не нашлось. Такая копия повреждена; удалите её подкаталог |
 | `Cached dataset required split(s) contain no images: test` | Рабочая копия датасета для этого CSV уже есть, но в ней нет изображений split из `required_splits` |
 
 При загрузке разметки из датасета ClearML:
@@ -139,6 +142,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `No ground-truth rows for calibration split 'val'` | В файле нет `val` (`cy-metrics`) |
 | `A logical image cannot belong to both val and test; overlapping image_name(s): ['a.jpg']` | Изображение есть и в `val`, и в `test` |
 | `'background' is a reserved class label for unmatched detections.` | Класс называется `background` |
+| `'background' is reserved for unmatched detections.` | Класс `background` есть в файле, но не в `val` и не в первом split из ключа `splits` (`cy-metrics`, `cy-val`) |
 | `Ground-truth unlabeled rows must have fully empty boxes.` | Строка без `instance_label`, но с координатами |
 | `Ground-truth boxes must have numeric coordinates.` | Координата не число |
 | `Ground-truth boxes must have ordered corners and positive area.` | Правая или нижняя граница не больше левой или верхней |
