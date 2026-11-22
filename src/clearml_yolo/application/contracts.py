@@ -469,6 +469,20 @@ class ModelRef(BaseModel):
         return self
 
 
+_CANDIDATE_NOT_SPECIFIED = (
+    "candidate_model is not specified: it holds only default values, which are the baseline defaults. "
+    "Set candidate_model.task_id=<task-id>, or candidate_model.project_name / candidate_model.task_name / "
+    "candidate_model.tags, or candidate_model.source=local with candidate_model.weights=<path> "
+    "and candidate_model.thresholds={...}"
+)
+
+
+def require_specified_candidate(candidate: ModelRef) -> None:
+    """Reject a candidate that holds only default values; it would resolve like the baseline."""
+    if candidate == ModelRef():
+        raise ValueError(_CANDIDATE_NOT_SPECIFIED)
+
+
 class ResolvedModel(BaseModel):
     """A model reference after lookup, with its exact provenance retained."""
 

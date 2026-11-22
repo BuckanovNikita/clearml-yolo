@@ -9,6 +9,7 @@ import pytest
 
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
 from clearml_yolo.adapters.clearml.session import ClearMLConfig
+from clearml_yolo.application.contracts import require_specified_candidate
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases.pipeline import routed_native
 from clearml_yolo.core.publication import FiftyOneConfig, PublicationReceipt
@@ -634,6 +635,7 @@ def test_pipeline_comparison_reuses_an_existing_local_checkpoint_string(
         deps=workflow_dependencies,
     )
     assert received[0].weights == checkpoint
+    require_specified_candidate(received[0])
 
 
 def test_pipeline_local_comparison_rejects_unresolved_remote_references(
@@ -698,6 +700,7 @@ def test_pipeline_comparison_uses_its_native_candidate_source_task(
         deps=workflow_dependencies,
     )
     assert received[0].source == "clearml"
+    require_specified_candidate(received[0])
     assert received[0].task_id == "owner"
     assert received[0].thresholds is None
 

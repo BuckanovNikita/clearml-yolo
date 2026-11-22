@@ -54,7 +54,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 
 ### Ссылка на модель: `baseline_model` и `candidate_model`
 
-У обоих ключей одинаковый набор полей и одни и те же значения по умолчанию.
+У обоих ключей одинаковый набор полей и одни и те же значения по умолчанию. Но `baseline_model` со значениями по умолчанию означает автоматический поиск `prod`, а `candidate_model` со значениями по умолчанию отклоняется: кандидата нужно задать явно (`candidate_model.task_id`, либо `project_name`, `task_name` или `tags`, либо `source=local` с `weights` и `thresholds`).
 
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 
 ## Как это работает
 
-1. Hydra собирает конфигурацию. Значение `inference.image_name`, отличное от `name`, отклоняется до создания задачи ClearML.
+1. Hydra собирает конфигурацию. Значение `inference.image_name`, отличное от `name`, и `candidate_model` только со значениями по умолчанию отклоняются до создания задачи ClearML.
 2. Команда создаёт задачу ClearML с именем и тегами из группы `clearml` и проверяет поля `baseline_model`, `candidate_model`, `inference`, `ultralytics_predict`, `q`.
 3. Команда читает разметку и проверяет, что каждое изображение относится к одному split.
 4. Выбирается модель baseline:
@@ -93,7 +93,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 
    Из задачи ClearML берётся лучший checkpoint и, если `thresholds` не заданы, пороги, подобранные при её оценке (см. [публикацию](../publication.md#что-cy-читает-обратно)).
 5. Если модель baseline задана только значениями по умолчанию (`source=clearml`, тег `prod`, без `task_id`, `project_name`, `task_name` и `weights`) и подходящей задачи нет, сравнение пропускается: команда оценивает только кандидата (см. «Результат»). Если поиск с явно заданными полями ничего не нашёл, команда завершается ошибкой.
-6. Тем же способом выбирается модель-кандидат. Значения по умолчанию у неё те же, что у модели baseline, поэтому кандидата нужно задать явно: иначе обе стороны найдут одну и ту же задачу. Если обе модели указывают на один и тот же файл, команда завершается ошибкой.
+6. Тем же способом выбирается модель-кандидат. Кандидата нужно задать явно: `candidate_model` только со значениями по умолчанию команда отклоняет ещё до создания задачи (шаг 1). Если обе явно заданные модели указывают на один и тот же файл, команда завершается ошибкой.
 7. Обе модели запускаются на изображениях split из текущей разметки — не на сохранённых предсказаниях из прежних задач — с одинаковыми параметрами `ultralytics_predict` (или `model.predict` для других семейств). Если модель baseline обучалась с другим `imgsz`, команда пишет предупреждение, но обе модели получают один и тот же запрошенный `imgsz`.
 8. Предсказания каждой модели сохраняются в CSV в `output_dir`. Имя файла содержит хэш от пути и содержимого весов, параметров предсказания, утверждений о модели (`backend`, `preset` и другие) и состава split (имена и пути изображений). При `inference.reuse_existing=true` и уже существующем файле с таким именем предсказания читаются из него, а модель не запускается. Перед этим команда сверяет записанные в файле checkpoint и модель с выбранными; при расхождении она завершается ошибкой. Если файла `.metadata.json` рядом нет, он повреждён или нативные результаты прежнего запуска не сохранились в `output_dir/native`, файл игнорируется и модель запускается заново. При `inference.reuse_existing=false` модель запускается всегда.
 
@@ -145,7 +145,8 @@ Hydra печатает трассировку; смысл ошибки — в п
 - `Value error, Checkpoint backend and preset must be specified together` и `Value error, Raw checkpoint metadata requires backend and preset` — задайте `backend` и `preset` вместе.
 - `Value error, source_dir is only supported for DEIMv2` — `source_dir` задан для другого семейства.
 - `No completed ClearML task in project 'my-project' tagged ['my-tag']` — поиск модели ничего не нашёл. Проверьте проект, имя и теги или задайте `task_id`.
-- `Both sides resolved to the same checkpoint (...), so there is nothing to compare` — обе модели указывают на один файл; чаще всего кандидат не задан и найден тот же `prod`, что и для baseline.
+- `candidate_model is not specified: it holds only default values, which are the baseline defaults. Set candidate_model.task_id=<task-id>, ...` — кандидат не задан. Задайте `candidate_model.task_id`, либо `candidate_model.project_name`, `candidate_model.task_name` или `candidate_model.tags`, либо `candidate_model.source=local` вместе с `candidate_model.weights` и `candidate_model.thresholds`. Тег `prod` без других полей равен значению по умолчанию и тоже отклоняется.
+- `Both sides resolved to the same checkpoint (...), so there is nothing to compare` — две явно заданные модели указывают на один файл. Укажите разные модели.
 - `Local checkpoint does not exist: weights/best.pt` — нет файла `weights`.
 - `Confidence thresholds are missing required class(es): [...]` — в `thresholds` нет порога для класса, по которому оценивается модель.
 - `Prediction ['model'] are owned by comparison; use baseline_model/candidate_model and output_dir` — задан `ultralytics_predict.model` (то же для `project` и `name`). Верните `null`.

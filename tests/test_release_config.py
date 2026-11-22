@@ -95,6 +95,24 @@ def test_unknown_inference_settings_are_rejected() -> None:
         validate_wrapper_keys(config, compare)
 
 
+def test_compare_configuration_rejects_a_default_candidate_before_launch() -> None:
+    from hydra import compose, initialize_config_module
+    from hydra_zen import store
+
+    from clearml_yolo.application.use_cases.compare import compare
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+
+    store.add_to_hydra_store(overwrite_ok=True)
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        defaults = compose(config_name="compare")
+        named = compose(config_name="compare", overrides=["candidate_model.task_id=candidate-task"])
+        tagged = compose(config_name="compare", overrides=["candidate_model.tags=[staging]"])
+    with pytest.raises(ValueError, match="candidate_model is not specified"):
+        validate_wrapper_keys(defaults, compare)
+    validate_wrapper_keys(named, compare)
+    validate_wrapper_keys(tagged, compare)
+
+
 @pytest.mark.parametrize("key", ["model", "project", "name"])
 def test_comparison_rejects_owned_prediction_overrides(
     tmp_path: Path,

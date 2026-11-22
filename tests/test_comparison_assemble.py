@@ -505,6 +505,27 @@ def test_comparing_a_model_against_itself_is_refused(
         )
 
 
+def test_compare_rejects_a_default_candidate_before_the_task_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
+) -> None:
+    from clearml_yolo.adapters.clearml.session import ClearMLConfig
+    from clearml_yolo.application.use_cases.compare import InferenceConfig, ModelRef, compare
+
+    monkeypatch.setattr(workflow_dependencies.tracking, "init_task", lambda *a, **k: pytest.fail("created task"))
+    with pytest.raises(ValueError, match="candidate_model is not specified") as raised:
+        compare(
+            baseline_model=ModelRef(),
+            candidate_model=ModelRef(),
+            ground_truth=tmp_path / "gt.csv",
+            output_dir=tmp_path / "out",
+            clearml=ClearMLConfig(),
+            inference=InferenceConfig(conf=0.001, iou=0.7, imgsz=640, batch=1, device="cpu"),
+            deps=workflow_dependencies,
+        )
+    for key in ("task_id", "project_name", "task_name", "tags", "source=local", "weights", "thresholds"):
+        assert key in str(raised.value)
+
+
 def test_thresholds_are_carried_through_per_model() -> None:
     tables = _tables({"car": 20, "van": 20}, {"car": 30, "van": 20})
     rows = tables.rows

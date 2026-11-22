@@ -16,7 +16,7 @@ from clearml_yolo.adapters.yolo.config import (
     prediction_defaults,
     stage_settings,
 )
-from clearml_yolo.application.contracts import ClearMLConfig, ModelRef
+from clearml_yolo.application.contracts import ClearMLConfig, ModelRef, require_specified_candidate
 from clearml_yolo.application.ground_truth import normalize_ground_truth
 from clearml_yolo.application.use_cases.pipeline import (
     pipeline_stage_settings,
@@ -92,6 +92,18 @@ def _reject_null_fiftyone(value: object) -> None:
         raise ValueError("fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off")
 
 
+def _require_specified_candidate(config: DictConfig, function: Callable[..., Any]) -> None:
+    """Reject a default ``cy-compare`` candidate before the ClearML task is created."""
+    if function.__name__ != "compare" or "candidate_model" not in config:
+        return
+    candidate = config.candidate_model
+    values = OmegaConf.to_container(candidate, resolve=True) if isinstance(candidate, DictConfig) else candidate
+    if not isinstance(values, Mapping):
+        raise TypeError("ModelRef settings must be a mapping")
+    fields = {str(key): value for key, value in values.items() if key != "_target_"}
+    require_specified_candidate(ModelRef.model_validate(fields))
+
+
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
     """Validate the command schema, including keys introduced with Hydra's + syntax."""
     reject_legacy_controls(config)
@@ -112,6 +124,7 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
         and config.ground_truth is not None
     ):
         normalize_ground_truth(config.ground_truth)
+    _require_specified_candidate(config, function)
     prepare_transforms(config)
     model = materialize_model_config(config)
     _validate_export(config, model)
