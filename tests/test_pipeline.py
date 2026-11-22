@@ -730,3 +730,30 @@ def test_cache_cannot_live_inside_pipeline_run(
             fiftyone=FiftyOneConfig(enabled=False),
             deps=workflow_dependencies,
         )
+
+
+def test_explicit_cache_inside_the_run_dir_is_rejected_whatever_the_default_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    from clearml_yolo.application.use_cases import pipeline
+
+    # The default cache lies under CY_HOME, outside the run directory; only the given one is inside.
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    patch_workflow(monkeypatch, workflow_dependencies, pipeline, "init_task", lambda *a, **k: object())
+    run_dir = tmp_path / "run"
+    with pytest.raises(ValueError, match="dataset_cache_dir must be outside run_dir"):
+        pipeline.run_pipeline(
+            ground_truth="source.csv",
+            ultralytics=training_settings(),
+            ultralytics_predict={},
+            clearml=ClearMLConfig(),
+            run_dir=run_dir,
+            metrics={},
+            report={},
+            compare={},
+            dataset_cache_dir=run_dir / "cache",
+            fiftyone=FiftyOneConfig(enabled=False),
+            deps=workflow_dependencies,
+        )
