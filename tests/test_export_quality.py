@@ -171,7 +171,8 @@ def test_evaluator_alias_contamination_fails_before_quality_evaluation(
         {"__module__": "faster_coco_eval.core.faster_eval_api"},
     )
     replacement.COCOeval = replacement_type  # type: ignore[attr-defined]
-    import pycocotools
+    # Import the submodule first: setattr below needs the attribute to exist, whatever ran earlier.
+    import pycocotools.cocoeval
 
     monkeypatch.setitem(sys.modules, "pycocotools.cocoeval", replacement)
     monkeypatch.setattr(pycocotools, "cocoeval", replacement)
