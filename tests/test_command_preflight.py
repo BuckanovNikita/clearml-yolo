@@ -271,6 +271,7 @@ def test_invalid_configuration_fails_before_the_task_exists(
 
 VALID = [
     pytest.param("pipeline", ["ground_truth=truth.csv"], id="pipeline"),
+    pytest.param("pipeline", ["ground_truth=truth.csv", "~fiftyone"], id="pipeline-removed-fiftyone"),
     pytest.param("pipeline", ["ground_truth=truth.csv", "weights=w.pt", "skip_train=true"], id="pipeline-weights"),
     pytest.param(
         "pipeline",
@@ -296,6 +297,8 @@ VALID = [
     pytest.param("train", ["ground_truth=truth.csv"], id="train"),
     pytest.param("train", ["ground_truth=truth.csv", "model=rfdetr/small"], id="train-detector"),
     pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt"], id="predict"),
+    # A removed fiftyone group stays absent: the run published with defaults, as on the base commit.
+    pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt", "~fiftyone"], id="predict-removed-fiftyone"),
     pytest.param("predict", ["ground_truth=truth.csv", "ultralytics_predict.model=m.pt"], id="predict-native-model"),
     pytest.param(
         "predict", ["ground_truth=truth.csv", "weights=w.pt", "model=fcos/resnet50_fpn"], id="predict-detector"

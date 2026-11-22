@@ -180,7 +180,7 @@ visualization: failed — <сообщение ошибки>
 | `Legacy queue/autogpu controls are removed from direct cy commands. ...` | Заданы `queue`, `autogpu` или `auto_gpu`. Уберите их; постановка в очередь описана в [Очереди](../queue.md) |
 | `Project write destination /etc/x must be contained beneath CY_HOME=/workspace/project; ...` | `run_dir`, `dataset_cache_dir` или каталог Ultralytics вне рабочего каталога |
 | `Changed ultralytics settings ['epochs'] are inactive for deimv2/s; use model.train instead` | Для семейства, отличного от Ultralytics, изменён ключ `ultralytics`; задайте его в `model.train` |
-| `Invalid pipeline setting run_id: ...` | Значение неверного типа, например `run_id=123`. Задайте строку: `run_id="'123'"` (то же для `run_dir`, `dataset_cache_dir` и `dataset_format`) |
+| `Invalid pipeline setting run_id: ...` | `run_id` задан числом, например `run_id=123`. Задайте строку: `run_id="'123'"` |
 | `Required setting compare.baseline_model is missing` | В сохранённой конфигурации нет обязательного ключа. Верните его |
 | `weights is only valid with skip_train=true; training chooses its model` | `weights` без `skip_train=true`. Модель для обучения задаёт `ultralytics.model` или `model` |
 | `dataset_cache_dir must be outside run_dir` | `dataset_cache_dir` внутри каталога запуска |

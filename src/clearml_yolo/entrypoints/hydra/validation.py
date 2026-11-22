@@ -213,7 +213,9 @@ def _with_defaults(
     parameters = inspect.signature(function).parameters
     filled = dict(values)
     for name in names if names is not None else (name for name in parameters if name != "deps"):
-        if name in filled:
+        # A removed fiftyone group stays absent: the run publishes with defaults, while
+        # an explicit fiftyone=null is rejected.
+        if name in filled or name == "fiftyone":
             continue
         default = parameters[name].default
         if default is inspect.Parameter.empty:
