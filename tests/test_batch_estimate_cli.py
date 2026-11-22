@@ -221,6 +221,35 @@ def test_range_errors_name_the_flag(
     assert probe.calls == 0
 
 
+def test_memory_budget_of_the_whole_gpu_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _install(monkeypatch)
+    cli.main(["--imgsz", "640", "--models", "yolo11n", "--memory-budget", "1"])
+    (case,) = FileBatchEstimateStore().read().cases
+    assert case.settings.memory_fraction == 1
+
+
+@pytest.mark.parametrize(
+    ("option", "reason"),
+    [
+        (["--imgsz", "abc"], "invalid integer value: 'abc'"),
+        (["--imgsz", "-3"], "must be greater than 0, got -3"),
+        (["--trial-timeout", "abc"], "invalid number: 'abc'"),
+        (["--trial-timeout", "inf"], "must be a finite number greater than 0, got inf"),
+        (["--memory-budget", "2"], "must be greater than 0 and at most 1, got 2"),
+    ],
+)
+def test_range_errors_state_the_reason_and_the_value(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], option: list[str], reason: str
+) -> None:
+    probe, _ = _install(monkeypatch)
+    args = option if "--imgsz" in option else ["--imgsz", "960", *option]
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(args)
+    assert stopped.value.code == 2
+    assert reason in capsys.readouterr().err
+    assert probe.calls == 0
+
+
 def test_imgsz_range_error_names_the_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     probe, _ = _install(monkeypatch)
     with pytest.raises(SystemExit) as stopped:
