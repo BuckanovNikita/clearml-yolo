@@ -664,12 +664,11 @@ def test_cache_hit_for_a_csv_with_the_reserved_label_is_rejected_like_a_fresh_re
 ) -> None:
     import clearml_yolo.adapters.storage.dataset_cache as cache
     import clearml_yolo.adapters.storage.dataset_records as records
-    from clearml_yolo.core.validation import ValidationStage
+    from clearml_yolo.core.validation import ValidationStage, validate_dataframe
 
     source = _source(tmp_path / "input")
     source.write_text(source.read_text(encoding="utf-8").replace(",cat,", ",background,", 1), encoding="utf-8")
     cache_dir = tmp_path / "cache"
-    validate_dataframe = records.validate_dataframe
 
     def without_raw_ground_truth_checks(frame: Any, stage: Any) -> Any:
         # Builds the entry an earlier release published before it reserved the label.
