@@ -83,18 +83,6 @@ INVALID = [
     ),
     pytest.param(
         "pipeline",
-        ["ground_truth=truth.csv", "ultralytics.project=${oc.env:CY_HOME}/project"],
-        "Native pipeline output overrides require an explicit run_dir",
-        id="pipeline-native-route-without-run-dir",
-    ),
-    pytest.param(
-        "pipeline",
-        ["ground_truth=truth.csv", "ultralytics.name=other"],
-        "Native pipeline output overrides require an explicit run_dir",
-        id="pipeline-native-name-without-run-dir",
-    ),
-    pytest.param(
-        "pipeline",
         ["ground_truth=truth.csv", "run_id=123"],
         "Invalid pipeline setting run_id",
         id="pipeline-numeric-run-id",
@@ -104,6 +92,13 @@ INVALID = [
         ["ground_truth=truth.csv", "run_dir=${oc.env:CY_HOME}/run", "dataset_cache_dir=${oc.env:CY_HOME}/run/cache"],
         "dataset_cache_dir must be outside run_dir",
         id="pipeline-cache-inside-run-dir",
+    ),
+    # The run compares the default cache location too: it lies inside a run_dir of CY_HOME.
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "run_dir=${oc.env:CY_HOME}"],
+        "dataset_cache_dir must be outside run_dir",
+        id="pipeline-default-cache-inside-run-dir",
     ),
     pytest.param(
         "pipeline",
@@ -164,12 +159,6 @@ INVALID = [
         ["ground_truth=truth.csv", "skip_train=true", "weights=w.pt", "dataset_format=coco"],
         "Ultralytics training requires ndjson or flat dataset_format",
         id="pipeline-yolo-coco-without-training",
-    ),
-    pytest.param(
-        "pipeline",
-        ["ground_truth=truth.csv", "+ultralytics.save_dir=null"],
-        "Native pipeline output overrides require an explicit run_dir",
-        id="pipeline-null-save-dir-without-run-dir",
     ),
     pytest.param(
         "train",
@@ -234,7 +223,7 @@ INVALID = [
     pytest.param(
         "metrics",
         ["predictions=p.csv", "ground_truth=truth.csv", "~evaluation"],
-        "Required setting evaluation is missing",
+        "missing a required argument: 'evaluation'",
         id="metrics-removed-required-evaluation",
     ),
     pytest.param(
@@ -248,12 +237,6 @@ INVALID = [
         ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "q=2"],
         "q must be a finite probability in [0, 1]",
         id="compare-q",
-    ),
-    pytest.param(
-        "compare",
-        ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "bootstrap_iterations=0"],
-        "bootstrap_iterations must be a positive integer",
-        id="compare-bootstrap",
     ),
     pytest.param(
         "compare",
@@ -272,12 +255,6 @@ INVALID = [
         ["ground_truth=truth.csv"],
         "candidate_model is not specified",
         id="compare-default-candidate",
-    ),
-    pytest.param(
-        "report",
-        ["comparison_dir=comparison", "report_config_path=3"],
-        "report_config_path must be a path string or null",
-        id="report-config-path-type",
     ),
     pytest.param(
         "export",
@@ -496,6 +473,12 @@ REJECTED_IN_EVERY_STAGE = [
         "report_config_path must be a path string or null",
         id="report-config-path",
     ),
+    pytest.param(
+        ["splits=[all]"],
+        ["skip_metrics=true", "skip_predict=true"],
+        "split='all' is unsupported for frozen evaluation; name concrete splits",
+        id="all-split",
+    ),
     pytest.param(["model_label=2024"], _SKIP_TRAIN, "Invalid pipeline setting model_label", id="integer-model-label"),
     pytest.param(["run_id=0"], _SKIP_TRAIN, "Invalid pipeline setting run_id", id="falsy-integer-run-id"),
     pytest.param(["skip_compare=yes"], _SKIP_TRAIN, "Invalid pipeline setting skip_compare", id="string-skip-flag"),
@@ -525,7 +508,9 @@ def test_removed_required_stage_setting_fails_before_the_task(
     owner: list[str], removed: tuple[str, ...], skipped: list[str], stage: str
 ) -> None:
     config = _pipeline(skipped if stage == "skipped" else [], removed=removed)
-    with pytest.raises(ValueError, match=re.escape(f"Required setting {removed[0]} is missing")):
+    # The run passes the stage settings to the stage call, which binds them like this.
+    name = removed[0].rpartition(".")[2]
+    with pytest.raises(TypeError, match=re.escape(f"missing a required argument: '{name}'")):
         common.execute_owned("pipeline", config, run_pipeline)
     assert owner == []
 
@@ -620,6 +605,44 @@ def test_queue_admission_keeps_its_strict_rules(overrides: list[str], removed: t
 def test_queue_admission_accepts_the_default_configuration() -> None:
     validate_pipeline_configuration(_pipeline([]))
     validate_pipeline_configuration(_pipeline(_SKIP_TRAIN))
+
+
+def test_queue_admission_accepts_null_fiftyone_like_master() -> None:
+    # cy-queue's admission skipped a null fiftyone; only the direct preflight rejects it.
+    config = _pipeline(["fiftyone=null"])
+    validate_pipeline_configuration(config)
+    with pytest.raises(ValueError, match=re.escape("fiftyone=null is not supported")):
+        validate_pipeline_configuration(config, direct=True)
+
+
+# (overrides, whether cy-queue admits it, whether the direct preflight admits it). The
+# queue routes against the literal run_dir and checks only an explicit dataset_cache_dir,
+# while the direct preflight resolves both as run_pipeline does.
+ROUTES = [
+    pytest.param(["run_dir=../runs/x", "ultralytics.project=../runs/x/detect"], True, False, id="relative-project"),
+    pytest.param(["run_dir=${oc.env:CY_HOME}"], True, False, id="default-cache-inside-run-dir"),
+    # The working directory is run_dir: read literally, ~/cache lies inside it.
+    pytest.param(["run_dir=${oc.env:CY_HOME}/work", "dataset_cache_dir='~/cache'"], False, True, id="home-cache"),
+    pytest.param(["run_dir=${oc.env:CY_HOME}/run", "ultralytics.name=train"], True, True, id="stage-name-with-run-dir"),
+]
+
+
+@pytest.mark.parametrize(("overrides", "queue", "direct"), ROUTES)
+def test_queue_and_direct_routes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, overrides: list[str], queue: bool, direct: bool
+) -> None:
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / "work").mkdir()
+    monkeypatch.chdir(tmp_path / "work")
+    config = _pipeline(overrides)
+    for strict, admitted in ((True, queue), (False, direct)):
+        if admitted:
+            validate_pipeline_configuration(config, direct=not strict)
+        else:
+            with pytest.raises(ValueError, match="run_dir"):
+                validate_pipeline_configuration(config, direct=not strict)
+    assert not (tmp_path / "runs").exists()
 
 
 def test_strict_admission_still_rejects_the_detector_inactive_group_removal() -> None:
@@ -719,18 +742,35 @@ def test_standalone_detector_accepts_a_removed_ultralytics_group(
             "Submission requires the supported configuration target clearml_yolo.application.contracts.ModelRef",
             id="other-class-target",
         ),
-        pytest.param(
-            "compare",
-            ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "seed=true"],
-            "Comparison seed must be a nonnegative integer or null",
-            id="boolean-seed",
-        ),
     ],
 )
 def test_standalone_records_keep_their_rules(owner: list[str], name: str, overrides: list[str], message: str) -> None:
     with pytest.raises(ValueError, match=re.escape(message)):
         common.execute_owned(name, _compose(name, overrides), COMMANDS[name])
     assert owner == []
+
+
+# Checks the composed configuration cannot decide before the task, or that no
+# validator of the run applies: the command reaches the task and the run decides.
+LEFT_TO_THE_RUN = [
+    # Without run_dir or run_id the run directory is named after the task.
+    pytest.param("pipeline", ["ground_truth=truth.csv", "ultralytics.project=${oc.env:CY_HOME}/p"], id="route-project"),
+    pytest.param("pipeline", ["ground_truth=truth.csv", "ultralytics.name=other"], id="route-name"),
+    pytest.param("pipeline", ["ground_truth=truth.csv", "+ultralytics.save_dir=null"], id="route-save-dir"),
+    # cy-compare and cy-report have no such value rule; cy checks these values as cy-queue does.
+    pytest.param(
+        "compare", ["ground_truth=truth.csv", "candidate_model.task_id=c", "bootstrap_iterations=0"], id="bootstrap"
+    ),
+    pytest.param("compare", ["ground_truth=truth.csv", "candidate_model.task_id=c", "seed=true"], id="seed"),
+    pytest.param("report", ["comparison_dir=comparison", "report_config_path=3"], id="report-config-path"),
+]
+
+
+@pytest.mark.parametrize(("name", "overrides"), LEFT_TO_THE_RUN)
+def test_checks_left_to_the_run_reach_the_task(owner: list[str], name: str, overrides: list[str]) -> None:
+    with pytest.raises(TaskCreated):
+        common.execute_owned(name, _compose(name, overrides), COMMANDS[name])
+    assert owner[-1] == "invocation"
 
 
 def _tree(root: Path) -> list[tuple[str, int]]:

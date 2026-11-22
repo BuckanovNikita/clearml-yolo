@@ -72,6 +72,36 @@ class _ReinferArguments(TypedDict):
     reuse_existing: bool
 
 
+def native_stage_settings(settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
+    """Validate a native detector group, keeping the routing keys the stage owns."""
+    values = {key: value for key, value in settings.items() if key not in _ROUTING}
+    schema = TrainSettings if stage == "train" else PredictSettings
+    validated = schema.model_validate(values).model_dump(mode="json")
+    return validated | {key: value for key, value in settings.items() if key in _ROUTING}
+
+
+def native_prediction_settings(
+    config: ModelConfig, ultralytics_predict: dict[str, Any], weights: str | Path | None = None
+) -> dict[str, Any]:
+    """Project a native detector's prediction settings; pure, so the preflight shares it."""
+    values = config.predict.model_dump(mode="json") | ultralytics_predict
+    result = native_stage_settings(values, "predict")
+    if result.get("source") is not None:
+        raise ValueError("Prediction source is owned by ground_truth image membership")
+    if result.get("task", "detect") != "detect":
+        raise ValueError("Prediction task must be detect")
+    if result.get("mode", "predict") != "predict":
+        raise ValueError("Prediction mode must be predict")
+    native_model = result.get("model")
+    if weights is not None and native_model is not None and str(weights) != str(native_model):
+        raise ValueError("weights conflicts with the native prediction model")
+    result["model"] = str(weights) if weights is not None else result.get("model")
+    if result["imgsz"] is None and weights is None:
+        result["imgsz"] = config.train.model_dump(mode="json")["imgsz"]
+    result.update(backend=config.backend, preset=config.preset)
+    return result
+
+
 class DetectorRunner:
     """Keep legacy YOLO behavior while resolving described checkpoints independently."""
 
@@ -178,10 +208,7 @@ class DetectorRunner:
     def stage_settings(self, settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
         if self.config.backend == "ultralytics":
             return self.legacy.stage_settings(settings, stage)
-        values = {key: value for key, value in settings.items() if key not in _ROUTING}
-        schema = TrainSettings if stage == "train" else PredictSettings
-        validated = schema.model_validate(values).model_dump(mode="json")
-        return validated | {key: value for key, value in settings.items() if key in _ROUTING}
+        return native_stage_settings(settings, stage)
 
     def execution_settings(self, settings: dict[str, Any], stage: Stage) -> dict[str, Any]:
         if self.config.backend == "ultralytics":
@@ -198,22 +225,7 @@ class DetectorRunner:
     ) -> dict[str, Any]:
         if self.config.backend == "ultralytics":
             return self.legacy.prediction_settings(ultralytics_predict, weights)
-        values = self.config.predict.model_dump(mode="json") | ultralytics_predict
-        result = self.stage_settings(values, "predict")
-        if result.get("source") is not None:
-            raise ValueError("Prediction source is owned by ground_truth image membership")
-        if result.get("task", "detect") != "detect":
-            raise ValueError("Prediction task must be detect")
-        if result.get("mode", "predict") != "predict":
-            raise ValueError("Prediction mode must be predict")
-        native_model = result.get("model")
-        if weights is not None and native_model is not None and str(weights) != str(native_model):
-            raise ValueError("weights conflicts with the native prediction model")
-        result["model"] = str(weights) if weights is not None else result.get("model")
-        if result["imgsz"] is None and weights is None:
-            result["imgsz"] = self.config.train.model_dump(mode="json")["imgsz"]
-        result.update(backend=self.config.backend, preset=self.config.preset)
-        return result
+        return native_prediction_settings(self.config, ultralytics_predict, weights)
 
     def trained_imgsz(self, weights: str | Path) -> int | list[int] | None:
         descriptor = self._descriptor(weights)

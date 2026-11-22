@@ -155,8 +155,9 @@ def test_pipeline_validation_rejects_null_fiftyone_with_hint(tmp_path: Path) -> 
     dump_config_tree(tmp_path)
     with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
         config = compose(config_name="cy", overrides=["ground_truth=truth.csv", "fiftyone=null"])
+    # The direct cy preflight rejects it; cy-queue's admission keeps master's rule and skips it.
     with pytest.raises(ValueError, match=r"fiftyone\.enabled=false"):
-        validate_pipeline_configuration(config)
+        validate_pipeline_configuration(config, direct=True)
 
 
 def test_pipeline_validation_accepts_default_fiftyone_mapping(tmp_path: Path) -> None:

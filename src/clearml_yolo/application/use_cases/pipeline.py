@@ -147,6 +147,12 @@ def routed_native(settings: dict[str, Any], project: Path, name: str) -> dict[st
     return chosen | expected
 
 
+def reject_cache_inside_run_dir(cache_root: Path, directory: Path) -> None:
+    """Reject a dataset cache inside the run directory; run directories are reused, never cleared."""
+    if cache_root.is_relative_to(directory):
+        raise ValueError("dataset_cache_dir must be outside run_dir")
+
+
 def _stage_values(config: Any, allowed: set[str], stage: str) -> dict[str, Any]:
     values = _as_dict(config)
     unknown = set(values) - allowed
@@ -355,8 +361,7 @@ def run_pipeline(
             if run_dir or run_id
             else deps.storage.task_run_dir(deps.storage.runs_root(), *deps.tracking.task_identity(task))
         )
-        if deps.dataset.dataset_cache_root(dataset_cache_dir).is_relative_to(deps.storage.resolve(directory)):
-            raise ValueError("dataset_cache_dir must be outside run_dir")
+        reject_cache_inside_run_dir(deps.dataset.dataset_cache_root(dataset_cache_dir), deps.storage.resolve(directory))
         metrics_cfg, report_cfg, compare_cfg = pipeline_stage_settings(metrics, report, compare)
         train_params = routed_native(ultralytics, directory / "detect", "train")
         prediction_overrides = dict(ultralytics_predict)
