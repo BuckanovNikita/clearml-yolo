@@ -192,6 +192,44 @@ def test_invalid_options_fail_without_trials(monkeypatch: pytest.MonkeyPatch, op
     assert probe.calls == 0
 
 
+@pytest.mark.parametrize(
+    ("option", "flag"),
+    [
+        (["--memory-budget", "0"], "--memory-budget"),
+        (["--memory-budget", "1.1"], "--memory-budget"),
+        (["--memory-budget", "nan"], "--memory-budget"),
+        (["--memory-budget", "inf"], "--memory-budget"),
+        (["--search-limit", "0"], "--search-limit"),
+        (["--trial-timeout", "-1"], "--trial-timeout"),
+        (["--trial-timeout", "nan"], "--trial-timeout"),
+        (["--objects-per-image", "0"], "--objects-per-image"),
+        (["--jobs", "0"], "--jobs"),
+    ],
+)
+def test_range_errors_name_the_flag(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], option: list[str], flag: str
+) -> None:
+    probe, _ = _install(monkeypatch)
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["--imgsz", "960", *option])
+    assert stopped.value.code == 2
+    error = capsys.readouterr().err
+    assert f"argument {flag}:" in error
+    internals = ("validation error", "memory_fraction", "max_global_batch", "trial_timeout_seconds")
+    for internal in (*internals, "objects_per_image", "_Options"):
+        assert internal not in error
+    assert probe.calls == 0
+
+
+def test_imgsz_range_error_names_the_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    probe, _ = _install(monkeypatch)
+    with pytest.raises(SystemExit) as stopped:
+        cli.main(["--imgsz", "0"])
+    assert stopped.value.code == 2
+    assert "argument --imgsz:" in capsys.readouterr().err
+    assert probe.calls == 0
+
+
 def test_busy_gpu_aborts_without_native_work(monkeypatch: pytest.MonkeyPatch) -> None:
     probe, _ = _install(monkeypatch)
 

@@ -31,6 +31,7 @@ from clearml_yolo.entrypoints.hydra.configs import (
 )
 from clearml_yolo.entrypoints.hydra.transforms import (
     TRAINING_COMMANDS,
+    model_selections,
     native_overlay,
     profile_values,
 )
@@ -131,6 +132,9 @@ def _selection(command: str, model: str | None) -> tuple[str, str]:
         raise ValueError(f"Unknown command {command!r}; choose from {', '.join(config_of_command)}")
     config_name = config_of_command[command]
     model = model or ("fasterrcnn/resnet50_fpn" if config_name == "export" else "ultralytics")
+    valid_models = model_selections()
+    if model not in valid_models:
+        raise ValueError(f"Unknown model {model!r}; choose from {', '.join(valid_models)}")
     if config_name == "export" and model_preset(model).backend != "fasterrcnn":
         raise ValueError("cy-export supports only Faster R-CNN presets")
     if model != "ultralytics" and config_name not in NATIVE_COMMANDS:

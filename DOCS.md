@@ -24,7 +24,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 ## Commands and configuration
 
 - Commands -> Hydra configs: `cy`->`pipeline`, `cy-train`->`train`, `cy-predict`->`predict`, `cy-val`->`val`, `cy-metrics`->`metrics`, `cy-compare`->`compare`, `cy-report`->`report`, `cy-ground-truth`->`ground_truth`, `cy-export`->`export`. No-task tools: `cy-init-config`, `cy-dedup`, `cy-download-weights`, `cy-batch-estimate`.
-- `cy-init-config DIR [--command NAME] [--model PRESET] [--force]` writes an editable tree; run it with `<command> --config-dir DIR --config-name <command>` (Python `dump_config_tree(directory, *, command="cy", model=None, overwrite=False)`).
+- `cy-init-config DIR [--command NAME] [--model PRESET] [--force]` writes an editable tree (an unknown `--model` fails before Hydra and lists every valid preset); run it with `<command> --config-dir DIR --config-name <command>` (Python `dump_config_tree(directory, *, command="cy", model=None, overwrite=False)`).
 - Help: `<command> --help` is a custom `hydra.help` set per launch (`configs.register_command_help`). The banner is the public command name. `== Configuration groups ==` lists only groups the command's packaged defaults let the user select (`model/<backend>`, `transforms`); `_cy_schemas`, `defaults` and `transform_overrides` are not shown. `--hydra-help` is unchanged.
 - Composition: packaged defaults, then `--config-dir`, then CLI overrides; `hydra.job.chdir=false`; logs `CY_HOME/outputs/<date>/<time>-<host>-<pid>`, sweeps `CY_HOME/multirun/...`; all routes are containment-checked before the first job.
 - Required `???` inputs: `ground_truth` (cy, train, predict, val, metrics, compare), `predictions` (metrics), `comparison_dir` (report), `data_yaml` (ground-truth). Unknown top-level keys fail `Unsupported wrapper settings: [...]`.
@@ -68,7 +68,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 ## Prediction and validation
 
 - YOLO predict defaults `conf=0.001`, `batch=1`, `rect=true`, `save=false`, `verbose=false`, `device=[-1]`; `batch=-1` rejected. Requested/effective settings in `ultralytics_predict_requested.yaml`/`ultralytics_predict.yaml`.
-- `weights`: local file, 32-char ClearML task ID (best model) or `clearml://<model id>` (SHA-256 must match). Without provenance a `model_label` is required. A checkpoint changing mid-prediction fails.
+- `weights`: local file, 32-char ClearML task ID (best model) or `clearml://<model id>` (SHA-256 must match). Without provenance a `model_label` is required. A path-like selector (absolute, starting with `~` or `.`, or containing a separator) that is not an existing file fails as `FileNotFoundError: Weights file does not exist: <path>`; a bare name such as `yolo11n.pt` goes to Ultralytics. A checkpoint changing mid-prediction fails.
 - Prediction CSV columns exactly `image_name, instance_label, confidence, bbox_x_tl, bbox_y_tl, bbox_x_br, bbox_y_br` (original pixels); every requested image must yield a result. `image_name` modes `name` (default; unique basenames required), `stem`, `path`; only `name` can be evaluated.
 - `<predictions>.csv.provenance.json` binds bytes SHA-256, checkpoint SHA-256 and naming mode; stale or contradictory sidecars fail; a missing one is accepted only if all names are canonical GT basenames.
 - `cy-val` predicts val plus requested splits into `<output_dir>/predictions.csv`, calibrates on val, scores under `<output_dir>/metrics`, one task, never trains, no FiftyOne.
@@ -130,7 +130,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 ## Batch estimation
 
 - `batch=null` reads `CY_HOME/.config/clearml-yolo/batch-sizes.yaml` keyed by GPU `Name [N GiB]`, square imgsz and canonical model (`ultralytics/yolo11n`): exact entry, else largest smaller-or-equal memory GPU; global batch = GPU count x smallest per-GPU batch. Keep the `# clearml-yolo-batch-metadata:` comment. CPU/MPS, non-square and custom YOLO need explicit batch.
-- `cy-batch-estimate --imgsz N`: strategy `memory_guided_small_batches_v1`; defaults `--objects-per-image 300`, `--memory-budget 0.9`, `--search-limit 1024`, `--trial-timeout 300`; statuses `validated`, `ceiling_limited`, `numerically_limited`, `no_capacity`, `failed`; exit 1 unusable, 2 invalid args; evidence `batch-estimates.json` (schema 3), never read by training.
+- `cy-batch-estimate --imgsz N`: strategy `memory_guided_small_batches_v1`; defaults `--objects-per-image 300`, `--memory-budget 0.9`, `--search-limit 1024`, `--trial-timeout 300`; statuses `validated`, `ceiling_limited`, `numerically_limited`, `no_capacity`, `failed`; exit 1 unusable, 2 invalid args (a range error is an argparse error naming the flag); evidence `batch-estimates.json` (schema 3), never read by training.
 
 ## Export
 

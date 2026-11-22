@@ -7,6 +7,7 @@ The original English argparse text remains stable; Russian semantics are separat
 # ruff: noqa: RUF001 -- Public configuration documentation is intentionally Russian.
 
 import argparse
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,33 @@ def integer_list(value: str) -> tuple[int, ...]:
         raise argparse.ArgumentTypeError("Use comma-separated integer values") from error
     if not result or len(set(result)) != len(result) or min(result) < 0:
         raise argparse.ArgumentTypeError("Values must be unique nonnegative integers")
+    return result
+
+
+def positive_int(value: str) -> int:
+    try:
+        result = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"invalid integer value: {value!r}") from error
+    if result <= 0:
+        raise argparse.ArgumentTypeError(f"must be greater than 0, got {value}")
+    return result
+
+
+def positive_float(value: str) -> float:
+    try:
+        result = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"invalid number: {value!r}") from error
+    if not math.isfinite(result) or result <= 0:
+        raise argparse.ArgumentTypeError(f"must be a finite number greater than 0, got {value}")
+    return result
+
+
+def unit_fraction(value: str) -> float:
+    result = positive_float(value)
+    if result > 1:
+        raise argparse.ArgumentTypeError(f"must be greater than 0 and at most 1, got {value}")
     return result
 
 
@@ -114,13 +142,13 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         ),
         OptionDeclaration(
             ("--imgsz",),
-            {"type": int, "help": "nominal square training resolution; required unless --list"},
+            {"type": positive_int, "help": "nominal square training resolution; required unless --list"},
             "Положительное квадратное разрешение измерения; обязательно, кроме режима --list.",
             ("--imgsz 640",),
         ),
         OptionDeclaration(
             ("--objects-per-image",),
-            {"type": int, "default": 300, "help": "synthetic objects (default: 300)"},
+            {"type": positive_int, "default": 300, "help": "synthetic objects (default: 300)"},
             "Количество синтетических объектов на изображение для измерения памяти.",
             ("--objects-per-image 300",),
         ),
@@ -148,7 +176,7 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         OptionDeclaration(
             ("--jobs",),
             {
-                "type": int,
+                "type": positive_int,
                 "help": "maximum concurrent single-GPU searches; default: available selected GPUs",
             },
             "Положительный предел одновременных поисков; по умолчанию используются свободные выбранные GPU.",
@@ -173,7 +201,7 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         OptionDeclaration(
             ("--memory-budget",),
             {
-                "type": float,
+                "type": unit_fraction,
                 "default": 0.9,
                 "help": "fraction of each GPU's total memory (default: 0.9)",
             },
@@ -183,7 +211,7 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         OptionDeclaration(
             ("--search-limit",),
             {
-                "type": int,
+                "type": positive_int,
                 "default": 1024,
                 "help": ("per-GPU search ceiling (default: 1024); extrapolated global batches may exceed it"),
             },
@@ -192,7 +220,7 @@ OPTION_DECLARATIONS: dict[str, tuple[OptionDeclaration, ...]] = {
         ),
         OptionDeclaration(
             ("--trial-timeout",),
-            {"type": float, "default": 300, "help": "seconds per fresh trial group (default: 300)"},
+            {"type": positive_float, "default": 300, "help": "seconds per fresh trial group (default: 300)"},
             "Положительный таймаут одной свежей группы проб в секундах.",
             ("--trial-timeout 300",),
         ),

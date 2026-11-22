@@ -147,7 +147,13 @@ ValueError: No ground-truth rows for splits ['test']
 ValueError: Model provenance is unavailable; supply a custom model_label (comparison model references use label)
 ```
 
-Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`. То же сообщение команда печатает, когда файла весов по указанному пути нет: проверьте путь.
+Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`.
+
+```text
+FileNotFoundError: Weights file does not exist: runs/best.pt
+```
+
+Файла весов по указанному пути нет: проверьте путь. Так команда читает значение, похожее на путь: абсолютное, начинающееся с `~` или `.` либо содержащее разделитель. Имя без разделителя, например `yolo11n.pt`, команда передаёт Ultralytics как есть.
 
 ```text
 ValueError: Native detector weights require a bound checkpoint descriptor; raw comparison weights require explicit ModelRef metadata

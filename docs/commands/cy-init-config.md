@@ -116,10 +116,10 @@ cy-init-config: error: Cannot initialize configuration directory configs: ValueE
 Для `cy-export` укажите preset `fasterrcnn/...` или не указывайте `--model`.
 
 ```text
-cy-init-config: error: Cannot initialize configuration directory configs: MissingConfigException: In 'pipeline': Could not find 'model/nope/x'
+cy-init-config: error: Cannot initialize configuration directory configs: ValueError: Unknown model 'nope/x'; choose from ultralytics, deimv2/s, deimv2/m, deimv2/l, deimv2/x, rfdetr/nano, rfdetr/small, rfdetr/medium, rfdetr/large, fasterrcnn/resnet50_fpn, fasterrcnn/resnet101_fpn, fasterrcnn/convnext_tiny, fasterrcnn/swin_tiny, fasterrcnn/dinov2_small, fasterrcnn/dinov3_small, fcos/resnet50_fpn, fcos/resnet101_fpn, fcos/convnext_tiny, fcos/swin_tiny, fcos/dinov2_small, fcos/dinov3_small
 ```
 
-Неизвестная модель. Список `Available options in 'model'` под сообщением показывает только `ultralytics`, а не все модели. Список моделей — на странице [Модель](../configuration/model.md).
+Неизвестная модель. Сообщение перечисляет все допустимые значения `--model`. Описание моделей — на странице [Модель](../configuration/model.md).
 
 ```text
 cy-init-config: error: Cannot initialize configuration directory ../outside: ValueError: Project write destination ../outside must be contained beneath CY_HOME=/workspace/project; choose a destination inside CY_HOME or select the intended project workspace. External input and library configuration paths remain supported.
