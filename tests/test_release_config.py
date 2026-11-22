@@ -121,26 +121,40 @@ def test_compare_configuration_resolves_candidate_interpolations_before_the_chec
 
     import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
     from clearml_yolo.application.use_cases.compare import compare
-    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+    from clearml_yolo.entrypoints.hydra.validation import validate_command_configuration
 
     store.add_to_hydra_store(overwrite_ok=True)
+    truth = "ground_truth=truth.csv"
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        to_default = compose(config_name="compare", overrides=["candidate_model.task_id='${baseline_model.task_id}'"])
+        to_default = compose(
+            config_name="compare", overrides=[truth, "candidate_model.task_id='${baseline_model.task_id}'"]
+        )
         to_value = compose(
             config_name="compare",
-            overrides=["baseline_model.task_id=base-task", "candidate_model.task_id='${baseline_model.task_id}'"],
+            overrides=[
+                truth,
+                "baseline_model.task_id=base-task",
+                "candidate_model.task_id='${baseline_model.task_id}'",
+            ],
         )
     with pytest.raises(ValueError, match="candidate_model is not specified"):
-        validate_wrapper_keys(to_default, compare)
-    validate_wrapper_keys(to_value, compare)
+        validate_command_configuration(to_default, compare)
+    validate_command_configuration(to_value, compare)
 
 
 def test_compare_configuration_rejects_a_null_candidate_as_a_non_mapping() -> None:
-    from clearml_yolo.application.use_cases.compare import compare
-    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+    from hydra import compose, initialize_config_module
+    from hydra_zen import store
 
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
+    from clearml_yolo.application.use_cases.compare import compare
+    from clearml_yolo.entrypoints.hydra.validation import validate_command_configuration
+
+    store.add_to_hydra_store(overwrite_ok=True)
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        config = compose(config_name="compare", overrides=["ground_truth=truth.csv", "candidate_model=null"])
     with pytest.raises(TypeError, match="ModelRef settings must be a mapping"):
-        validate_wrapper_keys(OmegaConf.create({"candidate_model": None}), compare)
+        validate_command_configuration(config, compare)
 
 
 @pytest.mark.parametrize("key", ["model", "project", "name"])
