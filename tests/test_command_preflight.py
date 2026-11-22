@@ -606,6 +606,11 @@ AFTER_TRAINING = [
     pytest.param(["compare.seed=-1"], id="compare-seed"),
     pytest.param(["report.report_config_path=123"], id="report-config-path"),
     pytest.param(["model=fasterrcnn/resnet50_fpn", "metrics.calibration_split=test"], id="detector"),
+    # zen instantiates an importable alias of the supported class.
+    pytest.param(
+        ["metrics.evaluation._target_=clearml_yolo.application.use_cases.metrics.EvaluationConfig"],
+        id="aliased-evaluation-target",
+    ),
 ]
 
 
