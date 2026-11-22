@@ -186,7 +186,7 @@ visualization: failed — <сообщение ошибки>
 | `dataset_cache_dir must be outside run_dir` | `dataset_cache_dir` внутри каталога запуска |
 | `project='other' conflicts with pipeline run_dir; expected /workspace/project/runs/my-run/detect` | Задан `ultralytics.project` или `ultralytics_predict.project` (аналогично `name`, отличный от имени этапа: `train` в `ultralytics`, `predict` в `ultralytics_predict`). Уберите ключ; путь задаёт `run_dir` |
 | `save_dir conflicts with pipeline run_dir; use run_dir to route outputs` | Задан `ultralytics.save_dir` (без `run_dir` и `run_id` — со значением `null`) |
-| `Native pipeline output overrides require an explicit run_dir` | Без `run_dir` и `run_id` задан `ultralytics.project`, `ultralytics_predict.project` или `ultralytics.save_dir`. Уберите ключ или задайте `run_dir` |
+| `Native pipeline output overrides require an explicit run_dir` | Без `run_dir` и `run_id` задан `ultralytics.project`, `ultralytics_predict.project` или `ultralytics.save_dir`. Уберите ключ: пути результатов задаёт `run_dir` |
 | `<путь>: required split(s) contain no images: test` | В разметке нет изображений split, который нужен включённым этапам (см. шаг 5). Добавьте split в разметку, уберите его из `splits` или отключите этап, например `skip_compare=true` для `test` |
 | `Training did not produce a usable checkpoint: <путь>` | Обучение не оставило `best.pt` или он пустой |
 | `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Происхождение модели неизвестно; задайте `model_label` |
