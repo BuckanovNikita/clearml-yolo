@@ -705,6 +705,7 @@ forbidden_modules =
     test_hub_assets
     test_hub_weight_bundles
     test_hydra_help
+    test_hydra_help_composition
     test_hydra_sweep_configuration
     test_hydra_transforms
     test_identity_flows
