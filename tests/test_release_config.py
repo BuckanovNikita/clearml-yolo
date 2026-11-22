@@ -62,6 +62,8 @@ def test_command_inputs_are_required(name: str, key: str) -> None:
     from hydra import compose, initialize_config_module
     from hydra_zen import store
 
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - registers the Hydra configurations
+
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name=name)
@@ -71,6 +73,8 @@ def test_command_inputs_are_required(name: str, key: str) -> None:
 def test_standalone_compare_exposes_shared_evaluation_defaults() -> None:
     from hydra import compose, initialize_config_module
     from hydra_zen import store
+
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - registers the Hydra configurations
 
     store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
