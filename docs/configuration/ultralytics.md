@@ -36,7 +36,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 - `save_dir` в `cy` отклоняется до создания задачи ClearML (task): без `run_dir` и `run_id` — `Native pipeline output overrides require an explicit run_dir`, с ними — `save_dir conflicts with pipeline run_dir; use run_dir to route outputs`. В `cy-train` `save_dir` отбрасывается; в обоих случаях путь сначала проверяется на нахождение внутри `CY_HOME`;
 - `augmentations` (список преобразований Albumentations для нативного загрузчика) передаётся в Ultralytics как есть. Собственный пайплайн аугментаций CY настраивается в группе [`transforms`](transforms.md); профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) `transforms=albumentations` сам обнуляет встроенные аугментации Ultralytics (`hsv_*`, `degrees`, `translate`, `scale`, `shear`, `perspective`, `flipud`, `fliplr`, `bgr`, `mosaic` и другие).
 
-При запуске `cy-train` и `cy` с обучением (без `skip_train=true`), до создания задачи ClearML (task), CY проверяет полную группу: все ключи обучения должны присутствовать, типы и диапазоны должны совпадать с ожиданиями Ultralytics. Ошибки имеют вид `ultralytics.epochs must be an integer`, `ultralytics.lr0 must be between 0 and 1`, `ultralytics.epochs must be at least 1`, `ultralytics.amp must not be null`.
+При запуске `cy-train` и `cy` (в `cy` — и при `skip_train=true`), до создания задачи ClearML (task), CY проверяет полную группу: все ключи обучения должны присутствовать, типы и диапазоны должны совпадать с ожиданиями Ultralytics. Ошибки имеют вид `ultralytics.epochs must be an integer`, `ultralytics.lr0 must be between 0 and 1`, `ultralytics.epochs must be at least 1`, `ultralytics.amp must not be null`.
 
 ## Ключи
 
@@ -48,7 +48,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 | --- | --- | --- |
 | `task` | `detect` | Тип задачи Ultralytics. CY поддерживает только `detect`; другое значение отклоняется (`ultralytics.task must be detect`). |
 | `mode` | `train` | Режим Ultralytics. Должен быть `train` (`ultralytics.mode must be train`). |
-| `model` | `yolo11n.pt` | Модель для обучения: имя предобученных весов (weights), путь к `.pt` или к `.yaml` архитектуры. В Ultralytics по умолчанию пусто; CY подставляет `yolo11n.pt`. Пустое значение отклоняется: `Set ultralytics.model explicitly; no training model fallback is provided`. Загруженная модель должна быть детектором. |
+| `model` | `yolo11n.pt` | Модель для обучения: имя предобученных весов (weights), путь к `.pt` или к `.yaml` архитектуры. В Ultralytics по умолчанию пусто; CY подставляет `yolo11n.pt`. Пустое значение отклоняется до создания задачи ClearML (task), в `cy` — и при `skip_train=true`: `Set ultralytics.model explicitly; no training model fallback is provided`. Загруженная модель должна быть детектором. |
 | `data` | `null` | Файл описания датасета. CY всегда подменяет его рабочей копией датасета ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)), подготовленной из разметки ([ground truth](../../GLOSSARY.md#ground-truth)) `ground_truth` (см. [форматы датасетов](../formats/datasets.md)); собственное значение не используется. |
 | `epochs` | `100` | Число эпох обучения. Целое, не меньше 1. |
 | `time` | `null` | Максимальная длительность обучения в часах; если задано, заменяет `epochs`. |
@@ -83,7 +83,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 | `rect` | `false` | Прямоугольные batch при обучении. |
 | `cos_lr` | `false` | Косинусный планировщик learning rate. |
 | `close_mosaic` | `10` | Отключить mosaic на последних N эпохах (`0` — не отключать). |
-| `resume` | `false` | Продолжить обучение с последнего checkpoint. CY не поддерживает: при `true` обучение на разметке завершается ошибкой `resume is unsupported with ground_truth; use model weights to fine-tune`. Чтобы дообучить модель, укажите её веса в `model`. |
+| `resume` | `false` | Продолжить обучение с последнего checkpoint. CY не поддерживает: при `true` `cy-train` и `cy` (в `cy` — и при `skip_train=true`) завершаются до создания задачи ClearML (task) ошибкой `resume is unsupported with ground_truth; use model weights to fine-tune`. Чтобы дообучить модель, укажите её веса в `model`. |
 | `amp` | `true` | Точность обучения: `true`/`fp16` (AMP), `bf16`, `false`/`fp32`. `null` отклоняется. |
 | `fraction` | `1.0` | Доля или число обучающих изображений. При обучении на разметке CY принудительно ставит `1.0`: состав split задаёт CSV. |
 | `profile` | `false` | Профилировать скорость ONNX/TensorRT во время обучения для логгеров. |
