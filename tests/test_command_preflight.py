@@ -641,6 +641,27 @@ def test_standalone_records_accept_loose_but_valid_forms(owner: list[str], name:
 
 
 @pytest.mark.parametrize(
+    ("name", "overrides"),
+    [
+        pytest.param("train", ["ground_truth=truth.csv"], id="train"),
+        pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt"], id="predict"),
+        pytest.param("val", ["ground_truth=truth.csv", "weights=w.pt"], id="val"),
+    ],
+)
+def test_standalone_detector_accepts_a_removed_ultralytics_group(
+    owner: list[str], name: str, overrides: list[str]
+) -> None:
+    # The run executes the detector's model.train and model.predict in place of the group.
+    composed = _compose(name, [*overrides, "model=fasterrcnn/resnet50_fpn"])
+    config = OmegaConf.create(OmegaConf.to_container(composed, resolve=True))
+    assert isinstance(config, DictConfig)
+    del config["ultralytics"]
+    with pytest.raises(TaskCreated):
+        common.execute_owned(name, config, COMMANDS[name])
+    assert owner[-1] == "invocation"
+
+
+@pytest.mark.parametrize(
     ("name", "overrides", "message"),
     [
         pytest.param(

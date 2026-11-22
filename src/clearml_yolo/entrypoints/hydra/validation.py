@@ -376,16 +376,18 @@ def _with_defaults(
 
 
 def _direct_values(values: dict[str, Any], function: Callable[..., Any]) -> dict[str, Any]:
-    """Accept the direct commands' loose forms: removed optional keys and instantiable records."""
+    """Apply what the direct run applies before it validates, then accept the loose forms."""
+    model = ModelConfig.model_validate(values["model"]) if "model" in values else None
+    if model is not None and model.backend != "ultralytics" and function.__name__ != "export_model":
+        # _execute_direct runs a detector's model groups and its COCO dataset.
+        values = values | detector_native_groups(model)
+        if "dataset_format" in values:
+            values["dataset_format"] = "coco"
     return _with_records(_with_defaults(values, function))
 
 
 def _direct_pipeline_values(values: dict[str, Any]) -> dict[str, Any]:
-    """Apply what the direct run applies before it validates, then the loose forms."""
-    model = ModelConfig.model_validate(values["model"]) if "model" in values else None
-    if model is not None and model.backend != "ultralytics":
-        # _execute_direct runs a detector's model groups and its COCO dataset.
-        values = values | detector_native_groups(model) | {"dataset_format": "coco"}
+    """Apply ``_direct_values`` and the routing of the prediction group to cy's settings."""
     values = _direct_values(values, run_pipeline)
     for key, function, names in _STAGE_SETTINGS:
         if isinstance(values[key], Mapping):
@@ -398,7 +400,7 @@ def _direct_pipeline_values(values: dict[str, Any]) -> dict[str, Any]:
         # run_pipeline reads run_id only without run_dir.
         values["run_id"] = None
     prediction = values["ultralytics_predict"]
-    if (model is None or model.backend == "ultralytics") and isinstance(prediction, Mapping):
+    if _uses_ultralytics(values) and isinstance(prediction, Mapping):
         # run_pipeline routes the prediction group after the CSV dataset policy (when
         # training) and the prediction projection.
         if not values["skip_train"]:
