@@ -259,6 +259,31 @@ INVALID = [
         "candidate_model is not specified",
         id="compare-default-candidate",
     ),
+    # cy-compare and cy-report share these rules with cy-queue's admission of cy's stages.
+    pytest.param(
+        "compare",
+        ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "bootstrap_iterations=0"],
+        "bootstrap_iterations must be a positive integer",
+        id="compare-bootstrap-iterations",
+    ),
+    pytest.param(
+        "compare",
+        ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "seed=-1"],
+        "Comparison seed must be a nonnegative integer or null",
+        id="compare-negative-seed",
+    ),
+    pytest.param(
+        "compare",
+        ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "seed=true"],
+        "Comparison seed must be a nonnegative integer or null",
+        id="compare-boolean-seed",
+    ),
+    pytest.param(
+        "report",
+        ["comparison_dir=comparison", "report_config_path=3"],
+        "report_config_path must be a path string or null",
+        id="report-config-path-type",
+    ),
     pytest.param(
         "export",
         [],
@@ -791,12 +816,6 @@ LEFT_TO_THE_RUN = [
     pytest.param("pipeline", ["ground_truth=truth.csv", "ultralytics.project=${oc.env:CY_HOME}/p"], id="route-project"),
     pytest.param("pipeline", ["ground_truth=truth.csv", "ultralytics.name=other"], id="route-name"),
     pytest.param("pipeline", ["ground_truth=truth.csv", "+ultralytics.save_dir=null"], id="route-save-dir"),
-    # cy-compare and cy-report have no such value rule; cy checks these values as cy-queue does.
-    pytest.param(
-        "compare", ["ground_truth=truth.csv", "candidate_model.task_id=c", "bootstrap_iterations=0"], id="bootstrap"
-    ),
-    pytest.param("compare", ["ground_truth=truth.csv", "candidate_model.task_id=c", "seed=true"], id="seed"),
-    pytest.param("report", ["comparison_dir=comparison", "report_config_path=3"], id="report-config-path"),
 ]
 
 

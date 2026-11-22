@@ -214,6 +214,11 @@ def _validate_comparison(compare: dict[str, Any]) -> None:
         raise ValueError("Comparison seed must be a nonnegative integer or null")
 
 
+def _validate_report_config_path(path: object) -> None:
+    if path is not None and not isinstance(path, str):
+        raise TypeError("report_config_path must be a path string or null")
+
+
 def _validate_pipeline_types(values: dict[str, Any]) -> None:
     # Validate the existing public function contract without invoking it or
     # duplicating its scalar/collection schema. Nested target records are checked
@@ -260,8 +265,7 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     if metrics["calibration_split"] != "val":
         raise ValueError("calibration_split must be exactly 'val'")
     _validate_comparison(compare)
-    if report["report_config_path"] is not None and not isinstance(report["report_config_path"], str):
-        raise TypeError("report_config_path must be a path string or null")
+    _validate_report_config_path(report["report_config_path"])
     _validate_request(values["clearml"], ClearMLConfig)
     _validate_pipeline_fiftyone(values, direct=direct)
     if values["weights"] is not None and not values["skip_train"]:
@@ -495,8 +499,8 @@ def _validate_metrics(values: dict[str, Any]) -> None:
 
 
 def _validate_compare(values: dict[str, Any]) -> None:
-    validate_q(values["q"])
-    _validate_request(values["baseline_model"], ModelRef)
+    # The comparison settings cy-queue admission checks in cy's compare group.
+    _validate_comparison(values)
     if _uses_ultralytics(values):
         reject_owned_prediction_overrides(values["ultralytics_predict"])
         prediction_settings(values["ultralytics_predict"] or {})
@@ -514,15 +518,18 @@ def _validate_ground_truth(values: dict[str, Any]) -> None:
     validate_test_fraction(values["test_fraction"])
 
 
-# Keyed by the command function, like the wrapper schema checks above. cy-report has
-# no value check beyond binding its call: its run applies no rule the configuration
-# alone decides.
+def _validate_report(values: dict[str, Any]) -> None:
+    _validate_report_config_path(values["report_config_path"])
+
+
+# Keyed by the command function, like the wrapper schema checks above.
 _COMMAND_CHECKS: dict[str, Callable[[dict[str, Any]], None]] = {
     "train": _validate_train_command,
     "predict": _validate_predict,
     "validate": _validate_val,
     "compute_metrics": _validate_metrics,
     "compare": _validate_compare,
+    "report": _validate_report,
     "export_model": _validate_export_inputs,
     "ground_truth": _validate_ground_truth,
 }
