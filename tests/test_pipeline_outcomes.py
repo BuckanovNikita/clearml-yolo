@@ -164,6 +164,42 @@ def test_report_is_skipped_when_comparison_was_skipped_and_none_exists(
     assert written["stages"]["report"]["status"] == "skipped"
 
 
+def test_evaluating_weights_without_comparison_on_a_fresh_run_directory_succeeds(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[Any] = []
+    monkeypatch.setattr(pipeline, "run_report", lambda *_a, **kwargs: calls.append(kwargs))
+    fake_metrics = pipeline.compute_metrics
+
+    def metrics(*args: Any, **kwargs: Any) -> Any:
+        # The product use case creates its output directory; threshold publication writes there.
+        Path(args[2]).mkdir(parents=True)
+        return fake_metrics(*args, **kwargs)
+
+    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
+    directory = pipeline_case["run_dir"]
+    assert not directory.exists()
+
+    result = pipeline.run_pipeline(**pipeline_case, skip_train=True, weights="existing.pt", skip_compare=True)
+
+    written = json.loads((directory / "pipeline_outcome.json").read_text())
+    for outcome in (result["outcome"], written):
+        assert outcome["status"] == "succeeded"
+        assert outcome["stages"]["prediction"]["status"] == "succeeded"
+        assert outcome["stages"]["metrics"]["status"] == "succeeded"
+        assert outcome["stages"]["comparison"] == {
+            "status": "skipped",
+            "reason": "Disabled by configuration",
+            "artifacts": [],
+        }
+        assert outcome["stages"]["report"] == {
+            "status": "skipped",
+            "reason": "No comparison exists in the run directory; set skip_report=true to disable the report stage",
+            "artifacts": [],
+        }
+    assert calls == []
+
+
 def test_report_uses_comparison_left_by_an_earlier_run(
     pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
