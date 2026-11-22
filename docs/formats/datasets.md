@@ -68,7 +68,7 @@ names:
 | `flat` | Те же каталоги, но файлы названы по порядку: `00000001.jpg`, `00000002.jpg`, ... |
 | `coco` | Каталоги `train/`, `valid/` (для split `val`), `test/` с нумерованными изображениями и `_annotations.coco.json` в каждом, плюс `data.yaml` |
 
-Для [семейства моделей](../configuration/model.md) `ultralytics` допустимы `ndjson` и `flat`; `coco` вызывает ошибку `Ultralytics training requires ndjson or flat dataset_format`. Остальные семейства всегда получают `coco`, какое бы значение вы ни задали. Другое значение вызывает ошибку `dataset_format must be one of: ndjson, flat, coco`.
+Для [семейства моделей](../configuration/model.md) `ultralytics` допустимы `ndjson` и `flat`; `coco` вызывает ошибку `Ultralytics training requires ndjson or flat dataset_format`. Остальные семейства всегда получают `coco`, какое бы значение вы ни задали. Другое значение вызывает ошибку `dataset_format must be one of: ndjson, flat, coco` (в `cy` — `Invalid pipeline setting dataset_format: ...`). `cy-train` и `cy` проверяют значение до создания задачи ClearML (task), `cy` — и при `skip_train=true`.
 
 В формате `ndjson` два изображения одного split не могут иметь одинаковое имя без расширения без учёта регистра: `NDJSON label stem collision in split 'train': 'a.jpg' and 'A.png' share stem 'a'`. Используйте `flat` или переименуйте файлы.
 
