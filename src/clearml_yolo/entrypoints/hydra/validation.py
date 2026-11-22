@@ -271,8 +271,8 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     ``bootstrap_iterations`` and ``seed`` rules and the ``report_config_path`` type rule
     apply even when the run would skip that work for want of a baseline model, and a
     required nested key missing for a stage that runs fails here as ``Required setting
-    <name> is missing``; a record of a stage that runs, or of ``clearml`` or ``fiftyone``,
-    must name its supported ``_target_``.
+    <name> is missing``, and a record of a stage that runs must name its supported
+    ``_target_``; the ``clearml`` and ``fiftyone`` records must name it in every run.
     """
     if direct:
         _validate_direct_pipeline(_resolved_values(config))
