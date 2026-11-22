@@ -36,7 +36,7 @@ cy-report [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 
 ## Как это работает
 
-1. Команда проверяет, что `output_dir` (если задан) лежит внутри `CY_HOME`, и создаёт задачу ClearML. Обе проверки идут до чтения `comparison_dir`, поэтому при недоступном сервере ClearML вы увидите ошибку ClearML, даже если каталога сравнения нет.
+1. Команда проверяет, что `output_dir` (если задан) лежит внутри `CY_HOME`, а `report_config_path` — строка пути или `null`, и создаёт задачу ClearML. Эти проверки и создание задачи идут до чтения `comparison_dir`, поэтому при недоступном сервере ClearML вы увидите ошибку ClearML, даже если каталога сравнения нет.
 2. Читает `comparison_manifest.json` из `comparison_dir` и проверяет, что обе книги сравнения, на которые ссылается манифест, лежат в этом каталоге. Split отчёта берётся из манифеста. Если задан `report_config_path`, публикует файл как объект конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `report`; ссылки `${...}` в нём разрешаются (см. [Интерполяции](../configuration/README.md#интерполяции-в-файлах-конфигурации)).
 3. Определяет обе модели: по подписи, сохранённой в книге, иначе по манифесту, иначе по `baseline_label` и `candidate_label`. Если описание в книге не совпадает с манифестом, команда останавливается.
 4. Строит `report_dev_<split>.xlsx` и `report_business_<split>.xlsx` в `output_dir`. Классы без корректного числа обучающих объектов исключаются из агрегатов, отфильтрованных по этому числу; в обе книги добавляются листы `Unknown training count` и `Report issues`, в журнал — предупреждение `Reports contain N unavailable training counts; ...` (см. [Отчёт: `cy-report`](../formats/workbooks.md#отчёт-cy-report)).

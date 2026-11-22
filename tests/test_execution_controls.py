@@ -13,7 +13,7 @@ import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra con
 from clearml_yolo.application.use_cases.metrics import compute_metrics
 from clearml_yolo.application.use_cases.predict import predict
 from clearml_yolo.entrypoints.hydra import common
-from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+from clearml_yolo.entrypoints.hydra.validation import validate_command_configuration, validate_wrapper_keys
 
 
 @pytest.mark.parametrize("setting", ["queue", "autogpu", "auto_gpu"])
@@ -31,15 +31,19 @@ def test_non_model_commands_also_reject_legacy_controls(setting: str) -> None:
         validate_wrapper_keys(config, lambda predictions: None)
 
 
+def _metrics_settings(fiftyone: object) -> dict[str, object]:
+    return {"splits": None, "calibration_split": "val", "evaluation": {}, "fiftyone": fiftyone}
+
+
 def test_direct_commands_reject_null_fiftyone_with_hint() -> None:
-    config = OmegaConf.create({"fiftyone": None})
+    config = OmegaConf.create(_metrics_settings(None))
     with pytest.raises(ValueError, match=r"fiftyone=null is not supported; use fiftyone\.enabled=false"):
-        validate_wrapper_keys(config, lambda fiftyone: None)
+        validate_command_configuration(config, compute_metrics)
 
 
 def test_direct_commands_accept_disabled_fiftyone_mapping() -> None:
-    config = OmegaConf.create({"fiftyone": {"enabled": False}})
-    validate_wrapper_keys(config, lambda fiftyone: None)
+    config = OmegaConf.create(_metrics_settings({"enabled": False}))
+    validate_command_configuration(config, compute_metrics)
 
 
 @pytest.mark.parametrize(

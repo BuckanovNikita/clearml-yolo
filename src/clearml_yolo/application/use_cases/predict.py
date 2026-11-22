@@ -1,6 +1,7 @@
 """Predict dataset images with native settings and persist the evaluation table."""
 
 __all__ = ["PredictResult"]
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,12 @@ def images_to_score(ground_truth: pd.DataFrame, splits: list[str] | None) -> lis
     return sorted(str(path) for path in rows["image_path"].unique())
 
 
+def require_prediction_model(settings: Mapping[str, Any]) -> None:
+    """Reject prediction settings that name no checkpoint."""
+    if settings.get("model") is None:
+        raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")
+
+
 def predict(
     weights: str | Path | None,
     ground_truth: GroundTruthInput,
@@ -57,9 +64,8 @@ def predict(
         publisher = prepare_publisher(task, fiftyone, factory=deps.publisher_factory, deps=deps)
         deps.model.stage_settings(ultralytics, "train")
         settings = deps.model.prediction_settings(ultralytics_predict or {}, weights)
-        selected = settings.pop("model", None)
-        if selected is None:
-            raise ValueError("Prediction requires weights=<checkpoint> or ultralytics_predict.model")
+        require_prediction_model(settings)
+        selected = settings.pop("model")
         checkpoint, source_identity = deps.repository.resolve_weights_with_identity(selected)
         checkpoint_path = Path(checkpoint)
         checkpoint_hash = deps.tracking.file_digest(checkpoint_path) if deps.storage.is_file(checkpoint_path) else None

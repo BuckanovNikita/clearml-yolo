@@ -1,4 +1,9 @@
-"""Validate public command arguments before waiting for GPUs or invoking workflows."""
+"""Validate public command arguments before waiting for GPUs or invoking workflows.
+
+``validate_command_configuration`` is the per-command preflight: it runs every request check
+that the composed configuration alone decides, before the invocation creates the ClearML
+task. Checks that need the task, files, downloads or the SDK stay in the use cases.
+"""
 
 import inspect
 from collections.abc import Callable, Mapping
@@ -14,15 +19,25 @@ from clearml_yolo.adapters.yolo.config import (
     execution_settings,
     native_defaults,
     prediction_defaults,
+    prediction_settings,
     stage_settings,
 )
-from clearml_yolo.application.contracts import ClearMLConfig, ModelRef, require_specified_candidate
+from clearml_yolo.application.contracts import (
+    ClearMLConfig,
+    ModelRef,
+    require_specified_candidate,
+    validate_test_fraction,
+)
 from clearml_yolo.application.ground_truth import normalize_ground_truth
+from clearml_yolo.application.use_cases.compare import frozen_evaluation_config, reject_owned_prediction_overrides
+from clearml_yolo.application.use_cases.metrics import frozen_calibration_split
 from clearml_yolo.application.use_cases.pipeline import (
     pipeline_stage_settings,
     routed_native,
     run_pipeline,
 )
+from clearml_yolo.application.use_cases.predict import require_prediction_model
+from clearml_yolo.application.use_cases.train import reject_csv_resume, require_training_model
 from clearml_yolo.core.comparison.significance import validate_q
 from clearml_yolo.core.evaluation.models import EvaluationConfig
 from clearml_yolo.core.evaluation.policy import validate_evaluation_image_name
@@ -92,18 +107,6 @@ def _reject_null_fiftyone(value: object) -> None:
         raise ValueError("fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off")
 
 
-def _require_specified_candidate(config: DictConfig, function: Callable[..., Any]) -> None:
-    """Reject a default ``cy-compare`` candidate before the ClearML task is created."""
-    if function.__name__ != "compare" or "candidate_model" not in config:
-        return
-    candidate = config.candidate_model
-    values = OmegaConf.to_container(candidate, resolve=True) if isinstance(candidate, DictConfig) else candidate
-    if not isinstance(values, Mapping):
-        raise TypeError("ModelRef settings must be a mapping")
-    fields = {str(key): value for key, value in values.items() if key != "_target_"}
-    require_specified_candidate(ModelRef.model_validate(fields))
-
-
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
     """Validate the command schema, including keys introduced with Hydra's + syntax."""
     reject_legacy_controls(config)
@@ -116,15 +119,12 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
     unknown = set(config) - accepted
     if unknown:
         raise ValueError(f"Unsupported wrapper settings: {sorted(unknown)}")
-    if "fiftyone" in config and not OmegaConf.is_missing(config, "fiftyone"):
-        _reject_null_fiftyone(config.fiftyone)
     if (
         "ground_truth" in config
         and not OmegaConf.is_missing(config, "ground_truth")
         and config.ground_truth is not None
     ):
         normalize_ground_truth(config.ground_truth)
-    _require_specified_candidate(config, function)
     prepare_transforms(config)
     model = materialize_model_config(config)
     _validate_export(config, model)
@@ -173,17 +173,26 @@ def validate_project_destinations(config: DictConfig) -> None:
             write_path(native.save_dir)
 
 
-def _validate_request(config: object, request: type[BaseModel]) -> None:
+def _request_fields(config: object, request: type[BaseModel]) -> dict[str, Any]:
     if not isinstance(config, Mapping):
         raise TypeError(f"{request.__name__} settings must be a mapping")
-    values = dict(config)
+    values = {str(key): value for key, value in config.items()}
     target = f"{request.__module__}.{request.__qualname__}"
     if values.pop("_target_", target) != target:
         raise ValueError(f"Submission requires the supported configuration target {target}")
-    request.model_validate(values)
+    return values
 
 
-def _validate_pipeline_comparison(compare: dict[str, Any]) -> None:
+def _validate_request(config: object, request: type[BaseModel]) -> None:
+    request.model_validate(_request_fields(config, request))
+
+
+def _validate_report_config_path(value: object) -> None:
+    if value is not None and not isinstance(value, str):
+        raise TypeError("report_config_path must be a path string or null")
+
+
+def _validate_comparison(compare: dict[str, Any]) -> None:
     _validate_request(compare["baseline_model"], ModelRef)
     validate_q(compare["q"])
     iterations = compare["bootstrap_iterations"]
@@ -219,9 +228,8 @@ def validate_pipeline_configuration(config: DictConfig) -> None:
     _validate_request(metrics["evaluation"], EvaluationConfig)
     if metrics["calibration_split"] != "val":
         raise ValueError("calibration_split must be exactly 'val'")
-    _validate_pipeline_comparison(compare)
-    if report["report_config_path"] is not None and not isinstance(report["report_config_path"], str):
-        raise TypeError("report_config_path must be a path string or null")
+    _validate_comparison(compare)
+    _validate_report_config_path(report["report_config_path"])
     _validate_request(values["clearml"], ClearMLConfig)
     if "fiftyone" in values:
         _reject_null_fiftyone(values["fiftyone"])
@@ -256,6 +264,116 @@ def _validate_pipeline_routes(values: dict[str, Any]) -> None:
                 raise ValueError("Native pipeline output overrides require an explicit run_dir")
         else:
             routed_native(settings, directory / relative, stage)
+
+
+def _resolved_values(config: DictConfig) -> dict[str, Any]:
+    resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
+    if not isinstance(resolved, dict):
+        raise TypeError("Resolved command configuration must be a mapping")
+    return {str(key): value for key, value in resolved.items()}
+
+
+def _uses_ultralytics(values: dict[str, Any]) -> bool:
+    model = values.get("model", {})
+    return not isinstance(model, Mapping) or model.get("backend", "ultralytics") == "ultralytics"
+
+
+def _validate_fiftyone(values: dict[str, Any]) -> None:
+    if "fiftyone" in values:
+        _reject_null_fiftyone(values["fiftyone"])
+        _validate_request(values["fiftyone"], FiftyOneConfig)
+
+
+def _validate_prediction_model(values: dict[str, Any]) -> None:
+    # Detector presets resolve their prediction settings from model.predict at run time.
+    if _uses_ultralytics(values):
+        require_prediction_model(prediction_settings(values["ultralytics_predict"], values["weights"]))
+
+
+def _validate_train(values: dict[str, Any]) -> None:
+    if _uses_ultralytics(values):
+        settings = execution_settings(values["ultralytics"], "train")
+        require_training_model(settings)
+        reject_csv_resume(settings)
+
+
+def _validate_frozen_evaluation(evaluation: object) -> None:
+    frozen_evaluation_config(None if evaluation is None else _request_fields(evaluation, EvaluationConfig))
+
+
+def _validate_pipeline(config: DictConfig) -> None:
+    # validate_pipeline_configuration is also cy-queue's submission check; the rules
+    # below are direct-command additions and stay outside it.
+    validate_pipeline_configuration(config)
+    values = _resolved_values(config)
+    if not values["skip_train"]:
+        _validate_train(values)
+    _validate_frozen_evaluation(values["metrics"]["evaluation"])
+
+
+def _validate_predict(values: dict[str, Any]) -> None:
+    _validate_prediction_model(values)
+    _validate_fiftyone(values)
+
+
+def _validate_val(values: dict[str, Any]) -> None:
+    _validate_prediction_model(values)
+    _validate_request(values["evaluation"], EvaluationConfig)
+    _validate_frozen_evaluation(values["evaluation"])
+    frozen_calibration_split(values["splits"] or (), "val")
+
+
+def _validate_metrics(values: dict[str, Any]) -> None:
+    frozen_calibration_split(values["splits"] or (), values["calibration_split"])
+    _validate_request(values["evaluation"], EvaluationConfig)
+    _validate_frozen_evaluation(values["evaluation"])
+    _validate_fiftyone(values)
+
+
+def _validate_compare(values: dict[str, Any]) -> None:
+    _validate_comparison(values)
+    if _uses_ultralytics(values):
+        reject_owned_prediction_overrides(values["ultralytics_predict"])
+        prediction_settings(values["ultralytics_predict"])
+    require_specified_candidate(ModelRef.model_validate(_request_fields(values["candidate_model"], ModelRef)))
+    _validate_frozen_evaluation(values["evaluation"])
+
+
+def _validate_report(values: dict[str, Any]) -> None:
+    _validate_report_config_path(values["report_config_path"])
+
+
+def _validate_export_inputs(values: dict[str, Any]) -> None:
+    ExportSettings.model_validate(values["export"]).validate_input_presence(
+        has_weights=values["weights"] is not None, has_ground_truth=values["ground_truth"] is not None
+    )
+
+
+def _validate_ground_truth(values: dict[str, Any]) -> None:
+    validate_test_fraction(values["test_fraction"])
+
+
+# Keyed by the command function, like the wrapper schema checks above.
+_COMMAND_CHECKS: dict[str, Callable[[dict[str, Any]], None]] = {
+    "train": _validate_train,
+    "predict": _validate_predict,
+    "validate": _validate_val,
+    "compute_metrics": _validate_metrics,
+    "compare": _validate_compare,
+    "report": _validate_report,
+    "export_model": _validate_export_inputs,
+    "ground_truth": _validate_ground_truth,
+}
+
+
+def validate_command_configuration(config: DictConfig, function: Callable[..., Any]) -> None:
+    """Run the command's effect-free request checks before its ClearML task is created."""
+    if function.__name__ == "run_pipeline":
+        _validate_pipeline(config)
+        return
+    check = _COMMAND_CHECKS.get(function.__name__)
+    if check is not None:
+        check(_resolved_values(config))
 
 
 def reject_saved_legacy_controls(directory: Path, name: str) -> None:

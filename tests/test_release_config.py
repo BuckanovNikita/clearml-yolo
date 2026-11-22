@@ -101,17 +101,18 @@ def test_compare_configuration_rejects_a_default_candidate_before_launch() -> No
 
     import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - registers the Hydra configurations
     from clearml_yolo.application.use_cases.compare import compare
-    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+    from clearml_yolo.entrypoints.hydra.validation import validate_command_configuration
 
     store.add_to_hydra_store(overwrite_ok=True)
+    truth = "ground_truth=truth.csv"
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
-        defaults = compose(config_name="compare")
-        named = compose(config_name="compare", overrides=["candidate_model.task_id=candidate-task"])
-        tagged = compose(config_name="compare", overrides=["candidate_model.tags=[staging]"])
+        defaults = compose(config_name="compare", overrides=[truth])
+        named = compose(config_name="compare", overrides=[truth, "candidate_model.task_id=candidate-task"])
+        tagged = compose(config_name="compare", overrides=[truth, "candidate_model.tags=[staging]"])
     with pytest.raises(ValueError, match="candidate_model is not specified"):
-        validate_wrapper_keys(defaults, compare)
-    validate_wrapper_keys(named, compare)
-    validate_wrapper_keys(tagged, compare)
+        validate_command_configuration(defaults, compare)
+    validate_command_configuration(named, compare)
+    validate_command_configuration(tagged, compare)
 
 
 def test_compare_configuration_resolves_candidate_interpolations_before_the_check() -> None:

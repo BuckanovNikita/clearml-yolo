@@ -67,7 +67,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 
 ## Как это работает
 
-1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Ошибка на этом шаге останавливает команду до создания задачи ClearML.
+1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Здесь же CY проверяет значения, для которых не нужны файлы и задача: группы `ultralytics` и `ultralytics_predict` для YOLO (при обучении — и пустой `ultralytics.model` и `ultralytics.resume`), `metrics`, `compare`, `report`, `fiftyone`, `weights` без `skip_train=true`, а при заданных `run_dir` или `run_id` — `dataset_cache_dir` внутри каталога запуска и ключи `project`, `name`, `save_dir` групп Ultralytics. Без `run_dir` и `run_id` эти три ключа должны быть `null`. Ошибка на этом шаге останавливает команду до создания задачи ClearML.
 2. CY создаёт задачу ClearML и публикует в неё конфигурацию (см. [Публикация](../publication.md)).
 3. CY готовит предобученные веса всех моделей из своего списка в кэше рабочего каталога. Перед этим CY записывает абсолютный путь каталога весов Ultralytics (`weights_dir`) в настройки Ultralytics, если там был относительный путь. Попытка запоминается в `.cache/clearml-yolo/preparation/`, и следующие запуски её не повторяют. Ошибка подготовки не останавливает запуск: CY пишет предупреждение `Model preparation <модель>: <сообщение>`. Повторить подготовку можно командой [`cy-download-weights`](cy-download-weights.md). Затем CY готовит веса выбранной модели, как описано в [Как выбираются веса](../configuration/model.md#как-выбираются-веса); здесь ошибка останавливает команду.
 4. CY выбирает каталог запуска:
@@ -75,7 +75,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
    - иначе `run_id` — `runs/<run_id>`;
    - иначе `runs/<проект ClearML>/<имя задачи>-<ID задачи>` (правило кодирования имён — в [Рабочем каталоге](../workspace.md#runs)).
 
-   Здесь же, уже после создания задачи ClearML, CY проверяет `weights` без `skip_train=true`, `dataset_cache_dir` внутри каталога запуска и ключи `project`, `name`, `save_dir` групп Ultralytics. Затем каталог создаётся, и ссылка `runs/latest` переводится на него, если каталог лежит в рабочем каталоге.
+   Если каталог запуска задаёт задача (нет `run_dir` и `run_id`), здесь же, уже после создания задачи ClearML, CY проверяет, что `dataset_cache_dir` лежит вне него. Затем каталог создаётся, и ссылка `runs/latest` переводится на него, если каталог лежит в рабочем каталоге.
 5. **Обучение** (если не `skip_train`). Разметка проверяется и собирается в рабочую копию датасета (см. [Датасеты](../formats/datasets.md)). Обучение требует изображений в split `train` и `val`; если включены предсказания или метрики — ещё во всех split из `splits`; если включено сравнение — ещё в `test`. Результат пишется в `<каталог запуска>/detect/train/`. Имя лучшего checkpoint зависит от семейства моделей (см. [`cy-train`](cy-train.md#результат)); для YOLO это `detect/train/weights/best.pt`. Если файла нет или он пустой, команда завершается ошибкой.
 6. **Предсказания** (если не `skip_predict`) для split `val` и всех split из `splits` пишутся в `<каталог запуска>/predictions.csv` (формат — [Предсказания](../formats/predictions.md)). Используется checkpoint из шага 5, а при `skip_train=true` — `weights` или, без него, `detect/train/weights/best.pt` каталога запуска.
 7. **Метрики** (если не `skip_metrics`) по `predictions.csv` пишутся в `<каталог запуска>/metrics/`. Пороги уверенности подбираются на `val` (см. [`evaluation`](../configuration/evaluation.md#пороги-уверенности)), и подобранные пороги ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)) сохраняются в `metrics/frozen_thresholds.json`.
@@ -171,7 +171,7 @@ visualization: failed — <сообщение ошибки>
 
 ## Частые ошибки
 
-Первые пять ошибок выводятся до создания задачи ClearML; остальные — после него, поэтому без доступного сервера ClearML вы увидите сначала ошибку подключения.
+Ошибки из таблицы до `Native pipeline output overrides require an explicit run_dir` включительно выводятся до создания задачи ClearML. Исключение — `dataset_cache_dir must be outside run_dir` без `run_dir` и `run_id`: тогда каталог запуска зависит от задачи, и ошибка выводится после её создания. Остальные ошибки выводятся после создания задачи, поэтому без доступного сервера ClearML вы увидите сначала ошибку подключения.
 
 | Сообщение | Причина и решение |
 | --- | --- |
@@ -184,6 +184,7 @@ visualization: failed — <сообщение ошибки>
 | `dataset_cache_dir must be outside run_dir` | `dataset_cache_dir` внутри каталога запуска |
 | `project='other' conflicts with pipeline run_dir; expected /workspace/project/runs/my-run/detect` | Задан `ultralytics.project` или `ultralytics_predict.project` (аналогично `name`). Уберите ключ; путь задаёт `run_dir` |
 | `save_dir conflicts with pipeline run_dir; use run_dir to route outputs` | Задан `save_dir` в группе Ultralytics |
+| `Native pipeline output overrides require an explicit run_dir` | Задан `project`, `name` или `save_dir` в группе Ultralytics, а `run_dir` и `run_id` не заданы. Уберите ключ; путь задаёт `run_dir` |
 | `<путь>: required split(s) contain no images: test` | В разметке нет изображений split, который нужен включённым этапам (см. шаг 5). Добавьте split в разметку, уберите его из `splits` или отключите этап, например `skip_compare=true` для `test` |
 | `Training did not produce a usable checkpoint: <путь>` | Обучение не оставило `best.pt` или он пустой |
 | `Model provenance is unavailable; supply a custom model_label (comparison model references use label)` | Происхождение модели неизвестно; задайте `model_label` |

@@ -36,7 +36,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 - `save_dir` в `cy` отклоняется (`save_dir conflicts with pipeline run_dir; use run_dir to route outputs`), в `cy-train` отбрасывается; в обоих случаях путь сначала проверяется на нахождение внутри `CY_HOME`;
 - `augmentations` (список преобразований Albumentations для нативного загрузчика) передаётся в Ultralytics как есть. Собственный пайплайн аугментаций CY настраивается в группе [`transforms`](transforms.md); профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) `transforms=albumentations` сам обнуляет встроенные аугментации Ultralytics (`hsv_*`, `degrees`, `translate`, `scale`, `shear`, `perspective`, `flipud`, `fliplr`, `bgr`, `mosaic` и другие).
 
-Когда начинается обучение, CY проверяет полную группу: все ключи обучения должны присутствовать, типы и диапазоны должны совпадать с ожиданиями Ultralytics. Ошибки имеют вид `ultralytics.epochs must be an integer`, `ultralytics.lr0 must be between 0 and 1`, `ultralytics.epochs must be at least 1`, `ultralytics.amp must not be null`.
+При запуске `cy` и `cy-train`, до создания задачи ClearML (task), CY проверяет полную группу: все ключи обучения должны присутствовать, типы и диапазоны должны совпадать с ожиданиями Ultralytics. Ошибки имеют вид `ultralytics.epochs must be an integer`, `ultralytics.lr0 must be between 0 and 1`, `ultralytics.epochs must be at least 1`, `ultralytics.amp must not be null`.
 
 ## Ключи
 

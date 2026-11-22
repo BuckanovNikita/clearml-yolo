@@ -512,6 +512,15 @@ def _skip_without_baseline(
             )
 
 
+def reject_owned_prediction_overrides(ultralytics_predict: dict[str, Any] | None) -> None:
+    """Reject prediction routes and models that comparison selects itself."""
+    conflicts = {key for key in ("model", "project", "name") if (ultralytics_predict or {}).get(key) is not None}
+    if conflicts:
+        raise ValueError(
+            f"Prediction {sorted(conflicts)} are owned by comparison; use baseline_model/candidate_model and output_dir"
+        )
+
+
 def _native_inference(
     inference: dict[str, Any],
     ultralytics_predict: dict[str, Any] | None,
@@ -519,11 +528,7 @@ def _native_inference(
     deps: WorkflowDependencies,
 ) -> InferenceConfig:
     """Adapt public native groups to paired comparison's internal settings."""
-    conflicts = {key for key in ("model", "project", "name") if (ultralytics_predict or {}).get(key) is not None}
-    if conflicts:
-        raise ValueError(
-            f"Prediction {sorted(conflicts)} are owned by comparison; use baseline_model/candidate_model and output_dir"
-        )
+    reject_owned_prediction_overrides(ultralytics_predict)
     unknown = set(inference) - {"reuse_existing", "image_name"}
     if unknown:
         raise ValueError(f"Unsupported inference settings: {sorted(unknown)}")
@@ -545,7 +550,7 @@ def _native_inference(
     return InferenceConfig(**inference, **fields, ultralytics=extras)
 
 
-def _evaluation_config(evaluation: EvaluationConfig | dict[str, Any] | None) -> EvaluationConfig:
+def frozen_evaluation_config(evaluation: EvaluationConfig | dict[str, Any] | None) -> EvaluationConfig:
     config = (
         evaluation if isinstance(evaluation, EvaluationConfig) else EvaluationConfig.model_validate(evaluation or {})
     )
@@ -626,7 +631,7 @@ def compare(
         destination = deps.storage.write_path(output_dir)
         deps.storage.mkdir(destination, parents=True, exist_ok=True)
         current_task_id = str(task.id) if task is not None else None
-        evaluation_config = _evaluation_config(evaluation)
+        evaluation_config = frozen_evaluation_config(evaluation)
         ground_truth_path = resolve_ground_truth(ground_truth, task=task, deps=deps).path
         loaded_truth = _read_comparison_truth(ground_truth_path, inference.image_name, deps=deps)
         truth = loaded_truth.source

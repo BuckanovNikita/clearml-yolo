@@ -57,8 +57,9 @@ cy-export [ключ=значение ...]
 1. Выбран ли вариант `fasterrcnn/*` (иначе `cy-export supports only Faster R-CNN presets`).
 2. Допустимы ли значения `export.*` и их сочетание: `onnx` — только `cpu` и `fp32`; `build` и `verify` — ровно один GPU; `export.workspace_gib` больше нуля; `export.split` из списка.
 3. Если задан `ground_truth`, корректна ли форма ссылки на разметку.
+4. Заданы ли нужные для операции входы: `onnx` — `weights`; `build` — `export.onnx`; `verify` — `export.engine`, `weights` и `ground_truth`.
 
-Затем команда создаёт задачу ClearML и проверяет, что для операции заданы нужные входы: `onnx` — `weights`; `build` — `export.onnx`; `verify` — `export.engine`, `weights` и `ground_truth`. Ссылку на ClearML Dataset команда разрешает в локальный файл, `weights` — в локальный checkpoint. Происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)) — модель ClearML, задача обучения или SHA-256 файла — записывается в объект конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `run` задачи как раздел `source_model`.
+Затем команда создаёт задачу ClearML. Ссылку на ClearML Dataset команда разрешает в локальный файл, `weights` — в локальный checkpoint. Происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)) — модель ClearML, задача обучения или SHA-256 файла — записывается в объект конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `run` задачи как раздел `source_model`.
 
 ### `export.operation=onnx`
 

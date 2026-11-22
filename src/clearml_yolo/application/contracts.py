@@ -477,6 +477,12 @@ _CANDIDATE_NOT_SPECIFIED = (
 )
 
 
+def validate_test_fraction(test_fraction: float) -> None:
+    """Reject a share of val images that cannot leave both val and test usable."""
+    if not 0.0 <= test_fraction < 1.0:
+        raise ValueError(f"test_fraction must be within [0.0, 1.0), got {test_fraction}")
+
+
 def require_specified_candidate(candidate: ModelRef) -> None:
     """Reject a candidate that holds only default values; it would resolve like the baseline."""
     if candidate == ModelRef():

@@ -4,7 +4,8 @@
 Git workspace advisory once before Hydra composes; every sweep member is validated before
 the first job, and one multirun tag is created per launch. ``execute_owned`` keeps this
 order: initialize the filesystem, read one detached Agent replay snapshot and apply its
-canonical ``run`` before mandatory-input validation and backend selection, initialize the
+canonical ``run`` before mandatory-input validation and backend selection, run the command's
+configuration preflight, initialize the
 matching native runtime before ClearML starts package detection, then join the same task
 through ``invocation``. A replay must not switch the initialized runtime family. Remote
 ``General`` parameters apply only to YOLO training, never to detector ``model`` settings, and
@@ -61,6 +62,7 @@ from clearml_yolo.adapters.runtime.process_tree import native_descendant_scope
 from clearml_yolo.adapters.storage.filesystem import initialize_filesystem, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
+from clearml_yolo.application.use_cases.train import require_training_model
 from clearml_yolo.core.models import ModelConfig, model_preset
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
 from clearml_yolo.entrypoints.hydra.configs import command_schema
@@ -69,6 +71,7 @@ from clearml_yolo.entrypoints.hydra.transforms import prepare_transforms, profil
 from clearml_yolo.entrypoints.hydra.validation import (
     materialize_model_config,
     reject_legacy_controls,
+    validate_command_configuration,
     validate_launch_arguments,
     validate_project_destinations,
     validate_wrapper_keys,
@@ -199,6 +202,8 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
         raise TypeError("Resolved command configuration must be a mapping")
     inputs = {str(key): value for key, value in resolved.items()}
     validate_project_destinations(config)
+    # Every check the composed configuration decides runs before the task exists.
+    validate_command_configuration(config, function)
     # Initialize native imports before ClearML starts background package detection;
     # concurrent torch submodule discovery can observe a partially loaded package.
     model_values = inputs.get("model", {})
@@ -237,6 +242,7 @@ def execute_owned(name: str, config: DictConfig, function: Callable[..., Any]) -
                 config.ultralytics = native
         validate_wrapper_keys(config, function)
         validate_project_destinations(config)
+        validate_command_configuration(config, function)
         publish_run_configuration(task, _publication_inputs(config), _builtin_defaults(name, config))
         initialize_naming(task)
         # Derive paths only after the owner exists; remote task names may differ.
@@ -301,8 +307,7 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
             # Supply concrete capabilities outside the public Hydra configuration.
             if name == "train" or (name == "pipeline" and not effective.skip_train):
                 parameters = dependencies.model.execution_settings(dict(effective.ultralytics), "train")
-                if not parameters.get("model"):
-                    raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
+                require_training_model(parameters)
                 dependencies.tracking.publish_training_parameters(
                     dependencies.tracking.init_task(instantiate(effective.clearml), stage=name),
                     parameters | {"mode": "train"},

@@ -1,7 +1,7 @@
 """CSV-backed native training with one verified native best model."""
 
 __all__ = ["TrainResult"]
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -17,6 +17,18 @@ from clearml_yolo.application.ground_truth import resolve_ground_truth
 from clearml_yolo.application.ports import TaskHandle, WorkflowDependencies
 
 TRAIN_DIR = "detect"
+
+
+def require_training_model(settings: Mapping[str, Any]) -> None:
+    """Reject an empty training model; CY never chooses a fallback model."""
+    if not settings.get("model"):
+        raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
+
+
+def reject_csv_resume(settings: Mapping[str, Any]) -> None:
+    """Reject native resume; training from ground truth starts from model weights."""
+    if settings.get("resume"):
+        raise ValueError("resume is unsupported with ground_truth; use model weights to fine-tune")
 
 
 def _project_of_this_run(project: str | None, task: TaskHandle | None, *, deps: WorkflowDependencies) -> Path:
@@ -39,8 +51,7 @@ def _prepare_csv_dataset(
     *,
     deps: WorkflowDependencies,
 ) -> Iterator[tuple[PreparedDataset, dict[str, Any]]]:
-    if settings.get("resume"):
-        raise ValueError("resume is unsupported with ground_truth; use model weights to fine-tune")
+    reject_csv_resume(settings)
     project = deps.storage.resolve(Path(settings["project"]))
     output = deps.storage.resolve(project / str(settings["name"]))
     if output == project or not output.is_relative_to(project):
@@ -98,9 +109,8 @@ def train(
         ground_truth = resolve_ground_truth(ground_truth, task=task, deps=deps).path
         deps.model.stage_settings(ultralytics_predict or {}, "predict")
         settings = deps.model.execution_settings(ultralytics, "train")
+        require_training_model(settings)
         architecture = settings.pop("model")
-        if not architecture:
-            raise ValueError("Set ultralytics.model explicitly; no training model fallback is provided")
         settings["mode"] = "train"
         settings["project"] = str(_project_of_this_run(settings.get("project"), task, deps=deps))
         settings["name"] = settings.get("name") or deps.storage.safe_path_component(

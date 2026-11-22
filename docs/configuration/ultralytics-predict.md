@@ -30,7 +30,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 
 Пути `project` и `name` CY проверяет при запуске команды, ещё до задачи ClearML, даже с `--cfg job`: они должны лежать внутри `CY_HOME`, иначе `Project write destination ... must be contained beneath CY_HOME=...` (см. [правило записи внутри `CY_HOME`](../workspace.md#правило-записи-внутри-cy_home) ([write containment rule](../../GLOSSARY.md#write-containment-rule))).
 
-Остальные значения CY проверяет перед предсказанием, после создания задачи ClearML: полноту группы, типы и диапазоны значений. Ошибки имеют вид `ultralytics_predict.conf must be between 0 and 1`.
+Остальные значения — полноту группы, типы и диапазоны — CY тоже проверяет до создания задачи ClearML. Ошибки имеют вид `ultralytics_predict.conf must be between 0 and 1`.
 
 ## Ключи
 

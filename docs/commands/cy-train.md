@@ -44,7 +44,7 @@ cy-train [--config-dir configs] [--cfg job] [-m] key=value ...
 
 ## Как это работает
 
-1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) для `dataset_cache_dir`, `ultralytics.project`, `ultralytics.name` и `ultralytics.save_dir` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Ошибка на этом шаге останавливает команду до создания задачи ClearML. Пустой `ultralytics.model`, `ultralytics.resume` и список `required_splits` проверяются позже, уже после создания задачи.
+1. CY проверяет override и конфигурацию: неизвестные ключи, ключи неактивного семейства моделей, правило записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) для `dataset_cache_dir`, `ultralytics.project`, `ultralytics.name` и `ultralytics.save_dir` (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)). Для YOLO здесь же проверяются значения группы `ultralytics`: полнота группы, типы и диапазоны, пустой `ultralytics.model` и `ultralytics.resume`. Ошибка на этом шаге останавливает команду до создания задачи ClearML. Список `required_splits` проверяется позже, по данным разметки, уже после создания задачи.
 2. CY создаёт задачу ClearML, публикует в неё конфигурацию (см. [Публикация](../publication.md)) и готовит веса (weights) выбранной модели, как описано в [Как выбираются веса](../configuration/model.md#как-выбираются-веса). В отличие от `cy`, остальные модели из списка CY не готовятся.
 3. CY выбирает каталог обучения ([training directory](../../GLOSSARY.md#training-directory)):
    - если задан `ultralytics.project` — этот каталог;

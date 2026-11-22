@@ -1,6 +1,7 @@
 """Calibrate on validation once, score each split, and publish readable evidence."""
 
 __all__ = ["EvaluationConfig", "MetricsResult"]
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -92,6 +93,15 @@ def _prepare(
     return (prepared_gt, raw_predictions, prepared_predictions, classes)
 
 
+def frozen_calibration_split(requested: Sequence[str], calibration_split: str | None) -> str:
+    """Calibrate only on validation and score only concrete splits."""
+    if calibration_split != "val":
+        raise ValueError("calibration_split must be exactly 'val'; test data must never calibrate thresholds")
+    if "all" in requested:
+        raise ValueError("split='all' is unsupported for frozen evaluation; name concrete splits")
+    return calibration_split
+
+
 def compute_metrics(
     predictions: str | Path,
     ground_truth: GroundTruthInput,
@@ -116,10 +126,7 @@ def compute_metrics(
             checkpoint_hash=deps.tracking.prediction_checkpoint_hash(Path(predictions)),
         )
         requested = list(dict.fromkeys(splits or ["train", "val", "test"]))
-        if calibration_split != "val":
-            raise ValueError("calibration_split must be exactly 'val'; test data must never calibrate thresholds")
-        if "all" in requested:
-            raise ValueError("split='all' is unsupported for frozen evaluation; name concrete splits")
+        calibration_split = frozen_calibration_split(requested, calibration_split)
         predictions_frame = assign_source_ids(
             deps.storage.read_detection_csv(predictions),
             row_type="prediction",
