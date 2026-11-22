@@ -99,6 +99,7 @@ def test_compare_configuration_rejects_a_default_candidate_before_launch() -> No
     from hydra import compose, initialize_config_module
     from hydra_zen import store
 
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - registers the Hydra configurations
     from clearml_yolo.application.use_cases.compare import compare
     from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
 
