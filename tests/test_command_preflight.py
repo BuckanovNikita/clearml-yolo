@@ -23,7 +23,7 @@ from clearml_yolo.application.use_cases.report import report
 from clearml_yolo.application.use_cases.train import train
 from clearml_yolo.application.use_cases.val import validate
 from clearml_yolo.entrypoints.hydra import common, validation
-from clearml_yolo.entrypoints.hydra.validation import validate_pipeline_configuration
+from clearml_yolo.entrypoints.hydra.validation import validate_pipeline_configuration, validate_wrapper_keys
 
 COMMANDS: dict[str, Callable[..., Any]] = {
     "pipeline": run_pipeline,
@@ -36,6 +36,9 @@ COMMANDS: dict[str, Callable[..., Any]] = {
     "export": export_model,
     "ground_truth": ground_truth,
 }
+
+
+_NULL_FIFTYONE = "fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off"
 
 
 class TaskCreated(Exception):  # noqa: N818 - a sentinel, not an error condition
@@ -628,12 +631,22 @@ def test_queue_admission_accepts_the_default_configuration() -> None:
     validate_pipeline_configuration(_pipeline(_SKIP_TRAIN))
 
 
-def test_queue_admission_accepts_null_fiftyone_like_master() -> None:
-    # cy-queue's admission skipped a null fiftyone; only the direct preflight rejects it.
-    config = _pipeline(["fiftyone=null"])
-    validate_pipeline_configuration(config)
-    with pytest.raises(ValueError, match=re.escape("fiftyone=null is not supported")):
-        validate_pipeline_configuration(config, direct=True)
+@pytest.mark.parametrize("direct", [False, True], ids=["queue", "direct"])
+def test_both_admissions_reject_null_fiftyone(direct: bool) -> None:
+    # SIP-210: cy-queue's admission and the direct preflight both reject it.
+    with pytest.raises(ValueError, match=re.escape(_NULL_FIFTYONE)):
+        validate_pipeline_configuration(_pipeline(["fiftyone=null"]), direct=direct)
+
+
+def test_queue_admission_rejects_null_fiftyone_in_the_wrapper_keys() -> None:
+    with pytest.raises(ValueError, match=re.escape(_NULL_FIFTYONE)):
+        validate_wrapper_keys(_pipeline(["fiftyone=null"]), run_pipeline)
+
+
+def test_direct_preflight_accepts_a_removed_fiftyone_group() -> None:
+    config = _pipeline([])
+    del config["fiftyone"]
+    validate_pipeline_configuration(config, direct=True)
 
 
 # (overrides, whether cy-queue admits it, whether the direct preflight admits it). The

@@ -129,6 +129,8 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
     unknown = set(config) - accepted
     if unknown:
         raise ValueError(f"Unsupported wrapper settings: {sorted(unknown)}")
+    if "fiftyone" in config and not OmegaConf.is_missing(config, "fiftyone"):
+        _reject_null_fiftyone(config.fiftyone)
     if (
         "ground_truth" in config
         and not OmegaConf.is_missing(config, "ground_truth")
@@ -261,8 +263,7 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     if report["report_config_path"] is not None and not isinstance(report["report_config_path"], str):
         raise TypeError("report_config_path must be a path string or null")
     _validate_request(values["clearml"], ClearMLConfig)
-    if values.get("fiftyone") is not None:
-        _validate_request(values["fiftyone"], FiftyOneConfig)
+    _validate_pipeline_fiftyone(values, direct=direct)
     if values["weights"] is not None and not values["skip_train"]:
         raise ValueError("weights is only valid with skip_train=true; training chooses its model")
     if values["dataset_format"] not in {"ndjson", "flat", "coco"}:
@@ -275,6 +276,16 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
         _validate_frozen_evaluation(metrics["evaluation"])
         _validate_train(values)
     _validate_pipeline_routes(values, strict=not direct)
+
+
+def _validate_pipeline_fiftyone(values: dict[str, Any], *, direct: bool) -> None:
+    if "fiftyone" not in values:
+        return
+    if not direct:
+        # Direct mode rejected an explicit null before it bound a removed group to None.
+        _reject_null_fiftyone(values["fiftyone"])
+    if values["fiftyone"] is not None:
+        _validate_request(values["fiftyone"], FiftyOneConfig)
 
 
 def _validate_pipeline_routes(values: dict[str, Any], *, strict: bool) -> None:

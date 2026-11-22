@@ -42,6 +42,16 @@ def _metrics_settings(fiftyone: object) -> dict[str, object]:
     }
 
 
+def test_wrapper_keys_reject_null_fiftyone_with_hint() -> None:
+    config = OmegaConf.create({"fiftyone": None})
+    with pytest.raises(ValueError, match=r"fiftyone=null is not supported; use fiftyone\.enabled=false"):
+        validate_wrapper_keys(config, lambda fiftyone: None)
+
+
+def test_wrapper_keys_accept_disabled_fiftyone_mapping() -> None:
+    validate_wrapper_keys(OmegaConf.create({"fiftyone": {"enabled": False}}), lambda fiftyone: None)
+
+
 def test_direct_commands_reject_null_fiftyone_with_hint() -> None:
     config = OmegaConf.create(_metrics_settings(None))
     with pytest.raises(ValueError, match=r"fiftyone=null is not supported; use fiftyone\.enabled=false"):
