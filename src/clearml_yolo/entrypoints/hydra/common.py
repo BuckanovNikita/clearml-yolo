@@ -69,6 +69,7 @@ from clearml_yolo.entrypoints.hydra.configs import command_schema
 from clearml_yolo.entrypoints.hydra.sweeps import new_multirun_tag, tag_multirun_job
 from clearml_yolo.entrypoints.hydra.transforms import prepare_transforms, profile_values
 from clearml_yolo.entrypoints.hydra.validation import (
+    detector_native_groups,
     materialize_model_config,
     reject_legacy_controls,
     validate_command_configuration,
@@ -297,10 +298,8 @@ def _execute_direct(name: str, config: DictConfig, function: Callable[..., Any])
                 effective.pop("model", None)
                 effective.pop("transforms", None)
                 if selected.backend != "ultralytics" and name != "export":
-                    effective.ultralytics = selected.train.model_dump(mode="json") | {
-                        "model": selected.preset,
-                    }
-                    effective.ultralytics_predict = selected.predict.model_dump(mode="json")
+                    for group, native in detector_native_groups(selected).items():
+                        effective[group] = native
                     if "dataset_format" in effective:
                         effective.dataset_format = "coco"
 

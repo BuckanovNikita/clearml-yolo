@@ -11,10 +11,12 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from hydra.utils import get_object
 from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from clearml_yolo.adapters.integrations.native_runtime import validate_owner_environment
+from clearml_yolo.adapters.storage.dataset_cache import dataset_cache_root
 from clearml_yolo.adapters.storage.filesystem import cy_home, runs_root, write_path
 from clearml_yolo.adapters.storage.run_identity import resolve_run_dir
 from clearml_yolo.adapters.yolo.config import (
@@ -182,19 +184,18 @@ def _target(request: type[BaseModel]) -> str:
     return f"{request.__module__}.{request.__qualname__}"
 
 
-def _request_fields(config: object, request: type[BaseModel], *, any_target: bool = False) -> dict[str, Any]:
-    """Return a record's fields; ``any_target`` drops ``_target_`` unchecked, as an alias names the same class."""
+def _request_fields(config: object, request: type[BaseModel]) -> dict[str, Any]:
     if not isinstance(config, Mapping):
         raise TypeError(f"{request.__name__} settings must be a mapping")
     values = {str(key): value for key, value in config.items()}
     target = _target(request)
-    if values.pop("_target_", target) != target and not any_target:
+    if values.pop("_target_", target) != target:
         raise ValueError(f"Submission requires the supported configuration target {target}")
     return values
 
 
-def _validate_request(config: object, request: type[BaseModel], *, any_target: bool = False) -> None:
-    request.model_validate(_request_fields(config, request, any_target=any_target))
+def _validate_request(config: object, request: type[BaseModel]) -> None:
+    request.model_validate(_request_fields(config, request))
 
 
 def _validate_report_config_path(value: object) -> None:
@@ -202,56 +203,26 @@ def _validate_report_config_path(value: object) -> None:
         raise TypeError("report_config_path must be a path string or null")
 
 
-def _validate_comparison(compare: dict[str, Any], *, direct: bool = False, any_target: bool = False) -> None:
-    _validate_request(compare["baseline_model"], ModelRef, any_target=any_target)
+def _validate_comparison(compare: dict[str, Any]) -> None:
+    _validate_request(compare["baseline_model"], ModelRef)
     validate_q(compare["q"])
     iterations = compare["bootstrap_iterations"]
-    # np.empty rejects a boolean iteration count, so the direct run rejects it too.
     if type(iterations) is not int or iterations <= 0:
         raise ValueError("bootstrap_iterations must be a positive integer")
     seed = compare["seed"]
-    # numpy's default_rng accepts a boolean seed, so only cy-queue admission rejects it.
-    integer = isinstance(seed, int) if direct else type(seed) is int
-    if seed is not None and (not integer or seed < 0):
+    if seed is not None and (type(seed) is not int or seed < 0):
         raise ValueError("Comparison seed must be a nonnegative integer or null")
 
 
-def _with_defaults(
-    values: dict[str, Any], function: Callable[..., Any], names: Iterable[str] | None = None, *, prefix: str = ""
-) -> dict[str, Any]:
-    """Fill settings removed with ``~key`` from the use-case signature, as the direct call does."""
-    parameters = inspect.signature(function).parameters
-    filled = dict(values)
-    for name in names if names is not None else (name for name in parameters if name != "deps"):
-        # A removed fiftyone group stays absent: the run publishes with defaults, while
-        # an explicit fiftyone=null is rejected.
-        if name in filled or name == "fiftyone":
-            continue
-        default = parameters[name].default
-        if default is inspect.Parameter.empty:
-            raise ValueError(f"Required setting {prefix}{name} is missing")
-        filled[name] = default
-    return filled
-
-
-# The direct run read skip flags only for truthiness, model_label only for a checkpoint
-# without provenance, and weights and splits as file and CSV selectors, so a loose value
-# of these could still complete there. cy-queue admission keeps their strict types.
-_DIRECT_LOOSE_SETTINGS = frozenset(
-    {"skip_train", "skip_predict", "skip_metrics", "skip_report", "skip_compare", "model_label", "weights", "splits"}
-)
-
-
-def _validate_pipeline_types(values: dict[str, Any], *, direct: bool, skipped: Iterable[str] = ()) -> None:
+def _validate_pipeline_types(values: dict[str, Any]) -> None:
     # Validate the existing public function contract without invoking it or
     # duplicating its scalar/collection schema. Nested target records are checked
     # separately below because they have not been instantiated at submission.
-    ignored = {"deps", "clearml", "fiftyone", *skipped} | (_DIRECT_LOOSE_SETTINGS if direct else set())
     for name, parameter in inspect.signature(run_pipeline).parameters.items():
-        if name in ignored:
+        if name in {"deps", "clearml", "fiftyone"}:
             continue
         try:
-            TypeAdapter(parameter.annotation).validate_python(values[name], strict=not direct)
+            TypeAdapter(parameter.annotation).validate_python(values[name], strict=True)
         except ValidationError as error:
             raise ValueError(f"Invalid pipeline setting {name}: {error}") from error
 
@@ -259,30 +230,28 @@ def _validate_pipeline_types(values: dict[str, Any], *, direct: bool, skipped: I
 def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False) -> None:
     """Validate known requests and cross-field rules without instantiating SDK effects.
 
-    The default is cy-queue's submission check: it checks every stage with strict types.
-    ``direct=True`` is the direct ``cy`` preflight. It rejects only what the direct run
-    rejects later, given the configuration alone: it checks a stage's settings only when
-    ``run_pipeline`` would run that stage, and the metrics, comparison and report values
-    only without training (after successful training the run only marks a failing later
-    stage failed). It fills removed optional settings from the use-case signatures, leaves
-    the types of ``_DIRECT_LOOSE_SETTINGS`` to the run, resolves ``run_dir`` as the use
-    case does and checks the routes the run applies: the YOLO groups as routed, no native
-    route for a detector. Deliberate exceptions: without training, the comparison
-    ``bootstrap_iterations`` and ``seed`` rules and the ``report_config_path`` type rule
-    apply even when the run would skip that work for want of a baseline model, and a
-    required nested key missing for a stage that runs fails here as ``Required setting
-    <name> is missing``, and a record of a stage that runs must name its supported
-    ``_target_``; the ``clearml`` and ``fiftyone`` records must name it in every run.
+    The default is cy-queue's submission check: strict types, every key present and
+    records that name their supported ``_target_``. ``direct=True`` is the direct ``cy``
+    preflight. It rejects every value these checks reject, in every stage, whether the
+    stage is skipped or follows training. It first applies what the run applies before
+    it validates: a detector's ``model.train`` and ``model.predict`` groups and
+    ``dataset_format=coco`` replace the Ultralytics groups, and the YOLO prediction group
+    is checked as ``run_pipeline`` routes it (the CSV dataset policy when training, then
+    the prediction projection). It accepts these loose but valid forms: integer skip
+    flags, keys removed with ``~key`` (the use-case signature default applies), a
+    ``_target_`` that imports the supported class, Hydra's reserved instantiate keys
+    in records and any ``run_id`` next to ``run_dir``. It adds the direct run's own
+    checks: the frozen-evaluation backend, the training model, ``resume``, and the
+    routes resolved as the run resolves them.
     """
-    if direct:
-        _validate_direct_pipeline(_resolved_values(config))
-        return
     resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved, dict):
         raise TypeError("Pipeline settings must be a mapping")
     values = {str(key): value for key, value in resolved.items()}
+    if direct:
+        values = _direct_pipeline_values(values)
     normalize_ground_truth(values["ground_truth"])
-    _validate_pipeline_types(values, direct=False)
+    _validate_pipeline_types(values)
     metrics, report, compare = pipeline_stage_settings(values["metrics"], values["report"], values["compare"])
     _validate_request(metrics["evaluation"], EvaluationConfig)
     if metrics["calibration_split"] != "val":
@@ -299,7 +268,12 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     if values.get("model", {}).get("backend", "ultralytics") == "ultralytics":
         execution_settings(values["ultralytics"], "train")
         execution_settings(values["ultralytics_predict"], "predict")
-    _validate_queue_routes(values)
+    if direct:
+        _validate_frozen_evaluation(metrics["evaluation"])
+        _validate_train(values)
+        _validate_direct_routes(values)
+    else:
+        _validate_queue_routes(values)
 
 
 def _validate_pipeline_weights(values: dict[str, Any]) -> None:
@@ -329,103 +303,126 @@ def _validate_queue_routes(values: dict[str, Any]) -> None:
             routed_native(settings, directory / relative, stage)
 
 
-def _pipeline_stages(values: dict[str, Any]) -> frozenset[str]:
-    """Name the stages run_pipeline runs for these skip flags, read by truthiness as it does.
+# Loose but valid forms of the direct commands, which cy-queue admission keeps strict.
+_SKIP_FLAGS = ("skip_train", "skip_predict", "skip_metrics", "skip_report", "skip_compare")
+# Hydra consumes these keys when it instantiates a record.
+_HYDRA_RESERVED_KEYS = frozenset({"_convert_", "_recursive_", "_args_", "_partial_"})
+_RECORDS: tuple[tuple[str, type[BaseModel]], ...] = (
+    ("clearml", ClearMLConfig),
+    ("fiftyone", FiftyOneConfig),
+    ("evaluation", EvaluationConfig),
+    ("baseline_model", ModelRef),
+    ("candidate_model", ModelRef),
+)
+_STAGE_SETTINGS: tuple[tuple[str, Callable[..., Any], tuple[str, ...]], ...] = (
+    ("metrics", compute_metrics, ("evaluation", "calibration_split")),
+    ("report", run_report, ("report_config_path",)),
+    ("compare", run_comparison, ("baseline_model", "q", "bootstrap_iterations", "seed")),
+)
 
-    Metrics need predictions (training with skip_predict leaves none), comparison needs
-    thresholds (from metrics, or from the run directory without training) and the report
-    needs a comparison (or, without training and comparison, the existing one).
-    """
-    training = not values["skip_train"]
-    metrics = not values["skip_metrics"] and (not training or not values["skip_predict"])
-    comparison = not values["skip_compare"] and (not training or metrics)
-    report = not values["skip_report"] and (not training or comparison)
-    stages = {"training": training, "metrics": metrics, "comparison": comparison, "report": report}
-    return frozenset(name for name, runs in stages.items() if runs)
+
+def detector_native_groups(model: ModelConfig) -> dict[str, dict[str, Any]]:
+    """Return the native groups a detector run executes in place of the Ultralytics groups."""
+    return {
+        "ultralytics": model.train.model_dump(mode="json") | {"model": model.preset},
+        "ultralytics_predict": model.predict.model_dump(mode="json"),
+    }
 
 
-def _validate_direct_pipeline(raw: dict[str, Any]) -> None:
-    values = _with_defaults(raw, run_pipeline)
-    normalize_ground_truth(values["ground_truth"])
-    stages = _pipeline_stages(values)
-    yolo = _uses_ultralytics(values)
-    training = "training" in stages and yolo
-    # Detector backends replace dataset_format, and only training reads it; run_id is
-    # read only when no run_dir is given.
-    unread = {"dataset_format"} if not training else set()
-    if values["run_dir"] or not values["run_id"]:
-        unread.add("run_id")
-    _validate_pipeline_types(values, direct=True, skipped=unread)
-    _validate_direct_stage_settings(values, stages)
-    _validate_request(values["clearml"], ClearMLConfig)
-    _validate_fiftyone(values)
-    _validate_pipeline_weights(values)
-    if training:
-        if values["dataset_format"] not in {"ndjson", "flat", "coco"}:
-            raise ValueError("Unsupported pipeline dataset_format")
-        _validate_train(values)
-    # A detector run routes its model.train and model.predict dumps, which hold no route keys.
-    native: dict[str, Any] = {}
-    prediction: dict[str, Any] = {}
-    if yolo:
-        native = values["ultralytics"]
+def _names_class(target: object, request: type[BaseModel]) -> bool:
+    """Tell whether a ``_target_`` locates the supported class, as Hydra's instantiate does."""
+    if not isinstance(target, str):
+        return False
+    try:
+        return get_object(target) is request
+    except (ImportError, ValueError):
+        # Not locatable: the shared check rejects the unsupported target.
+        return False
+
+
+def _instantiated_record(record: object, request: type[BaseModel]) -> object:
+    """Return a record as Hydra instantiates it: reserved keys consumed, an alias resolved."""
+    if not isinstance(record, Mapping):
+        return record
+    values = {str(key): value for key, value in record.items() if key not in _HYDRA_RESERVED_KEYS}
+    if _names_class(values.get("_target_"), request):
+        values["_target_"] = _target(request)
+    return values
+
+
+def _with_records(values: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _instantiated_record(value, request) if (request := dict(_RECORDS).get(key)) else value
+        for key, value in values.items()
+    }
+
+
+def _with_defaults(
+    values: dict[str, Any], function: Callable[..., Any], names: Iterable[str] | None = None, *, prefix: str = ""
+) -> dict[str, Any]:
+    """Fill settings removed with ``~key`` from the use-case signature, as the direct call does."""
+    parameters = inspect.signature(function).parameters
+    filled = dict(values)
+    for name in names if names is not None else (name for name in parameters if name != "deps"):
+        # A removed fiftyone group stays absent: the run publishes with defaults, while
+        # an explicit fiftyone=null is rejected.
+        if name in filled or name == "fiftyone":
+            continue
+        default = parameters[name].default
+        if default is inspect.Parameter.empty:
+            raise ValueError(f"Required setting {prefix}{name} is missing")
+        filled[name] = default
+    return filled
+
+
+def _direct_values(values: dict[str, Any], function: Callable[..., Any]) -> dict[str, Any]:
+    """Accept the direct commands' loose forms: removed optional keys and instantiable records."""
+    return _with_records(_with_defaults(values, function))
+
+
+def _direct_pipeline_values(values: dict[str, Any]) -> dict[str, Any]:
+    """Apply what the direct run applies before it validates, then the loose forms."""
+    model = ModelConfig.model_validate(values["model"]) if "model" in values else None
+    if model is not None and model.backend != "ultralytics":
+        # _execute_direct runs a detector's model groups and its COCO dataset.
+        values = values | detector_native_groups(model) | {"dataset_format": "coco"}
+    values = _direct_values(values, run_pipeline)
+    for key, function, names in _STAGE_SETTINGS:
+        if isinstance(values[key], Mapping):
+            values[key] = _with_records(_with_defaults(dict(values[key]), function, names, prefix=f"{key}."))
+    for flag in _SKIP_FLAGS:
+        # run_pipeline reads skip flags by truthiness.
+        if type(values[flag]) is int:
+            values[flag] = bool(values[flag])
+    if values["run_dir"]:
+        # run_pipeline reads run_id only without run_dir.
+        values["run_id"] = None
+    prediction = values["ultralytics_predict"]
+    if (model is None or model.backend == "ultralytics") and isinstance(prediction, Mapping):
         # run_pipeline routes the prediction group after the CSV dataset policy (when
-        # training) and the prediction projection, which keeps only prediction keys.
-        prediction = values["ultralytics_predict"]
-        if "training" in stages:
+        # training) and the prediction projection.
+        if not values["skip_train"]:
             prediction, _ = csv_dataset_policy(prediction)
-        prediction = prediction_settings(prediction)
-    _validate_direct_routes(values, native, prediction)
+        values["ultralytics_predict"] = prediction_settings(dict(prediction))
+    return values
 
 
-def _validate_direct_stage_settings(values: dict[str, Any], stages: frozenset[str]) -> None:
-    # Unknown stage keys fail whatever runs; a stage's values only when it runs.
-    metrics, report, compare = pipeline_stage_settings(values["metrics"], values["report"], values["compare"])
-    # zen instantiates a record with the supported target whether or not its stage runs.
-    for settings, key, request in ((metrics, "evaluation", EvaluationConfig), (compare, "baseline_model", ModelRef)):
-        record = settings.get(key)
-        if isinstance(record, Mapping) and record.get("_target_") == _target(request):
-            _validate_request(record, request)
-    if "training" in stages:
-        # After successful training run_pipeline only marks a failing later stage failed.
-        return
-    if stages & {"metrics", "comparison"}:
-        evaluation = _with_defaults(metrics, compute_metrics, ("evaluation",), prefix="metrics.")["evaluation"]
-        if "metrics" in stages:
-            _validate_request(evaluation, EvaluationConfig)
-        # Comparison alone accepts a null evaluation and uses the defaults.
-        _validate_frozen_evaluation(evaluation)
-    if "metrics" in stages:
-        calibration = _with_defaults(metrics, compute_metrics, ("calibration_split",), prefix="metrics.")
-        if calibration["calibration_split"] != "val":
-            raise ValueError("calibration_split must be exactly 'val'")
-    if "comparison" in stages:
-        names = ("baseline_model", "q", "bootstrap_iterations", "seed")
-        _validate_comparison(_with_defaults(compare, run_comparison, names, prefix="compare."), direct=True)
-    if "report" in stages:
-        path = _with_defaults(report, run_report, ("report_config_path",), prefix="report.")["report_config_path"]
-        _validate_report_config_path(path)
-
-
-def _validate_direct_routes(values: dict[str, Any], native: dict[str, Any], prediction: dict[str, Any]) -> None:
+def _validate_direct_routes(values: dict[str, Any]) -> None:
     directory = None
     if values["run_dir"] or values["run_id"]:
         # The resolved directory run_pipeline routes to; resolving checks containment and creates nothing.
         explicit = Path(values["run_dir"]) if values["run_dir"] else None
         directory = resolve_run_dir(runs_root(), values["run_id"] or "", explicit)
-    if (
-        directory is not None
-        and values["dataset_cache_dir"] is not None
-        # write_path expands ~ as the run's dataset cache root does.
-        and write_path(values["dataset_cache_dir"]).resolve().is_relative_to(directory)
+        if dataset_cache_root(values["dataset_cache_dir"]).is_relative_to(directory):
+            raise ValueError("dataset_cache_dir must be outside run_dir")
+    for group, relative, stage in (
+        ("ultralytics", "detect", "train"),
+        ("ultralytics_predict", "native", "predict"),
     ):
-        raise ValueError("dataset_cache_dir must be outside run_dir")
-    for settings, relative, stage in (
-        (native, "detect", "train"),
-        (prediction, "native", "predict"),
-    ):
+        settings = values[group]
         if directory is None:
-            # run_pipeline accepts a native name equal to the stage name it routes to.
+            # The run routes to the task's run directory, which the task names; it
+            # accepts only a native name equal to the stage name.
             name = settings.get("name")
             if any(settings.get(key) is not None for key in ("project", "save_dir")) or (
                 name is not None and str(name) != stage
@@ -447,10 +444,10 @@ def _uses_ultralytics(values: dict[str, Any]) -> bool:
     return not isinstance(model, Mapping) or model.get("backend", "ultralytics") == "ultralytics"
 
 
-def _validate_fiftyone(values: dict[str, Any], *, any_target: bool = False) -> None:
+def _validate_fiftyone(values: dict[str, Any]) -> None:
     if "fiftyone" in values:
         _reject_null_fiftyone(values["fiftyone"])
-        _validate_request(values["fiftyone"], FiftyOneConfig, any_target=any_target)
+        _validate_request(values["fiftyone"], FiftyOneConfig)
 
 
 def _validate_prediction_model(values: dict[str, Any]) -> None:
@@ -468,40 +465,36 @@ def _validate_train(values: dict[str, Any]) -> None:
         reject_csv_resume(settings)
 
 
-def _validate_frozen_evaluation(evaluation: object, *, any_target: bool = False) -> None:
-    fields = None if evaluation is None else _request_fields(evaluation, EvaluationConfig, any_target=any_target)
-    frozen_evaluation_config(fields)
+def _validate_frozen_evaluation(evaluation: object) -> None:
+    frozen_evaluation_config(None if evaluation is None else _request_fields(evaluation, EvaluationConfig))
 
 
-# Standalone commands check record fields with any_target=True: zen instantiates an
-# importable alias of the supported class, and the base commit did not compare _target_.
 def _validate_predict(values: dict[str, Any]) -> None:
     _validate_prediction_model(values)
-    _validate_fiftyone(values, any_target=True)
+    _validate_fiftyone(values)
 
 
 def _validate_val(values: dict[str, Any]) -> None:
     _validate_prediction_model(values)
-    _validate_request(values["evaluation"], EvaluationConfig, any_target=True)
-    _validate_frozen_evaluation(values["evaluation"], any_target=True)
+    _validate_request(values["evaluation"], EvaluationConfig)
+    _validate_frozen_evaluation(values["evaluation"])
     frozen_calibration_split(values["splits"] or (), "val")
 
 
 def _validate_metrics(values: dict[str, Any]) -> None:
     frozen_calibration_split(values["splits"] or (), values["calibration_split"])
-    _validate_request(values["evaluation"], EvaluationConfig, any_target=True)
-    _validate_frozen_evaluation(values["evaluation"], any_target=True)
-    _validate_fiftyone(values, any_target=True)
+    _validate_request(values["evaluation"], EvaluationConfig)
+    _validate_frozen_evaluation(values["evaluation"])
+    _validate_fiftyone(values)
 
 
 def _validate_compare(values: dict[str, Any]) -> None:
-    _validate_comparison(values, direct=True, any_target=True)
+    _validate_comparison(values)
     if _uses_ultralytics(values):
         reject_owned_prediction_overrides(values["ultralytics_predict"])
         prediction_settings(values["ultralytics_predict"] or {})
-    candidate = _request_fields(values["candidate_model"], ModelRef, any_target=True)
-    require_specified_candidate(ModelRef.model_validate(candidate))
-    _validate_frozen_evaluation(values["evaluation"], any_target=True)
+    require_specified_candidate(ModelRef.model_validate(_request_fields(values["candidate_model"], ModelRef)))
+    _validate_frozen_evaluation(values["evaluation"])
 
 
 def _validate_report(values: dict[str, Any]) -> None:
@@ -538,7 +531,7 @@ def validate_command_configuration(config: DictConfig, function: Callable[..., A
         return
     check = _COMMAND_CHECKS.get(function.__name__)
     if check is not None:
-        check(_with_defaults(_resolved_values(config), function))
+        check(_direct_values(_resolved_values(config), function))
 
 
 def reject_saved_legacy_controls(directory: Path, name: str) -> None:
