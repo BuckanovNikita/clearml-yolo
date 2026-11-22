@@ -575,6 +575,23 @@ def test_required_key_of_a_skipped_stage_may_be_missing(owner: list[str]) -> Non
     assert owner == []
 
 
+def test_record_without_its_target_is_left_to_a_skipped_stage(owner: list[str]) -> None:
+    # zen does not instantiate a mapping without _target_, so a skipped stage never read it.
+    def plain_baseline(overrides: list[str]) -> DictConfig:
+        config = OmegaConf.create(OmegaConf.to_container(_compose("pipeline", ["ground_truth=truth.csv", *overrides])))
+        assert isinstance(config, DictConfig)
+        del config.compare.baseline_model["_target_"]
+        config.compare.baseline_model.source = "bad"
+        return config
+
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", plain_baseline(["skip_compare=true"]), run_pipeline)
+    owner.clear()
+    with pytest.raises(ValueError, match="source"):
+        common.execute_owned("pipeline", plain_baseline([]), run_pipeline)
+    assert owner == []
+
+
 # run_pipeline routed the prediction group after the CSV dataset policy and the
 # prediction projection, which drops save_dir and, when training, sets task=detect.
 ROUTED_PREDICTION = [

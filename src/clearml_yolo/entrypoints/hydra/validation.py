@@ -177,11 +177,15 @@ def validate_project_destinations(config: DictConfig) -> None:
             write_path(native.save_dir)
 
 
+def _target(request: type[BaseModel]) -> str:
+    return f"{request.__module__}.{request.__qualname__}"
+
+
 def _request_fields(config: object, request: type[BaseModel]) -> dict[str, Any]:
     if not isinstance(config, Mapping):
         raise TypeError(f"{request.__name__} settings must be a mapping")
     values = {str(key): value for key, value in config.items()}
-    target = f"{request.__module__}.{request.__qualname__}"
+    target = _target(request)
     if values.pop("_target_", target) != target:
         raise ValueError(f"Submission requires the supported configuration target {target}")
     return values
@@ -259,9 +263,10 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     routes. Deliberate exceptions: the comparison ``bootstrap_iterations`` and ``seed``
     rules and the ``report_config_path`` type rule apply even when the run would skip that
     work for want of a baseline model; a required nested key missing for a stage that runs
-    fails here as ``Required setting <name> is missing``; and a stage setting the run
-    would reject after successful training (it then only marks the stage failed) stops
-    the command here.
+    fails here as ``Required setting <name> is missing``; a stage setting the run would
+    reject after successful training (it then only marks the stage failed) stops the
+    command here; and a record of a stage that runs, or of ``clearml`` or ``fiftyone``,
+    must name its supported ``_target_``.
     """
     if direct:
         _validate_direct_pipeline(_resolved_values(config))
@@ -366,10 +371,11 @@ def _validate_direct_pipeline(raw: dict[str, Any]) -> None:
 def _validate_direct_stage_settings(values: dict[str, Any], stages: frozenset[str]) -> None:
     # Unknown stage keys fail whatever runs; a stage's values only when it runs.
     metrics, report, compare = pipeline_stage_settings(values["metrics"], values["report"], values["compare"])
-    # zen instantiates a present record whether or not its stage runs.
+    # zen instantiates a record with the supported target whether or not its stage runs.
     for settings, key, request in ((metrics, "evaluation", EvaluationConfig), (compare, "baseline_model", ModelRef)):
-        if isinstance(settings.get(key), Mapping):
-            _validate_request(settings[key], request)
+        record = settings.get(key)
+        if isinstance(record, Mapping) and record.get("_target_") == _target(request):
+            _validate_request(record, request)
     if stages & {"metrics", "comparison"}:
         evaluation = _with_defaults(metrics, compute_metrics, ("evaluation",), prefix="metrics.")["evaluation"]
         if "metrics" in stages:
