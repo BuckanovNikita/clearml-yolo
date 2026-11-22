@@ -47,11 +47,13 @@ def pipeline_case(
         return SimpleNamespace(predictions=path)
 
     monkeypatch.setattr(pipeline, "run_prediction", predict)
-    monkeypatch.setattr(
-        pipeline,
-        "compute_metrics",
-        lambda *_a, **_k: SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={}),
-    )
+
+    def metrics(*args: Any, **_kwargs: Any) -> SimpleNamespace:
+        # Like the use case, create the output directory that threshold publication writes into.
+        Path(args[2]).mkdir(parents=True, exist_ok=True)
+        return SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={})
+
+    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
     monkeypatch.setattr(pipeline, "_compare_and_report", lambda *_a, **_k: {"comparison": object()})
     monkeypatch.setattr(
         pipeline,
@@ -169,14 +171,6 @@ def test_evaluating_weights_without_comparison_on_a_fresh_run_directory_succeeds
 ) -> None:
     calls: list[Any] = []
     monkeypatch.setattr(pipeline, "run_report", lambda *_a, **kwargs: calls.append(kwargs))
-    fake_metrics = pipeline.compute_metrics
-
-    def metrics(*args: Any, **kwargs: Any) -> Any:
-        # The product use case creates its output directory; threshold publication writes there.
-        Path(args[2]).mkdir(parents=True)
-        return fake_metrics(*args, **kwargs)
-
-    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
     directory = pipeline_case["run_dir"]
     assert not directory.exists()
 
