@@ -41,6 +41,7 @@ from clearml_yolo.application.use_cases.metrics import compute_metrics, frozen_c
 from clearml_yolo.application.use_cases.pipeline import (
     pipeline_stage_settings,
     reject_cache_inside_run_dir,
+    reject_fixed_native_routes,
     routed_native,
     run_pipeline,
 )
@@ -297,8 +298,11 @@ def _validate_pipeline_routes(values: dict[str, Any], *, strict: bool) -> None:
 
     ``strict`` keeps cy-queue admission as it was: the literal ``run_dir``, the cache rule
     only for an explicit ``dataset_cache_dir``, and no native output key without a run
-    directory. Otherwise the directories resolve as ``run_pipeline`` resolves them; without
-    ``run_dir`` or ``run_id`` the task names the run directory, so the run checks the routes.
+    directory. Otherwise the directories resolve as ``run_pipeline`` resolves them. Without
+    ``run_dir`` or ``run_id`` the run directory needs the task id: a non-null ``project`` or
+    train ``save_dir`` cannot name it and fails with cy-queue admission's message, a null
+    ``save_dir`` key or a ``name`` other than the stage's fails as ``routed_native`` fails,
+    and only the dataset cache rule is left to the run.
     """
     run_dir, run_id, cache = values["run_dir"], values["run_id"], values["dataset_cache_dir"]
     directory: Path | None = None
@@ -319,8 +323,14 @@ def _validate_pipeline_routes(values: dict[str, Any], *, strict: bool) -> None:
         settings = values[group]
         if directory is not None:
             routed_native(settings, directory / relative, stage)
-        elif strict and any(settings.get(key) is not None for key in ("project", "name", "save_dir")):
+            continue
+        # No run directory: strict admission takes no output key; the direct run names its
+        # directory after the task, which no project or save_dir can name before it exists.
+        unroutable = ("project", "name", "save_dir") if strict else ("project", "save_dir")
+        if any(settings.get(key) is not None for key in unroutable):
             raise ValueError("Native pipeline output overrides require an explicit run_dir")
+        if not strict:
+            reject_fixed_native_routes(settings, stage)
 
 
 # Loose but valid forms of the direct commands, which cy-queue admission keeps strict.

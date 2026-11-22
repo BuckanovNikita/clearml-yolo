@@ -77,6 +77,8 @@ def _compose(name: str, overrides: list[str]) -> DictConfig:
         return compose(config_name=name, overrides=overrides)
 
 
+_SKIP_TRAIN = ["skip_train=true", "weights=w.pt"]
+
 INVALID = [
     pytest.param(
         "pipeline",
@@ -259,6 +261,51 @@ INVALID = [
         "candidate_model is not specified",
         id="compare-default-candidate",
     ),
+    # Without run_dir or run_id the run directory needs the task id, which no project or
+    # train save_dir can name: cy-queue admission's message. A null save_dir key or a
+    # name other than the stage's fails as run_pipeline fails, whatever the directory.
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "ultralytics.project=${oc.env:CY_HOME}/p"],
+        "Native pipeline output overrides require an explicit run_dir",
+        id="pipeline-train-project-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "ultralytics_predict.project=${oc.env:CY_HOME}/p"],
+        "Native pipeline output overrides require an explicit run_dir",
+        id="pipeline-predict-project-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "+ultralytics.save_dir=${oc.env:CY_HOME}/x"],
+        "Native pipeline output overrides require an explicit run_dir",
+        id="pipeline-train-save-dir-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", *_SKIP_TRAIN, "ultralytics.project=${oc.env:CY_HOME}/p"],
+        "Native pipeline output overrides require an explicit run_dir",
+        id="pipeline-skipped-train-project-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "+ultralytics.save_dir=null"],
+        "save_dir conflicts with pipeline run_dir; use run_dir to route outputs",
+        id="pipeline-null-save-dir-key-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "ultralytics.name=other"],
+        "name='other' conflicts with pipeline run_dir; expected train",
+        id="pipeline-train-name-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "ultralytics_predict.name=other"],
+        "name='other' conflicts with pipeline run_dir; expected predict",
+        id="pipeline-predict-name-without-run-dir",
+    ),
     # cy-compare and cy-report share these rules with cy-queue's admission of cy's stages.
     pytest.param(
         "compare",
@@ -419,9 +466,6 @@ def test_replayed_configuration_is_checked_again_before_publication(
         common.execute_owned("metrics", config, compute_metrics)
     assert owner[-1] == "invocation"
     assert published == []
-
-
-_SKIP_TRAIN = ["skip_train=true", "weights=w.pt"]
 
 
 def _pipeline(overrides: list[str], *, removed: tuple[str, ...] = ()) -> DictConfig:
@@ -812,10 +856,13 @@ def test_standalone_records_keep_their_rules(owner: list[str], name: str, overri
 # Checks the composed configuration cannot decide before the task, or that no
 # validator of the run applies: the command reaches the task and the run decides.
 LEFT_TO_THE_RUN = [
-    # Without run_dir or run_id the run directory is named after the task.
-    pytest.param("pipeline", ["ground_truth=truth.csv", "ultralytics.project=${oc.env:CY_HOME}/p"], id="route-project"),
-    pytest.param("pipeline", ["ground_truth=truth.csv", "ultralytics.name=other"], id="route-name"),
-    pytest.param("pipeline", ["ground_truth=truth.csv", "+ultralytics.save_dir=null"], id="route-save-dir"),
+    # Without run_dir or run_id the run directory is named after the task, so only the
+    # run can tell whether a dataset cache lies inside it.
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "dataset_cache_dir=${oc.env:CY_HOME}/runs/cy/cy-0/cache"],
+        id="cache-under-runs-without-run-dir",
+    ),
 ]
 
 
