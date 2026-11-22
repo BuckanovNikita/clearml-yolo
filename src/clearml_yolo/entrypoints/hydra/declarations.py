@@ -875,7 +875,7 @@ class GroundTruthConfig(CommandDeclaration):
             "path string | null",
             ("null выбирает имя результата текущей команды; существующие входы не заменяют этим полем."),
             "ground_truth",
-            "output=predictions.csv",
+            "output=ground_truth.csv",
         ),
     )
     test_fraction: Any = field(

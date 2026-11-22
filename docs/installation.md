@@ -49,7 +49,7 @@ uv pip install "clearml-yolo @ git+https://github.com/BuckanovNikita/clearml-yol
 
 В клоне репозитория пакеты `digital-metrics` и `report-generator` собираются из их исходников:
 
-1. Положите исходники нужных ревизий в `external/digital-metrics` и `external/report-generator`. Без них задача останавливается с сообщением `local-deps: missing approved checkouts: ...`.
+1. Положите исходники нужных ревизий в `external/digital-metrics` и `external/report-generator`. Без них задача останавливается с сообщением `local-deps: missing approved checkouts: ...`; вторая строка называет каталоги `external/` и команду повторного запуска.
 2. Соберите архивы и настройте `uv`:
 
    ```bash

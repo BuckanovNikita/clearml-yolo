@@ -63,7 +63,8 @@ from clearml_yolo.adapters.storage.run_identity import task_run_dir
 from clearml_yolo.adapters.yolo.config import requested_devices
 from clearml_yolo.core.models import ModelConfig, model_preset
 from clearml_yolo.entrypoints.hydra.config_resolution import resolve_config_file
-from clearml_yolo.entrypoints.hydra.configs import command_schema
+from clearml_yolo.entrypoints.hydra.config_tree import COMMAND_OF_CONFIG
+from clearml_yolo.entrypoints.hydra.configs import command_schema, register_command_help
 from clearml_yolo.entrypoints.hydra.sweeps import new_multirun_tag, tag_multirun_job
 from clearml_yolo.entrypoints.hydra.transforms import prepare_transforms, profile_values
 from clearml_yolo.entrypoints.hydra.validation import (
@@ -326,6 +327,7 @@ def _launch(name: str, function: Callable[..., Any]) -> None:
     with trace_operation("configuration.startup", context={"stage": name}):
         initialize_filesystem()
         store.add_to_hydra_store(overwrite_ok=True)
+        register_command_help(name, COMMAND_OF_CONFIG[name])
         config_path = validate_launch_arguments(name)
 
     multirun_tag: str | None = None

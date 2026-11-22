@@ -47,7 +47,7 @@ ValueError: Unsupported wrapper settings: ['foo']
 cy-train model=rfdetr/small ground_truth=data/ground_truth.csv
 ```
 
-Список доступных вариантов печатает `--help` в разделе `== Configuration groups ==` (строки `model/<backend>: ...`), а описание — страница [model.md](model.md). Профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) аугментации выбирается так же: `transforms=default` или `transforms=albumentations`, см. [transforms.md](transforms.md).
+Список доступных вариантов печатает `--help` в разделе `== Configuration groups ==` (строки `model/<backend>: ...`; служебные группы не показываются), а описание — страница [model.md](model.md). Профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) аугментации выбирается так же: `transforms=default` или `transforms=albumentations`, см. [transforms.md](transforms.md).
 
 ## Какие ключи действуют для какого backend
 

@@ -136,3 +136,10 @@ def test_public_pydantic_fields_keep_documentation_at_the_definition(model: Any)
         assert info.examples, (model.__name__, name)
         assert info.json_schema_extra["source"] == f"{model.__module__}.{model.__name__}.{name}"
         assert info.json_schema_extra["classification"] in {"input", "generated"}
+
+
+def test_ground_truth_output_example_names_a_ground_truth_file() -> None:
+    from clearml_yolo.entrypoints.hydra.declarations import GroundTruthConfig
+
+    metadata = {item.name: item.metadata for item in fields(GroundTruthConfig)}["output"]
+    assert metadata["examples"] == ("output=ground_truth.csv",)

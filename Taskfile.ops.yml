@@ -17,7 +17,7 @@ tasks:
         done
         if [ -n "$missing" ]; then
           echo "local-deps: missing approved checkouts:$missing" >&2
-          echo "local-deps: check out the approved digital-metrics and report-generator revisions there (DOCS.md, Installation and dependencies)." >&2
+          echo "local-deps: put the approved digital-metrics and report-generator checkouts under external/ (copy or symlink, never commit them), then rerun: uvx --from go-task-bin task local-deps" >&2
           exit 1
         fi
         # Never overwrite an existing uv.toml: it may hold other local settings.
