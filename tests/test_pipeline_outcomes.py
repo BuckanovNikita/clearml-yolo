@@ -10,6 +10,7 @@ import pytest
 from clearml_yolo.application.contracts import ClearMLConfig
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases import pipeline
+from clearml_yolo.application.use_cases.compare import MANIFEST_NAME
 from clearml_yolo.core.pipeline_outcome import PipelineOutcome, StageOutcome
 from clearml_yolo.core.publication import FiftyOneConfig
 from native_config_helpers import prediction_config, training_settings
@@ -133,6 +134,46 @@ def test_skip_training_keeps_failure_exit(pipeline_case: dict[str, Any], monkeyp
     monkeypatch.setattr(pipeline, "run_prediction", fail)
     with pytest.raises(ValueError, match="prediction failed"):
         pipeline.run_pipeline(**pipeline_case, skip_train=True, weights="existing.pt")
+
+
+def _cached_report_case(pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    calls: list[Path] = []
+
+    def report(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        calls.append(kwargs["comparison_dir"])
+        return SimpleNamespace(issues=(), dev_reports={}, business_reports={})
+
+    monkeypatch.setattr(pipeline, "run_report", report)
+    pipeline_case.update(
+        skip_train=True, weights="existing.pt", skip_predict=True, skip_metrics=True, skip_compare=True
+    )
+    return calls
+
+
+def test_report_is_skipped_when_comparison_was_skipped_and_none_exists(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _cached_report_case(pipeline_case, monkeypatch)
+    result = pipeline.run_pipeline(**pipeline_case)
+    assert calls == []
+    report_stage = result["outcome"]["stages"]["report"]
+    assert report_stage["status"] == "skipped"
+    assert "skip_report" in report_stage["reason"]
+    assert "no comparison" in report_stage["reason"].lower()
+    written = json.loads((pipeline_case["run_dir"] / "pipeline_outcome.json").read_text())
+    assert written["stages"]["report"]["status"] == "skipped"
+
+
+def test_report_uses_comparison_left_by_an_earlier_run(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _cached_report_case(pipeline_case, monkeypatch)
+    comparison = pipeline_case["run_dir"] / pipeline.COMPARISON_DIR
+    comparison.mkdir(parents=True)
+    (comparison / MANIFEST_NAME).write_text("{}", encoding="utf-8")
+    result = pipeline.run_pipeline(**pipeline_case)
+    assert calls == [comparison]
+    assert result["outcome"]["stages"]["report"]["status"] == "succeeded"
 
 
 def test_outcome_status_never_claims_failed_stage_succeeded() -> None:
