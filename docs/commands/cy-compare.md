@@ -48,7 +48,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 | `inference.image_name` | `name` | Как сопоставлять изображения разметки и предсказаний. Допустимо только `name`. |
 | `q` | `0.05` | Уровень значимости после поправки Benjamini-Hochberg; конечное число от 0 до 1. |
 | `bootstrap_iterations` | `10000` | Число bootstrap-выборок; положительное целое. |
-| `seed` | `0` | Seed генератора bootstrap-выборок. |
+| `seed` | `0` | Seed генератора bootstrap-выборок; неотрицательное целое или `null`. |
 | `evaluation` | см. [страницу группы](../configuration/evaluation.md) | Правила сопоставления рамок (bounding box) и вычисления метрик; ключ `evaluation.backend` должен оставаться `null`. |
 | `clearml` | см. [страницу группы](../configuration/clearml.md) | Проект, имя и теги задачи ClearML (task) этого запуска. Проект также служит проектом поиска моделей по умолчанию. |
 
@@ -83,7 +83,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 
 ## Как это работает
 
-1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет поля `baseline_model`, `candidate_model`, `q`, `bootstrap_iterations`, `seed`, группу `evaluation`, ключи `inference` и, для YOLO, группу `ultralytics_predict`. Значение `inference.image_name`, отличное от `name`, и `candidate_model` только со значениями по умолчанию тоже отклоняются на этом шаге.
+1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет поля `baseline_model`, `candidate_model`, `q`, `bootstrap_iterations`, `seed`, группу `evaluation`, ключи `inference` и, для YOLO, группу `ultralytics_predict`. Значение `inference.image_name`, отличное от `name`, и `candidate_model` только со значениями по умолчанию тоже отклоняются на этом шаге. `bootstrap_iterations` и `seed` проверяются, даже если автоматический baseline не найдётся и сравнение будет пропущено (шаг 4).
 2. Команда создаёт задачу ClearML с именем и тегами из группы `clearml` и проверяет значения `inference`.
 3. Команда читает разметку и проверяет, что каждое изображение относится к одному split.
 4. Выбирается модель baseline:

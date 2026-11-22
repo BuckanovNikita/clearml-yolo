@@ -38,7 +38,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
-| `task` | из `ultralytics` (`detect`) | Тип задачи. Должен быть `detect` (`ultralytics_predict.task must be detect`). |
+| `task` | из `ultralytics` (`detect`) | Тип задачи. Должен быть `detect` (`ultralytics_predict.task must be detect`). В `cy` с обучением CY сам задаёт `detect`, поэтому допустим и `null`; другое значение отклоняется: `CSV ground-truth training supports task=detect only`. |
 | `mode` | `predict` | Режим Ultralytics. Должен быть `predict` (`ultralytics_predict.mode must be predict`). |
 | `model` | `null` | Checkpoint для предсказания. В `cy-predict` и `cy-val` его можно задать здесь или аргументом `weights`; если заданы оба и они различаются, команда завершается ошибкой `weights conflicts with ultralytics_predict.model`. Если не задан ни один: `Prediction requires weights=<checkpoint> or ultralytics_predict.model`. В `cy` checkpoint берётся из этапа обучения или из `weights` при `skip_train=true`. В `cy-compare` должен быть `null`: модели задают `baseline_model` и `candidate_model`, иначе `Prediction ['model'] are owned by comparison; use baseline_model/candidate_model and output_dir`. Загруженная модель должна быть детектором. |
 | `data` | из `ultralytics` (`null`) | Файл описания датасета; передаётся в Ultralytics как есть. Изображения для предсказания CY берёт из разметки ([ground truth](../../GLOSSARY.md#ground-truth)), а не отсюда. |

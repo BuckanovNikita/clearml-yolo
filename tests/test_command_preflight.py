@@ -22,7 +22,7 @@ from clearml_yolo.application.use_cases.predict import predict
 from clearml_yolo.application.use_cases.report import report
 from clearml_yolo.application.use_cases.train import train
 from clearml_yolo.application.use_cases.val import validate
-from clearml_yolo.entrypoints.hydra import common
+from clearml_yolo.entrypoints.hydra import common, validation
 from clearml_yolo.entrypoints.hydra.validation import validate_pipeline_configuration
 
 COMMANDS: dict[str, Callable[..., Any]] = {
@@ -122,6 +122,18 @@ INVALID = [
         ["ground_truth=truth.csv", "metrics.evaluation.backend=other"],
         "Frozen thresholds require the native digital-metrics backend",
         id="pipeline-evaluation-backend",
+    ),
+    # zen instantiates the evaluation record after the task even when no stage reads it.
+    pytest.param(
+        "pipeline",
+        [
+            "ground_truth=truth.csv",
+            "skip_metrics=true",
+            "skip_compare=true",
+            "metrics.evaluation.matching_strategy=bad",
+        ],
+        "matching_strategy",
+        id="pipeline-skipped-evaluation-record",
     ),
     pytest.param(
         "train",
@@ -294,6 +306,19 @@ VALID = [
         ["ground_truth=truth.csv", "ultralytics.name=train", "ultralytics_predict.name=predict"],
         id="pipeline-stage-names-without-run-dir",
     ),
+    # Comparison without metrics reads a null evaluation as the defaults.
+    pytest.param(
+        "pipeline",
+        [
+            "ground_truth=truth.csv",
+            "skip_train=true",
+            "weights=w.pt",
+            "skip_metrics=true",
+            "metrics.evaluation=null",
+            "fiftyone.enabled=false",
+        ],
+        id="pipeline-comparison-with-null-evaluation",
+    ),
     pytest.param("train", ["ground_truth=truth.csv"], id="train"),
     pytest.param("train", ["ground_truth=truth.csv", "model=rfdetr/small"], id="train-detector"),
     pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt"], id="predict"),
@@ -415,6 +440,222 @@ def test_queue_admission_keeps_indexing_removed_keys() -> None:
     with pytest.raises(KeyError):
         validate_pipeline_configuration(config)
     validate_pipeline_configuration(config, direct=True)
+
+
+_SKIP_TRAIN = ["skip_train=true", "weights=w.pt"]
+
+# (stage settings with the bad value, overrides that skip the stage, overrides that run it,
+# message). run_pipeline reads metrics only after predictions (training with skip_predict
+# has none), comparison only after thresholds and report only after a comparison, so a
+# stage whose producer is skipped is skipped too. Each skipped case completed on the base.
+SKIPPED_STAGES = [
+    pytest.param(["ultralytics.epochs=0"], _SKIP_TRAIN, [], "ultralytics.epochs must be at least 1", id="train-range"),
+    pytest.param(
+        ["~ultralytics.epochs"], _SKIP_TRAIN, [], "Missing ultralytics parameters ['epochs']", id="train-completeness"
+    ),
+    pytest.param(
+        ["dataset_format=bad"], _SKIP_TRAIN, [], "Invalid pipeline setting dataset_format", id="dataset-format"
+    ),
+    pytest.param(
+        ["dataset_format=bad"],
+        ["model=fasterrcnn/resnet50_fpn"],
+        [],
+        "Invalid pipeline setting dataset_format",
+        id="dataset-format-detector",
+    ),
+    pytest.param(
+        ["metrics.calibration_split=test"],
+        ["skip_metrics=true"],
+        [],
+        "calibration_split must be exactly 'val'",
+        id="calibration-split",
+    ),
+    pytest.param(
+        ["metrics.calibration_split=test"],
+        ["skip_predict=true"],
+        [*_SKIP_TRAIN, "skip_predict=true"],
+        "calibration_split must be exactly 'val'",
+        id="calibration-split-without-predictions",
+    ),
+    pytest.param(
+        ["compare.bootstrap_iterations=0"],
+        ["skip_compare=true"],
+        [],
+        "bootstrap_iterations must be a positive integer",
+        id="compare-bootstrap",
+    ),
+    pytest.param(
+        ["compare.bootstrap_iterations=0"],
+        ["skip_metrics=true"],
+        [*_SKIP_TRAIN, "skip_metrics=true"],
+        "bootstrap_iterations must be a positive integer",
+        id="compare-bootstrap-without-thresholds",
+    ),
+    pytest.param(
+        ["compare.q=2"], ["skip_compare=true"], [], "q must be a finite probability in [0, 1]", id="compare-q"
+    ),
+    pytest.param(
+        ["compare.seed=-1"],
+        ["skip_compare=true"],
+        [],
+        "Comparison seed must be a nonnegative integer or null",
+        id="compare-seed",
+    ),
+    pytest.param(
+        ["report.report_config_path=3"],
+        ["skip_report=true"],
+        [],
+        "report_config_path must be a path string or null",
+        id="report-config-path",
+    ),
+    pytest.param(
+        ["report.report_config_path=3"],
+        ["skip_compare=true"],
+        [*_SKIP_TRAIN, "skip_compare=true"],
+        "report_config_path must be a path string or null",
+        id="report-config-path-without-comparison",
+    ),
+]
+
+
+@pytest.mark.parametrize(("bad", "skipped", "running", "message"), SKIPPED_STAGES)
+def test_settings_of_a_skipped_stage_pass_the_direct_preflight(
+    owner: list[str], bad: list[str], skipped: list[str], running: list[str], message: str
+) -> None:
+    skipped_config = _compose("pipeline", ["ground_truth=truth.csv", *skipped, *bad])
+    running_config = _compose("pipeline", ["ground_truth=truth.csv", *running, *bad])
+    # cy-queue admission stays strict and checks every stage.
+    for config in (skipped_config, running_config):
+        with pytest.raises((KeyError, TypeError, ValueError)):
+            validate_pipeline_configuration(config)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", skipped_config, run_pipeline)
+    owner.clear()
+    with pytest.raises((TypeError, ValueError), match=re.escape(message)):
+        common.execute_owned("pipeline", running_config, run_pipeline)
+    assert owner == []
+
+
+@pytest.mark.parametrize(
+    ("skipped", "running"),
+    [
+        pytest.param(["skip_metrics=true"], [*_SKIP_TRAIN, "skip_metrics=true"], id="comparison-reads-it"),
+        pytest.param(["skip_predict=true", "skip_compare=true"], [], id="metrics-reads-it"),
+    ],
+)
+def test_evaluation_backend_is_checked_only_when_a_stage_reads_it(
+    owner: list[str], skipped: list[str], running: list[str]
+) -> None:
+    bad = "metrics.evaluation.backend=other"
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", _compose("pipeline", ["ground_truth=truth.csv", *skipped, bad]), run_pipeline)
+    owner.clear()
+    with pytest.raises(ValueError, match="Frozen thresholds require the native digital-metrics backend"):
+        common.execute_owned("pipeline", _compose("pipeline", ["ground_truth=truth.csv", *running, bad]), run_pipeline)
+    assert owner == []
+
+
+def _without_baseline(overrides: list[str]) -> DictConfig:
+    # A saved YAML or a replayed run can omit keys that the structured schema keeps.
+    config = OmegaConf.create(OmegaConf.to_container(_compose("pipeline", ["ground_truth=truth.csv", *overrides])))
+    assert isinstance(config, DictConfig)
+    del config.compare["baseline_model"]
+    return config
+
+
+def test_required_key_of_a_skipped_stage_may_be_missing(owner: list[str]) -> None:
+    skipped = _without_baseline(["skip_compare=true"])
+    with pytest.raises(KeyError):
+        validate_pipeline_configuration(skipped)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", skipped, run_pipeline)
+    owner.clear()
+    with pytest.raises(ValueError, match=re.escape("Required setting compare.baseline_model is missing")):
+        common.execute_owned("pipeline", _without_baseline([]), run_pipeline)
+    assert owner == []
+
+
+# run_pipeline routed the prediction group after the CSV dataset policy and the
+# prediction projection, which drops save_dir and, when training, sets task=detect.
+ROUTED_PREDICTION = [
+    pytest.param(["+ultralytics_predict.save_dir=${oc.env:CY_HOME}/x"], id="save-dir-without-run-dir"),
+    pytest.param(
+        ["run_dir=${oc.env:CY_HOME}/run", "+ultralytics_predict.save_dir=${oc.env:CY_HOME}/x"],
+        id="save-dir-with-run-dir",
+    ),
+    pytest.param(["ultralytics_predict.task=null"], id="null-task-when-training"),
+]
+
+
+@pytest.mark.parametrize("overrides", ROUTED_PREDICTION)
+def test_direct_preflight_checks_the_routed_prediction_group(owner: list[str], overrides: list[str]) -> None:
+    config = _compose("pipeline", ["ground_truth=truth.csv", *overrides])
+    with pytest.raises(ValueError, match=r"run_dir|task must be detect"):
+        validate_pipeline_configuration(config)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
+
+
+def test_prediction_task_is_checked_without_training(owner: list[str]) -> None:
+    config = _compose("pipeline", ["ground_truth=truth.csv", *_SKIP_TRAIN, "ultralytics_predict.task=null"])
+    with pytest.raises(ValueError, match=re.escape("ultralytics_predict.task must be detect")):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner == []
+
+
+def test_training_rejects_a_prediction_task_other_than_detect(owner: list[str]) -> None:
+    config = _compose("pipeline", ["ground_truth=truth.csv", "ultralytics_predict.task=segment"])
+    with pytest.raises(ValueError, match=re.escape("CSV ground-truth training supports task=detect only")):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner == []
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        pytest.param(["run_dir=${oc.env:CY_HOME}/run", "run_id=42"], id="numeric-run-id-with-run-dir"),
+        pytest.param(["run_id=0"], id="falsy-run-id"),
+    ],
+)
+def test_unused_run_id_type_is_left_to_the_run(owner: list[str], overrides: list[str]) -> None:
+    config = _compose("pipeline", ["ground_truth=truth.csv", *overrides])
+    with pytest.raises(ValueError, match="Invalid pipeline setting run_id"):
+        validate_pipeline_configuration(config)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
+
+
+def test_direct_pipeline_preflight_calls_the_public_validator(
+    owner: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[bool] = []
+    public = validation.validate_pipeline_configuration
+
+    def spy(config: DictConfig, *, direct: bool = False) -> None:
+        calls.append(direct)
+        public(config, direct=direct)
+
+    monkeypatch.setattr(validation, "validate_pipeline_configuration", spy)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", _compose("pipeline", ["ground_truth=truth.csv"]), run_pipeline)
+    assert calls == [True]
+    assert owner[-1] == "invocation"
+
+
+def test_dataset_cache_dir_expands_the_home_directory_like_the_run(
+    owner: list[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The run expands ~ before comparing; read literally, ~/cache would lie inside run_dir.
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.chdir(work)
+    config = _compose("pipeline", ["ground_truth=truth.csv", f"run_dir={work}", "dataset_cache_dir='~/cache'"])
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
 
 
 def test_relative_run_dir_is_resolved_like_the_use_case(
