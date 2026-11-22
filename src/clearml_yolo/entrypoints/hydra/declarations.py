@@ -430,7 +430,7 @@ class PredictConfig(CommandDeclaration):
         default_factory=lambda: builds(FiftyOneConfig, populate_full_signature=True),
         metadata=_metadata(
             "Публикация изображений, предсказаний и оценок в FiftyOne.",
-            "mapping FiftyOneConfig | null",
+            "mapping FiftyOneConfig",
             "enabled=false отключает публикацию; таймауты ограничивают отдельные операции.",
             "predict",
             "fiftyone.enabled=false",
@@ -636,7 +636,7 @@ class MetricsConfig(CommandDeclaration):
         default_factory=lambda: builds(FiftyOneConfig, populate_full_signature=True),
         metadata=_metadata(
             "Публикация изображений, предсказаний и оценок в FiftyOne.",
-            "mapping FiftyOneConfig | null",
+            "mapping FiftyOneConfig",
             "enabled=false отключает публикацию; таймауты ограничивают отдельные операции.",
             "metrics",
             "fiftyone.enabled=false",
@@ -1145,7 +1145,7 @@ class PipelineConfig(CommandDeclaration):
         default_factory=lambda: builds(FiftyOneConfig, populate_full_signature=True),
         metadata=_metadata(
             "Публикация изображений, предсказаний и оценок в FiftyOne.",
-            "mapping FiftyOneConfig | null",
+            "mapping FiftyOneConfig",
             "enabled=false отключает публикацию; таймауты ограничивают отдельные операции.",
             "pipeline",
             "fiftyone.enabled=false",

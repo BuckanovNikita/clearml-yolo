@@ -19,3 +19,14 @@ def test_non_model_commands_also_reject_legacy_controls(setting: str) -> None:
     config = OmegaConf.create({"predictions": "outside.csv", setting: {"enabled": False}})
     with pytest.raises(ValueError, match="saved YAML"):
         validate_wrapper_keys(config, lambda predictions: None)
+
+
+def test_direct_commands_reject_null_fiftyone_with_hint() -> None:
+    config = OmegaConf.create({"fiftyone": None})
+    with pytest.raises(ValueError, match=r"fiftyone=null is not supported; use fiftyone\.enabled=false"):
+        validate_wrapper_keys(config, lambda fiftyone: None)
+
+
+def test_direct_commands_accept_disabled_fiftyone_mapping() -> None:
+    config = OmegaConf.create({"fiftyone": {"enabled": False}})
+    validate_wrapper_keys(config, lambda fiftyone: None)

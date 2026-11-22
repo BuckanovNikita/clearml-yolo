@@ -14,7 +14,11 @@
 
 Значения ключей проверяются, когда команда переходит к работе, то есть уже после создания задачи ClearML (task). Недопустимое значение даёт ошибку, и задача помечается как неуспешная.
 
-Override `fiftyone=null` не отключает публикацию: команда публикует со значениями по умолчанию. Чтобы отключить публикацию, задайте `fiftyone.enabled=false`.
+Override `fiftyone=null` не поддерживается: команда завершается ошибкой до создания задачи ClearML (task) и подсказывает `fiftyone.enabled=false`. Чтобы отключить публикацию, задайте `fiftyone.enabled=false`.
+
+```text
+fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off
+```
 
 ## Ключи
 

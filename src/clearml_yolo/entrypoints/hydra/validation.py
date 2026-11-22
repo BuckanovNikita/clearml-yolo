@@ -86,6 +86,12 @@ def _validate_inactive_groups(config: DictConfig, model: ModelConfig | None) -> 
             )
 
 
+def _reject_null_fiftyone(value: object) -> None:
+    """Reject ``fiftyone=null``; it would silently publish with defaults."""
+    if value is None:
+        raise ValueError("fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off")
+
+
 def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> None:
     """Validate the command schema, including keys introduced with Hydra's + syntax."""
     reject_legacy_controls(config)
@@ -98,6 +104,8 @@ def validate_wrapper_keys(config: DictConfig, function: Callable[..., Any]) -> N
     unknown = set(config) - accepted
     if unknown:
         raise ValueError(f"Unsupported wrapper settings: {sorted(unknown)}")
+    if "fiftyone" in config and not OmegaConf.is_missing(config, "fiftyone"):
+        _reject_null_fiftyone(config.fiftyone)
     if (
         "ground_truth" in config
         and not OmegaConf.is_missing(config, "ground_truth")
@@ -202,7 +210,8 @@ def validate_pipeline_configuration(config: DictConfig) -> None:
     if report["report_config_path"] is not None and not isinstance(report["report_config_path"], str):
         raise TypeError("report_config_path must be a path string or null")
     _validate_request(values["clearml"], ClearMLConfig)
-    if values.get("fiftyone") is not None:
+    if "fiftyone" in values:
+        _reject_null_fiftyone(values["fiftyone"])
         _validate_request(values["fiftyone"], FiftyOneConfig)
     if values["weights"] is not None and not values["skip_train"]:
         raise ValueError("weights is only valid with skip_train=true; training chooses its model")

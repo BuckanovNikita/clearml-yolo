@@ -149,3 +149,11 @@ common.launch('train', lambda: None)
     )
     assert result.returncode == 0, result.stderr
     assert "LOCAL_EPOCHS=23" in result.stdout
+
+
+def test_pipeline_validation_rejects_null_fiftyone_with_hint(tmp_path: Path) -> None:
+    dump_config_tree(tmp_path)
+    with initialize_config_dir(config_dir=str(tmp_path), version_base="1.3"):
+        config = compose(config_name="cy", overrides=["ground_truth=truth.csv", "fiftyone=null"])
+    with pytest.raises(ValueError, match=r"fiftyone\.enabled=false"):
+        validate_pipeline_configuration(config)
