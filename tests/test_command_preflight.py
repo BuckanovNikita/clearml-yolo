@@ -666,7 +666,7 @@ def test_direct_preflight_accepts_loose_but_valid_forms(
     assert owner[-1] == "invocation"
 
 
-# cy-queue admission keeps rejecting each loose form master's strict call rejected.
+# cy-queue admission keeps rejecting each loose form its strict call rejects.
 STRICT_REJECTS = [
     pytest.param(["skip_compare=1"], (), "Invalid pipeline setting skip_compare", id="integer-skip-flag"),
     pytest.param([], ("compare.q",), "'q'", id="removed-optional-key"),
@@ -853,8 +853,8 @@ def test_standalone_records_keep_their_rules(owner: list[str], name: str, overri
     assert owner == []
 
 
-# Checks the composed configuration cannot decide before the task, or that no
-# validator of the run applies: the command reaches the task and the run decides.
+# Checks the composed configuration cannot decide before the task: the command
+# reaches the task and the run decides.
 LEFT_TO_THE_RUN = [
     # Without run_dir or run_id the run directory is named after the task, so only the
     # run can tell whether a dataset cache lies inside it.

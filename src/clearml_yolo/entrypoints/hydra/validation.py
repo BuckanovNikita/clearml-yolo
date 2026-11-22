@@ -2,8 +2,8 @@
 
 ``validate_command_configuration`` is the per-command preflight: it runs the request checks
 listed per command below and in DOCS.md, which the composed configuration alone decides,
-before the invocation creates the ClearML task. Other checks, and those that need the task,
-files, downloads or the SDK, stay in the use cases.
+before the invocation creates the ClearML task. Only the checks that need the task, files,
+downloads or the SDK stay in the use cases alone.
 """
 
 import inspect
@@ -236,12 +236,14 @@ def _validate_pipeline_types(values: dict[str, Any]) -> None:
 def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False) -> None:
     """Validate known requests and cross-field rules without instantiating SDK effects.
 
-    The default is cy-queue's submission check: strict types, every key present and
-    records that name their supported ``_target_``. ``direct=True`` is the direct ``cy``
-    preflight, run before the ClearML task exists. It rejects every setting value these
-    checks reject, also for a skipped stage and for the stages after training. It accepts
-    these loose but valid forms: skip flags given as integers, keys removed with ``~key``
-    (the use-case signature default applies), an inactive ``ultralytics`` or
+    The one-argument call is cy-queue's admission: strict types, every key present,
+    records that name their supported ``_target_``, ``fiftyone=null`` rejected, the
+    literal ``run_dir`` and no native output key without a run directory.
+    ``direct=True`` is the direct ``cy`` preflight, run before the ClearML task exists and
+    without effects. It rejects every setting value these checks or the run's validators
+    reject, also for a skipped stage and for the stages after training. It keeps accepting
+    these loose but valid forms: skip flags given as integers, optional keys removed with
+    ``~key`` (the use-case signature default applies), an inactive ``ultralytics`` or
     ``ultralytics_predict`` group removed when a detector backend is selected, a
     ``_target_`` that imports the supported class, Hydra's reserved instantiate keys in
     records and any ``run_id`` next to ``run_dir``. Before it validates, it applies the
@@ -249,9 +251,10 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     record instantiation, the CSV dataset policy (when training) and the prediction
     projection. It adds the run's own checks on the same values: ``split='all'``, the
     frozen-evaluation backend, the training model, ``resume``, the Ultralytics
-    ``dataset_format`` and, with ``run_dir`` or ``run_id``, the routes resolved as
-    ``run_pipeline`` resolves them. It also rejects ``fiftyone=null``, which the run would
-    publish with defaults, and a removed required key, which fails as the call binds it.
+    ``dataset_format`` and the native routes (see ``_validate_pipeline_routes``).
+    Accepted exceptions: ``fiftyone=null`` is rejected although the run would publish
+    with defaults, a required key missing from a saved or replayed configuration fails
+    as the call binds it, and a ``_target_`` naming a different class is rejected.
     """
     resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved, dict):
