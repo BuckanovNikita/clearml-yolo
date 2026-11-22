@@ -206,6 +206,30 @@ def test_report_uses_comparison_left_by_an_earlier_run(
     assert result["outcome"]["stages"]["report"]["status"] == "succeeded"
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        pytest.param({"skip_compare": True}, id="training-run-with-comparison-disabled"),
+        pytest.param({"skip_train": True, "weights": "existing.pt"}, id="existing-weights-without-baseline"),
+    ],
+)
+def test_report_names_the_comparison_producer_when_a_comparison_was_expected(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch, overrides: dict[str, Any]
+) -> None:
+    calls: list[Any] = []
+    monkeypatch.setattr(pipeline, "run_report", lambda *_a, **kwargs: calls.append(kwargs))
+    # Without the skip_compare override the comparison stage runs but yields no comparison.
+    monkeypatch.setattr(pipeline, "_compare_and_report", lambda *_a, **_k: {})
+
+    result = pipeline.run_pipeline(**pipeline_case, **overrides)
+
+    assert calls == []
+    reason = result["outcome"]["stages"]["report"]["reason"]
+    assert result["outcome"]["stages"]["report"]["status"] == "skipped"
+    assert "comparison producer" in reason
+    assert "skip_report" not in reason
+
+
 def test_outcome_status_never_claims_failed_stage_succeeded() -> None:
     outcome = PipelineOutcome(stages={"metrics": StageOutcome(status="failed", reason="bad")})
     initial_status = outcome.status
