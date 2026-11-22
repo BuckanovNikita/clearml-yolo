@@ -1,8 +1,9 @@
 """Validate public command arguments before waiting for GPUs or invoking workflows.
 
-``validate_command_configuration`` is the per-command preflight: it runs every request check
-that the composed configuration alone decides, before the invocation creates the ClearML
-task. Checks that need the task, files, downloads or the SDK stay in the use cases.
+``validate_command_configuration`` is the per-command preflight: it runs the request checks
+listed per command below and in DOCS.md, which the composed configuration alone decides,
+before the invocation creates the ClearML task. Other checks, and those that need the task,
+files, downloads or the SDK, stay in the use cases.
 """
 
 import inspect
@@ -181,18 +182,19 @@ def _target(request: type[BaseModel]) -> str:
     return f"{request.__module__}.{request.__qualname__}"
 
 
-def _request_fields(config: object, request: type[BaseModel]) -> dict[str, Any]:
+def _request_fields(config: object, request: type[BaseModel], *, any_target: bool = False) -> dict[str, Any]:
+    """Return a record's fields; ``any_target`` drops ``_target_`` unchecked, as an alias names the same class."""
     if not isinstance(config, Mapping):
         raise TypeError(f"{request.__name__} settings must be a mapping")
     values = {str(key): value for key, value in config.items()}
     target = _target(request)
-    if values.pop("_target_", target) != target:
+    if values.pop("_target_", target) != target and not any_target:
         raise ValueError(f"Submission requires the supported configuration target {target}")
     return values
 
 
-def _validate_request(config: object, request: type[BaseModel]) -> None:
-    request.model_validate(_request_fields(config, request))
+def _validate_request(config: object, request: type[BaseModel], *, any_target: bool = False) -> None:
+    request.model_validate(_request_fields(config, request, any_target=any_target))
 
 
 def _validate_report_config_path(value: object) -> None:
@@ -200,14 +202,17 @@ def _validate_report_config_path(value: object) -> None:
         raise TypeError("report_config_path must be a path string or null")
 
 
-def _validate_comparison(compare: dict[str, Any]) -> None:
-    _validate_request(compare["baseline_model"], ModelRef)
+def _validate_comparison(compare: dict[str, Any], *, direct: bool = False, any_target: bool = False) -> None:
+    _validate_request(compare["baseline_model"], ModelRef, any_target=any_target)
     validate_q(compare["q"])
     iterations = compare["bootstrap_iterations"]
+    # np.empty rejects a boolean iteration count, so the direct run rejects it too.
     if type(iterations) is not int or iterations <= 0:
         raise ValueError("bootstrap_iterations must be a positive integer")
     seed = compare["seed"]
-    if seed is not None and (type(seed) is not int or seed < 0):
+    # numpy's default_rng accepts a boolean seed, so only cy-queue admission rejects it.
+    integer = isinstance(seed, int) if direct else type(seed) is int
+    if seed is not None and (not integer or seed < 0):
         raise ValueError("Comparison seed must be a nonnegative integer or null")
 
 
@@ -257,15 +262,16 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     The default is cy-queue's submission check: it checks every stage with strict types.
     ``direct=True`` is the direct ``cy`` preflight. It rejects only what the direct run
     rejects later, given the configuration alone: it checks a stage's settings only when
-    ``run_pipeline`` would run that stage, fills removed optional settings from the
-    use-case signatures, leaves the types of ``_DIRECT_LOOSE_SETTINGS`` to the run,
-    resolves ``run_dir`` as the use case does and checks the prediction group the run
-    routes. Deliberate exceptions: the comparison ``bootstrap_iterations`` and ``seed``
-    rules and the ``report_config_path`` type rule apply even when the run would skip that
-    work for want of a baseline model; a required nested key missing for a stage that runs
-    fails here as ``Required setting <name> is missing``; a stage setting the run would
-    reject after successful training (it then only marks the stage failed) stops the
-    command here; and a record of a stage that runs, or of ``clearml`` or ``fiftyone``,
+    ``run_pipeline`` would run that stage, and the metrics, comparison and report values
+    only without training (after successful training the run only marks a failing later
+    stage failed). It fills removed optional settings from the use-case signatures, leaves
+    the types of ``_DIRECT_LOOSE_SETTINGS`` to the run, resolves ``run_dir`` as the use
+    case does and checks the routes the run applies: the YOLO groups as routed, no native
+    route for a detector. Deliberate exceptions: without training, the comparison
+    ``bootstrap_iterations`` and ``seed`` rules and the ``report_config_path`` type rule
+    apply even when the run would skip that work for want of a baseline model, and a
+    required nested key missing for a stage that runs fails here as ``Required setting
+    <name> is missing``; a record of a stage that runs, or of ``clearml`` or ``fiftyone``,
     must name its supported ``_target_``.
     """
     if direct:
@@ -358,14 +364,18 @@ def _validate_direct_pipeline(raw: dict[str, Any]) -> None:
         if values["dataset_format"] not in {"ndjson", "flat", "coco"}:
             raise ValueError("Unsupported pipeline dataset_format")
         _validate_train(values)
-    prediction = values["ultralytics_predict"]
+    # A detector run routes its model.train and model.predict dumps, which hold no route keys.
+    native: dict[str, Any] = {}
+    prediction: dict[str, Any] = {}
     if yolo:
+        native = values["ultralytics"]
         # run_pipeline routes the prediction group after the CSV dataset policy (when
         # training) and the prediction projection, which keeps only prediction keys.
+        prediction = values["ultralytics_predict"]
         if "training" in stages:
             prediction, _ = csv_dataset_policy(prediction)
         prediction = prediction_settings(prediction)
-    _validate_direct_routes(values, prediction)
+    _validate_direct_routes(values, native, prediction)
 
 
 def _validate_direct_stage_settings(values: dict[str, Any], stages: frozenset[str]) -> None:
@@ -376,6 +386,9 @@ def _validate_direct_stage_settings(values: dict[str, Any], stages: frozenset[st
         record = settings.get(key)
         if isinstance(record, Mapping) and record.get("_target_") == _target(request):
             _validate_request(record, request)
+    if "training" in stages:
+        # After successful training run_pipeline only marks a failing later stage failed.
+        return
     if stages & {"metrics", "comparison"}:
         evaluation = _with_defaults(metrics, compute_metrics, ("evaluation",), prefix="metrics.")["evaluation"]
         if "metrics" in stages:
@@ -388,13 +401,13 @@ def _validate_direct_stage_settings(values: dict[str, Any], stages: frozenset[st
             raise ValueError("calibration_split must be exactly 'val'")
     if "comparison" in stages:
         names = ("baseline_model", "q", "bootstrap_iterations", "seed")
-        _validate_comparison(_with_defaults(compare, run_comparison, names, prefix="compare."))
+        _validate_comparison(_with_defaults(compare, run_comparison, names, prefix="compare."), direct=True)
     if "report" in stages:
         path = _with_defaults(report, run_report, ("report_config_path",), prefix="report.")["report_config_path"]
         _validate_report_config_path(path)
 
 
-def _validate_direct_routes(values: dict[str, Any], prediction: dict[str, Any]) -> None:
+def _validate_direct_routes(values: dict[str, Any], native: dict[str, Any], prediction: dict[str, Any]) -> None:
     directory = None
     if values["run_dir"] or values["run_id"]:
         # The resolved directory run_pipeline routes to; resolving checks containment and creates nothing.
@@ -408,7 +421,7 @@ def _validate_direct_routes(values: dict[str, Any], prediction: dict[str, Any]) 
     ):
         raise ValueError("dataset_cache_dir must be outside run_dir")
     for settings, relative, stage in (
-        (values["ultralytics"], "detect", "train"),
+        (native, "detect", "train"),
         (prediction, "native", "predict"),
     ):
         if directory is None:
@@ -434,10 +447,10 @@ def _uses_ultralytics(values: dict[str, Any]) -> bool:
     return not isinstance(model, Mapping) or model.get("backend", "ultralytics") == "ultralytics"
 
 
-def _validate_fiftyone(values: dict[str, Any]) -> None:
+def _validate_fiftyone(values: dict[str, Any], *, any_target: bool = False) -> None:
     if "fiftyone" in values:
         _reject_null_fiftyone(values["fiftyone"])
-        _validate_request(values["fiftyone"], FiftyOneConfig)
+        _validate_request(values["fiftyone"], FiftyOneConfig, any_target=any_target)
 
 
 def _validate_prediction_model(values: dict[str, Any]) -> None:
@@ -455,36 +468,40 @@ def _validate_train(values: dict[str, Any]) -> None:
         reject_csv_resume(settings)
 
 
-def _validate_frozen_evaluation(evaluation: object) -> None:
-    frozen_evaluation_config(None if evaluation is None else _request_fields(evaluation, EvaluationConfig))
+def _validate_frozen_evaluation(evaluation: object, *, any_target: bool = False) -> None:
+    fields = None if evaluation is None else _request_fields(evaluation, EvaluationConfig, any_target=any_target)
+    frozen_evaluation_config(fields)
 
 
+# Standalone commands check record fields with any_target=True: zen instantiates an
+# importable alias of the supported class, and the base commit did not compare _target_.
 def _validate_predict(values: dict[str, Any]) -> None:
     _validate_prediction_model(values)
-    _validate_fiftyone(values)
+    _validate_fiftyone(values, any_target=True)
 
 
 def _validate_val(values: dict[str, Any]) -> None:
     _validate_prediction_model(values)
-    _validate_request(values["evaluation"], EvaluationConfig)
-    _validate_frozen_evaluation(values["evaluation"])
+    _validate_request(values["evaluation"], EvaluationConfig, any_target=True)
+    _validate_frozen_evaluation(values["evaluation"], any_target=True)
     frozen_calibration_split(values["splits"] or (), "val")
 
 
 def _validate_metrics(values: dict[str, Any]) -> None:
     frozen_calibration_split(values["splits"] or (), values["calibration_split"])
-    _validate_request(values["evaluation"], EvaluationConfig)
-    _validate_frozen_evaluation(values["evaluation"])
-    _validate_fiftyone(values)
+    _validate_request(values["evaluation"], EvaluationConfig, any_target=True)
+    _validate_frozen_evaluation(values["evaluation"], any_target=True)
+    _validate_fiftyone(values, any_target=True)
 
 
 def _validate_compare(values: dict[str, Any]) -> None:
-    _validate_comparison(values)
+    _validate_comparison(values, direct=True, any_target=True)
     if _uses_ultralytics(values):
         reject_owned_prediction_overrides(values["ultralytics_predict"])
         prediction_settings(values["ultralytics_predict"] or {})
-    require_specified_candidate(ModelRef.model_validate(_request_fields(values["candidate_model"], ModelRef)))
-    _validate_frozen_evaluation(values["evaluation"])
+    candidate = _request_fields(values["candidate_model"], ModelRef, any_target=True)
+    require_specified_candidate(ModelRef.model_validate(candidate))
+    _validate_frozen_evaluation(values["evaluation"], any_target=True)
 
 
 def _validate_report(values: dict[str, Any]) -> None:

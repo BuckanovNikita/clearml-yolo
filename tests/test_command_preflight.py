@@ -119,7 +119,7 @@ INVALID = [
     ),
     pytest.param(
         "pipeline",
-        ["ground_truth=truth.csv", "metrics.evaluation.backend=other"],
+        ["ground_truth=truth.csv", "skip_train=true", "weights=w.pt", "metrics.evaluation.backend=other"],
         "Frozen thresholds require the native digital-metrics backend",
         id="pipeline-evaluation-backend",
     ),
@@ -466,7 +466,7 @@ SKIPPED_STAGES = [
     pytest.param(
         ["metrics.calibration_split=test"],
         ["skip_metrics=true"],
-        [],
+        _SKIP_TRAIN,
         "calibration_split must be exactly 'val'",
         id="calibration-split",
     ),
@@ -480,7 +480,7 @@ SKIPPED_STAGES = [
     pytest.param(
         ["compare.bootstrap_iterations=0"],
         ["skip_compare=true"],
-        [],
+        _SKIP_TRAIN,
         "bootstrap_iterations must be a positive integer",
         id="compare-bootstrap",
     ),
@@ -492,19 +492,19 @@ SKIPPED_STAGES = [
         id="compare-bootstrap-without-thresholds",
     ),
     pytest.param(
-        ["compare.q=2"], ["skip_compare=true"], [], "q must be a finite probability in [0, 1]", id="compare-q"
+        ["compare.q=2"], ["skip_compare=true"], _SKIP_TRAIN, "q must be a finite probability in [0, 1]", id="compare-q"
     ),
     pytest.param(
         ["compare.seed=-1"],
         ["skip_compare=true"],
-        [],
+        _SKIP_TRAIN,
         "Comparison seed must be a nonnegative integer or null",
         id="compare-seed",
     ),
     pytest.param(
         ["report.report_config_path=3"],
         ["skip_report=true"],
-        [],
+        _SKIP_TRAIN,
         "report_config_path must be a path string or null",
         id="report-config-path",
     ),
@@ -540,7 +540,9 @@ def test_settings_of_a_skipped_stage_pass_the_direct_preflight(
     ("skipped", "running"),
     [
         pytest.param(["skip_metrics=true"], [*_SKIP_TRAIN, "skip_metrics=true"], id="comparison-reads-it"),
-        pytest.param(["skip_predict=true", "skip_compare=true"], [], id="metrics-reads-it"),
+        pytest.param(
+            ["skip_predict=true", "skip_compare=true"], [*_SKIP_TRAIN, "skip_compare=true"], id="metrics-reads-it"
+        ),
     ],
 )
 def test_evaluation_backend_is_checked_only_when_a_stage_reads_it(
@@ -571,7 +573,7 @@ def test_required_key_of_a_skipped_stage_may_be_missing(owner: list[str]) -> Non
         common.execute_owned("pipeline", skipped, run_pipeline)
     owner.clear()
     with pytest.raises(ValueError, match=re.escape("Required setting compare.baseline_model is missing")):
-        common.execute_owned("pipeline", _without_baseline([]), run_pipeline)
+        common.execute_owned("pipeline", _without_baseline(_SKIP_TRAIN), run_pipeline)
     assert owner == []
 
 
@@ -588,8 +590,145 @@ def test_record_without_its_target_is_left_to_a_skipped_stage(owner: list[str]) 
         common.execute_owned("pipeline", plain_baseline(["skip_compare=true"]), run_pipeline)
     owner.clear()
     with pytest.raises(ValueError, match="source"):
-        common.execute_owned("pipeline", plain_baseline([]), run_pipeline)
+        common.execute_owned("pipeline", plain_baseline(_SKIP_TRAIN), run_pipeline)
     assert owner == []
+    owner.clear()
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", plain_baseline([]), run_pipeline)
+
+
+# After successful training run_pipeline only marks a failing later stage failed and
+# completes with warnings (exit 0), so these settings completed on the base commit.
+AFTER_TRAINING = [
+    pytest.param(["metrics.calibration_split=test"], id="calibration-split"),
+    pytest.param(["compare.q=2"], id="compare-q"),
+    pytest.param(["compare.bootstrap_iterations=0"], id="compare-bootstrap"),
+    pytest.param(["compare.seed=-1"], id="compare-seed"),
+    pytest.param(["report.report_config_path=123"], id="report-config-path"),
+    pytest.param(["model=fasterrcnn/resnet50_fpn", "metrics.calibration_split=test"], id="detector"),
+]
+
+
+@pytest.mark.parametrize("bad", AFTER_TRAINING)
+def test_later_stage_settings_are_left_to_the_run_after_training(owner: list[str], bad: list[str]) -> None:
+    config = _compose("pipeline", ["ground_truth=truth.csv", *bad])
+    # cy-queue admission still checks every stage.
+    with pytest.raises((TypeError, ValueError)):
+        validate_pipeline_configuration(config)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
+
+
+def test_evaluation_backend_is_left_to_the_run_after_training(owner: list[str]) -> None:
+    config = _compose("pipeline", ["ground_truth=truth.csv", "metrics.evaluation.backend=other"])
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
+
+
+def test_missing_key_of_a_later_stage_is_left_to_the_run_after_training(owner: list[str]) -> None:
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", _without_baseline([]), run_pipeline)
+    assert owner[-1] == "invocation"
+
+
+# run_pipeline routes a detector's model.train and model.predict dumps, which hold no
+# route keys, so a null route key in the inactive Ultralytics groups is never routed.
+@pytest.mark.parametrize("key", ["+ultralytics.save_dir=null", "+ultralytics_predict.save_dir=null"])
+def test_detector_routes_ignore_the_inactive_ultralytics_groups(owner: list[str], key: str) -> None:
+    config = _compose(
+        "pipeline", ["ground_truth=truth.csv", "model=fasterrcnn/resnet50_fpn", "run_dir=${oc.env:CY_HOME}/run", key]
+    )
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
+
+
+# zen instantiates an importable alias of the supported class, so standalone commands
+# check the fields without comparing _target_.
+ALIASED_TARGETS = [
+    pytest.param(
+        "val",
+        [
+            "ground_truth=truth.csv",
+            "weights=w.pt",
+            "evaluation._target_=clearml_yolo.application.use_cases.metrics.EvaluationConfig",
+        ],
+        id="val-evaluation",
+    ),
+    pytest.param(
+        "metrics",
+        [
+            "predictions=p.csv",
+            "ground_truth=truth.csv",
+            "fiftyone._target_=clearml_yolo.application.use_cases.metrics.FiftyOneConfig",
+        ],
+        id="metrics-fiftyone",
+    ),
+    pytest.param(
+        "predict",
+        [
+            "ground_truth=truth.csv",
+            "weights=w.pt",
+            "fiftyone._target_=clearml_yolo.application.use_cases.predict.FiftyOneConfig",
+        ],
+        id="predict-fiftyone",
+    ),
+    pytest.param(
+        "compare",
+        [
+            "ground_truth=truth.csv",
+            "candidate_model.task_id=candidate",
+            "candidate_model._target_=clearml_yolo.application.use_cases.compare.ModelRef",
+            "baseline_model._target_=clearml_yolo.application.use_cases.compare.ModelRef",
+        ],
+        id="compare-model-refs",
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "overrides"), ALIASED_TARGETS)
+def test_standalone_records_accept_an_aliased_target(owner: list[str], name: str, overrides: list[str]) -> None:
+    with pytest.raises(TaskCreated):
+        common.execute_owned(name, _compose(name, overrides), COMMANDS[name])
+    assert owner[-1] == "invocation"
+
+
+def test_standalone_record_with_an_aliased_target_keeps_its_value_rules(owner: list[str]) -> None:
+    config = _compose(
+        "val",
+        [
+            "ground_truth=truth.csv",
+            "weights=w.pt",
+            "evaluation._target_=clearml_yolo.application.use_cases.metrics.EvaluationConfig",
+            "evaluation.backend=other",
+        ],
+    )
+    with pytest.raises(ValueError, match="Frozen thresholds require the native digital-metrics backend"):
+        common.execute_owned("val", config, validate)
+    assert owner == []
+
+
+# numpy's default_rng accepts a boolean seed, so the bootstrap ran with it on the base
+# commit; np.empty rejects a boolean iteration count, so that still fails here.
+@pytest.mark.parametrize(
+    ("name", "overrides"),
+    [
+        pytest.param(
+            "compare", ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "seed=true"], id="cy-compare"
+        ),
+        pytest.param("pipeline", ["ground_truth=truth.csv", *_SKIP_TRAIN, "compare.seed=true"], id="cy"),
+    ],
+)
+def test_direct_commands_accept_a_boolean_seed(owner: list[str], name: str, overrides: list[str]) -> None:
+    config = _compose(name, overrides)
+    with pytest.raises(TaskCreated):
+        common.execute_owned(name, config, COMMANDS[name])
+    assert owner[-1] == "invocation"
+    if name == "pipeline":
+        with pytest.raises(ValueError, match="Comparison seed must be a nonnegative integer or null"):
+            validate_pipeline_configuration(config)
 
 
 # run_pipeline routed the prediction group after the CSV dataset policy and the
