@@ -76,8 +76,12 @@ def predict(
         selected = settings.pop("model")
         checkpoint, source_identity = deps.repository.resolve_weights_with_identity(selected)
         checkpoint_path = Path(checkpoint)
-        if _is_filesystem_path(selected) and not deps.storage.is_file(Path(selected).expanduser()):
-            raise FileNotFoundError(f"Weights file does not exist: {selected}")
+        if _is_filesystem_path(selected):
+            local = Path(deps.storage.model_weights_path(selected))
+            if deps.storage.is_dir(local):
+                raise FileNotFoundError(f"Weights path is a directory, not a file: {selected}")
+            if not deps.storage.is_file(local):
+                raise FileNotFoundError(f"Weights file does not exist: {selected}")
         checkpoint_hash = deps.tracking.file_digest(checkpoint_path) if deps.storage.is_file(checkpoint_path) else None
         identity = require_model_identity(source_identity, model_label, checkpoint_hash=checkpoint_hash)
         resolution = deps.model.resolution_of(checkpoint, settings.get("imgsz"))

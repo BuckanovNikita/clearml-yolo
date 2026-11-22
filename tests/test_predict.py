@@ -133,6 +133,20 @@ def test_missing_local_weights_file_is_reported_as_a_missing_file(
     assert "provenance" not in str(raised.value)
 
 
+def test_directory_given_as_weights_is_not_reported_as_missing(
+    tmp_path: Path,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    """An existing directory is named as a directory, not as a path that does not exist."""
+    directory = tmp_path / "runs" / "exp"
+    directory.mkdir(parents=True)
+    with pytest.raises(FileNotFoundError, match="is a directory, not a file") as raised:
+        _predict(tmp_path, 640, workflow_dependencies=workflow_dependencies, model_label=None, weights=str(directory))
+    assert str(directory) in str(raised.value)
+    assert "does not exist" not in str(raised.value)
+
+
 def test_relative_weights_path_is_reported_as_a_missing_file(
     tmp_path: Path,
     published: dict[str, pd.DataFrame],

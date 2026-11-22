@@ -116,7 +116,7 @@ ValueError: Model provenance is unavailable; supply a custom model_label (compar
 FileNotFoundError: Weights file does not exist: runs/best.pt
 ```
 
-Файла весов по указанному пути нет: проверьте путь. Правило распознавания пути то же, что у [`cy-predict`](cy-predict.md).
+Файла весов по указанному пути нет: проверьте путь. Если по пути лежит каталог, сообщение другое: `FileNotFoundError: Weights path is a directory, not a file: runs/exp`. Правило распознавания пути то же, что у [`cy-predict`](cy-predict.md).
 
 ## См. также
 
