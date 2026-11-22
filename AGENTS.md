@@ -36,8 +36,6 @@ changing behavior or configuration.
   (verification routing, mutation, release, weight packaging, Severstal corpus).
 - Config: `pyproject.toml` (deps, mypy, vulture, pytest, semantic-release), `ruff.toml`,
   `src/ruff.toml`, `.importlinter`, `Taskfile.yml`, `Taskfile.ops.yml`.
-- `.claude/settings.json` and `.codex/hooks.json` run `scripts/session_status.sh` at session
-  start; changes it lists may belong to another session.
 - `CHANGELOG.md` is written by semantic-release; never edit it by hand.
 
 ## Environment setup (per worktree)
