@@ -25,7 +25,7 @@ cy-train 'ground_truth={project_name:my-project,name:my-dataset,version:"1.0.0"}
 | Колонка | Тип | Правила |
 | --- | --- | --- |
 | `image_name` | строка | Обязательна, не пустая. Должна совпадать с именем файла из `image_path` (последний компонент пути после раскрытия символических ссылок: для ссылки это имя файла, на который она указывает). По ней сопоставляются разметка и [предсказания](predictions.md) |
-| `instance_label` | строка | Имя класса. Пусто только в строке изображения без объектов ([image without objects](../../GLOSSARY.md#image-without-objects), см. ниже). Значение `background` зарезервировано: обучение его принимает, а метрики и сравнение отклоняют |
+| `instance_label` | строка | Имя класса. Пусто только в строке изображения без объектов ([image without objects](../../GLOSSARY.md#image-without-objects), см. ниже). Значение `background` зарезервировано во всех командах: строку с точно таким значением (регистр важен) отклоняет первое же чтение файла, до начала обучения |
 | `bbox_x_tl` | число | Левая граница рамки в пикселях |
 | `bbox_y_tl` | число | Верхняя граница рамки в пикселях |
 | `bbox_x_br` | число | Правая граница рамки в пикселях, больше `bbox_x_tl` |
@@ -97,6 +97,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `data/ground_truth.csv: row 2 image_name 'x.jpg' must match resolved path basename 'a.jpg'` | `image_name` не совпадает с именем файла |
 | `data/ground_truth.csv: image 'a.jpg' belongs to both split 'train' and 'val' (row 5)` | Одно изображение в двух split |
 | `data/ground_truth.csv: image name 'a.jpg' refers to both /workspace/project/data/a.jpg and /workspace/project/data/images/train/a.jpg (row 5)` | Одно имя у двух разных файлов |
+| `Invalid raw_ground_truth dataframe: instance_label at 2: reserved_background_label` | Класс называется `background`: имя зарезервировано; число после `at` — номер строки файла с заголовком. Сообщение не содержит пути к CSV |
 | `data/ground_truth.csv: Duplicate background row 5` | Две одинаковые строки изображения без объектов |
 | `data/ground_truth.csv: image 'b.jpg' mixes an explicit background row with an annotation row` | У изображения есть и строка изображения без объектов, и рамки |
 | `data/ground_truth.csv: Duplicate box for image 'a.jpg' at row 5; numerically repeats row 2` | Та же рамка того же класса повторяется (сравниваются числа, `240` и `240.0` совпадают) |

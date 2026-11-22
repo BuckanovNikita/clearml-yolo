@@ -264,6 +264,29 @@ def test_rejects_duplicate_annotation_rows(tmp_path: Path) -> None:
         validate_ground_truth(source)
 
 
+def test_rejects_the_reserved_background_label_before_reading_images(tmp_path: Path) -> None:
+    missing_image = tmp_path / "missing.png"
+    row = _row("missing.png", missing_image, "background", (1, 2, 30, 40), "train")
+    source = _write_csv(tmp_path / "ground-truth.csv", [row])
+
+    with pytest.raises(ValueError, match=r"raw_ground_truth.*instance_label at 2.*reserved_background_label"):
+        validate_ground_truth(source)
+
+
+def test_accepts_labels_that_only_resemble_the_reserved_label(tmp_path: Path) -> None:
+    train = _image(tmp_path / "train.png")
+    val = _image(tmp_path / "val.png")
+    source = _write_csv(
+        tmp_path / "ground-truth.csv",
+        [
+            _row("train.png", train, "Background", (1, 2, 30, 40), "train"),
+            _row("val.png", val, "background ", (1, 2, 30, 40), "val"),
+        ],
+    )
+
+    validate_ground_truth(source)
+
+
 def test_rejects_duplicate_background_rows(tmp_path: Path) -> None:
     train = _image(tmp_path / "train.png")
     row = _background("train.png", train, "train")

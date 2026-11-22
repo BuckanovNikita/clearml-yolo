@@ -34,7 +34,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 
 ## Datasets and ground truth
 
-- Ground truth CSV columns: `image_name`, `image_path`, `instance_label`, `bbox_x_tl`, `bbox_y_tl`, `bbox_x_br`, `bbox_y_br`, `split` (train/val/test); absolute pixel corners; `image_path` relative to the CSV dir; identity columns literal text; background rows have empty label and coordinates.
+- Ground truth CSV columns: `image_name`, `image_path`, `instance_label`, `bbox_x_tl`, `bbox_y_tl`, `bbox_x_br`, `bbox_y_br`, `split` (train/val/test); absolute pixel corners; `image_path` relative to the CSV dir; identity columns literal text; background rows have empty label and coordinates; `instance_label` `background` (exact, case-sensitive) is reserved and the raw ground-truth stage rejects it at the first read, before training starts (digital-metrics owns the matching metrics-side rule).
 - `ground_truth` is a path or a ClearML dataset selector (`{dataset_id}` or `{project_name, name[, version]}`) whose finalized dataset holds exactly root `dataset.csv`; unversioned resolves to latest; recorded under `run.ground_truth_source`; local paths warn.
 - Training drops invalid boxes (`Invalid bounding boxes dropped: N`), forces native `task`, `classes`, `data`, `single_cls`, `fraction`, `cls_remap`, `split` (recorded as `training_data_overrides`); YOLO uses `dataset_format=ndjson` (default) or `flat`, other families COCO; images below 10x10 fail.
 - Prepared datasets: `dataset_cache_dir` (default `CY_HOME/.cache/clearml-yolo/datasets`), keyed by CSV bytes, ordered resolved image refs, format and preparation version; locks in `.locks/`; never deletes entries; changed image bytes at unchanged paths are not detected.
