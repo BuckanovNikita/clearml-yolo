@@ -2,8 +2,8 @@
 
 ``validate_command_configuration`` is the per-command preflight: it runs the request checks
 listed per command below and in DOCS.md, which the composed configuration alone decides,
-before the invocation creates the ClearML task. Only the checks that need the task, files,
-downloads or the SDK stay in the use cases alone.
+before the invocation creates the ClearML task. The checks that need the task, files,
+downloads or the SDK, and cy-compare's ``inference`` values, stay in the use cases alone.
 """
 
 import inspect
