@@ -239,9 +239,11 @@ def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False)
     records and any ``run_id`` next to ``run_dir``. Before it validates, it applies the
     pure transformations the run applies first: the detector's native groups, Hydra's
     record instantiation, the CSV dataset policy (when training) and the prediction
-    projection. It adds the run's own checks on the same values: ``fiftyone=null``,
-    ``split='all'``, the frozen-evaluation backend, the training model, ``resume``, the
-    Ultralytics ``dataset_format`` and the routes resolved as ``run_pipeline`` resolves them.
+    projection. It adds the run's own checks on the same values: ``split='all'``, the
+    frozen-evaluation backend, the training model, ``resume``, the Ultralytics
+    ``dataset_format`` and, with ``run_dir`` or ``run_id``, the routes resolved as
+    ``run_pipeline`` resolves them. It also rejects ``fiftyone=null``, which the run would
+    publish with defaults, and a removed required key, which fails as the call binds it.
     """
     resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved, dict):
@@ -502,7 +504,8 @@ def _validate_ground_truth(values: dict[str, Any]) -> None:
 
 
 # Keyed by the command function, like the wrapper schema checks above. cy-report has
-# no check: its run applies no rule the configuration alone decides.
+# no value check beyond binding its call: its run applies no rule the configuration
+# alone decides.
 _COMMAND_CHECKS: dict[str, Callable[[dict[str, Any]], None]] = {
     "train": _validate_train_command,
     "predict": _validate_predict,
@@ -519,9 +522,10 @@ def validate_command_configuration(config: DictConfig, function: Callable[..., A
     if function.__name__ == "run_pipeline":
         validate_pipeline_configuration(config, direct=True)
         return
+    values = _direct_values(_resolved_values(config), function)
     check = _COMMAND_CHECKS.get(function.__name__)
     if check is not None:
-        check(_direct_values(_resolved_values(config), function))
+        check(values)
 
 
 def reject_saved_legacy_controls(directory: Path, name: str) -> None:

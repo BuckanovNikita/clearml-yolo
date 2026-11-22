@@ -515,6 +515,27 @@ def test_removed_required_stage_setting_fails_before_the_task(
     assert owner == []
 
 
+@pytest.mark.parametrize(
+    ("name", "overrides", "removed"),
+    [
+        pytest.param("report", ["comparison_dir=comparison"], "output_dir", id="report"),
+        pytest.param(
+            "compare", ["ground_truth=truth.csv", "candidate_model.task_id=c"], "baseline_model", id="compare"
+        ),
+    ],
+)
+def test_removed_required_command_setting_fails_before_the_task(
+    owner: list[str], name: str, overrides: list[str], removed: str
+) -> None:
+    # A saved YAML or a replayed run can lack a key; the command call binds it like this.
+    config = OmegaConf.create(OmegaConf.to_container(_compose(name, overrides), resolve=True))
+    assert isinstance(config, DictConfig)
+    del config[removed]
+    with pytest.raises(TypeError, match=re.escape(f"missing a required argument: '{removed}'")):
+        common.execute_owned(name, config, COMMANDS[name])
+    assert owner == []
+
+
 def test_stage_record_without_its_target_keeps_its_value_rules(owner: list[str]) -> None:
     bad = ["skip_compare=true", "compare.baseline_model.source=bad"]
     config = _pipeline(bad, removed=("compare.baseline_model._target_",))
