@@ -687,8 +687,9 @@ def test_cache_hit_for_a_csv_with_the_reserved_label_is_rejected_like_a_fresh_re
         "prepare_dataset",
         lambda *args, **kwargs: pytest.fail("cache hit must not prepare the dataset again"),
     )
-    with pytest.raises(ValueError, match="reserved_background_label") as cached, cache.cached_dataset(
-        source, cache_dir
+    with (
+        pytest.raises(ValueError, match="reserved_background_label") as cached,
+        cache.cached_dataset(source, cache_dir),
     ):
         pytest.fail("a cache entry with the reserved label must not reach training")
 
