@@ -32,7 +32,14 @@ def test_non_model_commands_also_reject_legacy_controls(setting: str) -> None:
 
 
 def _metrics_settings(fiftyone: object) -> dict[str, object]:
-    return {"splits": None, "calibration_split": "val", "evaluation": {}, "fiftyone": fiftyone}
+    return {
+        "predictions": "p.csv",
+        "ground_truth": "truth.csv",
+        "output_dir": None,
+        "clearml": {},
+        "evaluation": {},
+        "fiftyone": fiftyone,
+    }
 
 
 def test_direct_commands_reject_null_fiftyone_with_hint() -> None:

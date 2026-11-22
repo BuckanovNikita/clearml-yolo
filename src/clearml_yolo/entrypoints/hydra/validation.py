@@ -6,7 +6,7 @@ task. Checks that need the task, files, downloads or the SDK stay in the use cas
 """
 
 import inspect
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +14,8 @@ from omegaconf import DictConfig, OmegaConf, open_dict, read_write
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from clearml_yolo.adapters.integrations.native_runtime import validate_owner_environment
-from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
+from clearml_yolo.adapters.storage.filesystem import cy_home, runs_root, write_path
+from clearml_yolo.adapters.storage.run_identity import resolve_run_dir
 from clearml_yolo.adapters.yolo.config import (
     execution_settings,
     native_defaults,
@@ -29,14 +30,16 @@ from clearml_yolo.application.contracts import (
     validate_test_fraction,
 )
 from clearml_yolo.application.ground_truth import normalize_ground_truth
+from clearml_yolo.application.use_cases.compare import compare as run_comparison
 from clearml_yolo.application.use_cases.compare import frozen_evaluation_config, reject_owned_prediction_overrides
-from clearml_yolo.application.use_cases.metrics import frozen_calibration_split
+from clearml_yolo.application.use_cases.metrics import compute_metrics, frozen_calibration_split
 from clearml_yolo.application.use_cases.pipeline import (
     pipeline_stage_settings,
     routed_native,
     run_pipeline,
 )
 from clearml_yolo.application.use_cases.predict import require_prediction_model
+from clearml_yolo.application.use_cases.report import report as run_report
 from clearml_yolo.application.use_cases.train import reject_csv_resume, require_training_model
 from clearml_yolo.core.comparison.significance import validate_q
 from clearml_yolo.core.evaluation.models import EvaluationConfig
@@ -203,27 +206,76 @@ def _validate_comparison(compare: dict[str, Any]) -> None:
         raise ValueError("Comparison seed must be a nonnegative integer or null")
 
 
-def _validate_pipeline_types(values: dict[str, Any]) -> None:
+def _with_defaults(
+    values: dict[str, Any], function: Callable[..., Any], names: Iterable[str] | None = None, *, prefix: str = ""
+) -> dict[str, Any]:
+    """Fill settings removed with ``~key`` from the use-case signature, as the direct call does."""
+    parameters = inspect.signature(function).parameters
+    filled = dict(values)
+    for name in names if names is not None else (name for name in parameters if name != "deps"):
+        if name in filled:
+            continue
+        default = parameters[name].default
+        if default is inspect.Parameter.empty:
+            raise ValueError(f"Required setting {prefix}{name} is missing")
+        filled[name] = default
+    return filled
+
+
+# The direct run read skip flags only for truthiness, model_label only for a checkpoint
+# without provenance, and weights and splits as file and CSV selectors, so a loose value
+# of these could still complete there. cy-queue admission keeps their strict types.
+_DIRECT_LOOSE_SETTINGS = frozenset(
+    {"skip_train", "skip_predict", "skip_metrics", "skip_report", "skip_compare", "model_label", "weights", "splits"}
+)
+_STAGE_SETTINGS: tuple[tuple[str, Callable[..., Any], tuple[str, ...]], ...] = (
+    ("metrics", compute_metrics, ("evaluation", "calibration_split")),
+    ("report", run_report, ("report_config_path",)),
+    ("compare", run_comparison, ("baseline_model", "q", "bootstrap_iterations", "seed")),
+)
+
+
+def _validate_pipeline_types(values: dict[str, Any], *, direct: bool) -> None:
     # Validate the existing public function contract without invoking it or
     # duplicating its scalar/collection schema. Nested target records are checked
     # separately below because they have not been instantiated at submission.
     for name, parameter in inspect.signature(run_pipeline).parameters.items():
-        if name in {"deps", "clearml", "fiftyone"}:
+        if name in {"deps", "clearml", "fiftyone"} or (direct and name in _DIRECT_LOOSE_SETTINGS):
             continue
         try:
-            TypeAdapter(parameter.annotation).validate_python(values[name], strict=True)
+            TypeAdapter(parameter.annotation).validate_python(values[name], strict=not direct)
         except ValidationError as error:
             raise ValueError(f"Invalid pipeline setting {name}: {error}") from error
 
 
-def validate_pipeline_configuration(config: DictConfig) -> None:
-    """Validate known requests and cross-field rules without instantiating SDK effects."""
+def _pipeline_values(config: DictConfig, *, direct: bool) -> dict[str, Any]:
     resolved = OmegaConf.to_container(config, resolve=True, throw_on_missing=True)
     if not isinstance(resolved, dict):
         raise TypeError("Pipeline settings must be a mapping")
     values = {str(key): value for key, value in resolved.items()}
+    if direct:
+        values = _with_defaults(values, run_pipeline)
+        stages = pipeline_stage_settings(values["metrics"], values["report"], values["compare"])
+        for (group, function, names), settings in zip(_STAGE_SETTINGS, stages, strict=True):
+            values[group] = _with_defaults(settings, function, names, prefix=f"{group}.")
+    return values
+
+
+def validate_pipeline_configuration(config: DictConfig, *, direct: bool = False) -> None:
+    """Validate known requests and cross-field rules without instantiating SDK effects.
+
+    The default is cy-queue's submission check. ``direct=True`` is the direct ``cy``
+    preflight, which rejects only what ``run_pipeline`` rejects later: it fills removed
+    optional settings from the use-case signatures, leaves the types of the settings in
+    ``_DIRECT_LOOSE_SETTINGS`` to the run, resolves ``run_dir`` as the use case does and
+    accepts a native ``name`` equal to the stage name without ``run_dir``.
+    """
+    _validate_pipeline_values(_pipeline_values(config, direct=direct), direct=direct)
+
+
+def _validate_pipeline_values(values: dict[str, Any], *, direct: bool) -> None:
     normalize_ground_truth(values["ground_truth"])
-    _validate_pipeline_types(values)
+    _validate_pipeline_types(values, direct=direct)
     metrics, report, compare = pipeline_stage_settings(values["metrics"], values["report"], values["compare"])
     _validate_request(metrics["evaluation"], EvaluationConfig)
     if metrics["calibration_split"] != "val":
@@ -241,13 +293,24 @@ def validate_pipeline_configuration(config: DictConfig) -> None:
     if values.get("model", {}).get("backend", "ultralytics") == "ultralytics":
         execution_settings(values["ultralytics"], "train")
         execution_settings(values["ultralytics_predict"], "predict")
-    _validate_pipeline_routes(values)
+    _validate_pipeline_routes(values, direct=direct)
 
 
-def _validate_pipeline_routes(values: dict[str, Any]) -> None:
-    directory = Path(values["run_dir"]) if values["run_dir"] else None
-    if directory is None and values["run_id"]:
-        directory = write_path(cy_home() / "runs" / values["run_id"])
+def _pipeline_run_dir(values: dict[str, Any], *, direct: bool) -> Path | None:
+    if not direct:
+        directory = Path(values["run_dir"]) if values["run_dir"] else None
+        if directory is None and values["run_id"]:
+            directory = write_path(cy_home() / "runs" / values["run_id"])
+        return directory
+    if not values["run_dir"] and not values["run_id"]:
+        return None
+    # The resolved directory run_pipeline routes to; resolving checks containment and creates nothing.
+    explicit = Path(values["run_dir"]) if values["run_dir"] else None
+    return resolve_run_dir(runs_root(), values["run_id"] or "", explicit)
+
+
+def _validate_pipeline_routes(values: dict[str, Any], *, direct: bool) -> None:
+    directory = _pipeline_run_dir(values, direct=direct)
     if (
         directory is not None
         and values["dataset_cache_dir"] is not None
@@ -260,7 +323,11 @@ def _validate_pipeline_routes(values: dict[str, Any]) -> None:
     ):
         settings = values[group]
         if directory is None:
-            if any(settings.get(key) is not None for key in ("project", "name", "save_dir")):
+            # run_pipeline accepts a native name equal to the stage name it routes to.
+            name = settings.get("name")
+            if any(settings.get(key) is not None for key in ("project", "save_dir")) or (
+                name is not None and not (direct and str(name) == stage)
+            ):
                 raise ValueError("Native pipeline output overrides require an explicit run_dir")
         else:
             routed_native(settings, directory / relative, stage)
@@ -285,9 +352,11 @@ def _validate_fiftyone(values: dict[str, Any]) -> None:
 
 
 def _validate_prediction_model(values: dict[str, Any]) -> None:
-    # Detector presets resolve their prediction settings from model.predict at run time.
     if _uses_ultralytics(values):
-        require_prediction_model(prediction_settings(values["ultralytics_predict"], values["weights"]))
+        require_prediction_model(prediction_settings(values["ultralytics_predict"] or {}, values["weights"]))
+    else:
+        # A detector's model.predict has no model field; only weights names its checkpoint.
+        require_prediction_model({"model": values["weights"]})
 
 
 def _validate_train(values: dict[str, Any]) -> None:
@@ -304,8 +373,8 @@ def _validate_frozen_evaluation(evaluation: object) -> None:
 def _validate_pipeline(config: DictConfig) -> None:
     # validate_pipeline_configuration is also cy-queue's submission check; the rules
     # below are direct-command additions and stay outside it.
-    validate_pipeline_configuration(config)
-    values = _resolved_values(config)
+    values = _pipeline_values(config, direct=True)
+    _validate_pipeline_values(values, direct=True)
     if not values["skip_train"]:
         _validate_train(values)
     _validate_frozen_evaluation(values["metrics"]["evaluation"])
@@ -334,7 +403,7 @@ def _validate_compare(values: dict[str, Any]) -> None:
     _validate_comparison(values)
     if _uses_ultralytics(values):
         reject_owned_prediction_overrides(values["ultralytics_predict"])
-        prediction_settings(values["ultralytics_predict"])
+        prediction_settings(values["ultralytics_predict"] or {})
     require_specified_candidate(ModelRef.model_validate(_request_fields(values["candidate_model"], ModelRef)))
     _validate_frozen_evaluation(values["evaluation"])
 
@@ -373,7 +442,7 @@ def validate_command_configuration(config: DictConfig, function: Callable[..., A
         return
     check = _COMMAND_CHECKS.get(function.__name__)
     if check is not None:
-        check(_resolved_values(config))
+        check(_with_defaults(_resolved_values(config), function))
 
 
 def reject_saved_legacy_controls(directory: Path, name: str) -> None:

@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from hydra import compose, initialize_config_module
 from hydra_zen import store
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
 from clearml_yolo.application.use_cases.compare import compare
@@ -22,6 +22,7 @@ from clearml_yolo.application.use_cases.report import report
 from clearml_yolo.application.use_cases.train import train
 from clearml_yolo.application.use_cases.val import validate
 from clearml_yolo.entrypoints.hydra import common
+from clearml_yolo.entrypoints.hydra.validation import validate_pipeline_configuration
 
 COMMANDS: dict[str, Callable[..., Any]] = {
     "pipeline": run_pipeline,
@@ -87,6 +88,18 @@ INVALID = [
     ),
     pytest.param(
         "pipeline",
+        ["ground_truth=truth.csv", "ultralytics.name=other"],
+        "Native pipeline output overrides require an explicit run_dir",
+        id="pipeline-native-name-without-run-dir",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "run_id=123"],
+        "Invalid pipeline setting run_id",
+        id="pipeline-numeric-run-id",
+    ),
+    pytest.param(
+        "pipeline",
         ["ground_truth=truth.csv", "run_dir=${oc.env:CY_HOME}/run", "dataset_cache_dir=${oc.env:CY_HOME}/run/cache"],
         "dataset_cache_dir must be outside run_dir",
         id="pipeline-cache-inside-run-dir",
@@ -135,6 +148,12 @@ INVALID = [
     ),
     pytest.param(
         "predict",
+        ["ground_truth=truth.csv", "model=fcos/resnet50_fpn"],
+        "Prediction requires weights=<checkpoint> or ultralytics_predict.model",
+        id="predict-detector-no-weights",
+    ),
+    pytest.param(
+        "predict",
         ["ground_truth=truth.csv", "weights=w.pt", "fiftyone.preflight_timeout_seconds=0"],
         "Input should be greater than 0",
         id="predict-fiftyone-settings",
@@ -144,6 +163,12 @@ INVALID = [
         ["ground_truth=truth.csv", "weights=w.pt", "fiftyone=null"],
         "fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off",
         id="predict-null-fiftyone",
+    ),
+    pytest.param(
+        "val",
+        ["ground_truth=truth.csv", "model=deimv2/s"],
+        "Prediction requires weights=<checkpoint> or ultralytics_predict.model",
+        id="val-detector-no-weights",
     ),
     pytest.param(
         "val",
@@ -168,6 +193,12 @@ INVALID = [
         ["predictions=p.csv", "ground_truth=truth.csv", "evaluation.backend=other"],
         "Frozen thresholds require the native digital-metrics backend",
         id="metrics-evaluation-backend",
+    ),
+    pytest.param(
+        "metrics",
+        ["predictions=p.csv", "ground_truth=truth.csv", "~evaluation"],
+        "Required setting evaluation is missing",
+        id="metrics-removed-required-evaluation",
     ),
     pytest.param(
         "metrics",
@@ -247,18 +278,43 @@ VALID = [
     ),
     pytest.param("pipeline", ["ground_truth=truth.csv", "run_dir=${oc.env:CY_HOME}/run"], id="pipeline-run-dir"),
     pytest.param("pipeline", ["ground_truth=truth.csv", "model=fasterrcnn/resnet50_fpn"], id="pipeline-detector"),
+    # The direct run used skip flags only for truthiness and read model_label only
+    # for a checkpoint without provenance, so loose values ran on the base commit.
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "skip_compare=1", "skip_report=1", "skip_metrics=0"],
+        id="pipeline-integer-skip-flags",
+    ),
+    pytest.param("pipeline", ["ground_truth=truth.csv", "model_label=2024"], id="pipeline-integer-model-label"),
+    # run_pipeline accepts a native name equal to the stage name it routes.
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "ultralytics.name=train", "ultralytics_predict.name=predict"],
+        id="pipeline-stage-names-without-run-dir",
+    ),
     pytest.param("train", ["ground_truth=truth.csv"], id="train"),
     pytest.param("train", ["ground_truth=truth.csv", "model=rfdetr/small"], id="train-detector"),
     pytest.param("predict", ["ground_truth=truth.csv", "weights=w.pt"], id="predict"),
     pytest.param("predict", ["ground_truth=truth.csv", "ultralytics_predict.model=m.pt"], id="predict-native-model"),
-    pytest.param("predict", ["ground_truth=truth.csv", "model=fcos/resnet50_fpn"], id="predict-detector"),
+    pytest.param(
+        "predict", ["ground_truth=truth.csv", "weights=w.pt", "model=fcos/resnet50_fpn"], id="predict-detector"
+    ),
     pytest.param("val", ["ground_truth=truth.csv", "weights=w.pt"], id="val"),
-    pytest.param("val", ["ground_truth=truth.csv", "model=deimv2/s"], id="val-detector"),
+    pytest.param("val", ["ground_truth=truth.csv", "weights=w.pt", "model=deimv2/s"], id="val-detector"),
+    pytest.param("val", ["ground_truth=truth.csv", "weights=w.pt", "~splits"], id="val-removed-splits"),
     pytest.param("metrics", ["predictions=p.csv", "ground_truth=truth.csv"], id="metrics"),
     pytest.param(
         "metrics", ["predictions=p.csv", "ground_truth=truth.csv", "fiftyone.enabled=false"], id="metrics-no-fiftyone"
     ),
+    pytest.param(
+        "metrics", ["predictions=p.csv", "ground_truth=truth.csv", "~calibration_split"], id="metrics-removed-split"
+    ),
     pytest.param("compare", ["ground_truth=truth.csv", "candidate_model.task_id=candidate"], id="compare"),
+    pytest.param(
+        "compare",
+        ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "~q", "~seed", "~evaluation"],
+        id="compare-removed-optional-settings",
+    ),
     pytest.param(
         "compare",
         ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "model=fasterrcnn/resnet50_fpn"],
@@ -268,6 +324,7 @@ VALID = [
     pytest.param("report", ["comparison_dir=comparison", "report_config_path=report.yaml"], id="report-config"),
     pytest.param("export", ["weights=w.pt"], id="export"),
     pytest.param("ground_truth", ["data_yaml=data.yaml"], id="ground-truth"),
+    pytest.param("ground_truth", ["data_yaml=data.yaml", "~test_fraction"], id="ground-truth-removed-fraction"),
 ]
 
 
@@ -326,3 +383,46 @@ def test_replayed_configuration_is_checked_again_before_publication(
         common.execute_owned("metrics", config, compute_metrics)
     assert owner[-1] == "invocation"
     assert published == []
+
+
+QUEUE_STRICT = [
+    pytest.param(["skip_compare=1"], "Invalid pipeline setting skip_compare", id="integer-skip-flag"),
+    pytest.param(["model_label=2024"], "Invalid pipeline setting model_label", id="integer-model-label"),
+    pytest.param(["ultralytics.name=train"], "Native pipeline output overrides require an explicit run_dir", id="name"),
+]
+
+
+@pytest.mark.parametrize(("overrides", "message"), QUEUE_STRICT)
+def test_queue_admission_keeps_its_strict_rules(overrides: list[str], message: str) -> None:
+    # cy-queue calls validate_pipeline_configuration(config); the direct preflight
+    # relaxes only its own call.
+    config = _compose("pipeline", ["ground_truth=truth.csv", *overrides])
+    with pytest.raises(ValueError, match=re.escape(message)):
+        validate_pipeline_configuration(config)
+    validate_pipeline_configuration(config, direct=True)
+
+
+def test_queue_admission_keeps_indexing_removed_keys() -> None:
+    # A saved YAML or a replayed run can omit keys that the structured schema keeps.
+    config = OmegaConf.create(OmegaConf.to_container(_compose("pipeline", ["ground_truth=truth.csv"])))
+    assert isinstance(config, DictConfig)
+    del config["skip_report"]
+    del config.metrics["calibration_split"]
+    with pytest.raises(KeyError):
+        validate_pipeline_configuration(config)
+    validate_pipeline_configuration(config, direct=True)
+
+
+def test_relative_run_dir_is_resolved_like_the_use_case(
+    owner: list[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    project = tmp_path.resolve() / "runs" / "x" / "detect"
+    config = _compose("pipeline", ["ground_truth=truth.csv", "run_dir=runs/x", f"ultralytics.project={project}"])
+    with pytest.raises(ValueError, match="conflicts with pipeline run_dir"):
+        validate_pipeline_configuration(config)
+    with pytest.raises(TaskCreated):
+        common.execute_owned("pipeline", config, run_pipeline)
+    assert owner[-1] == "invocation"
+    # The preflight resolves paths only; the run directory is created after the task exists.
+    assert not (tmp_path / "runs").exists()

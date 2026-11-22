@@ -47,7 +47,7 @@ cy-val [--config-dir configs] [ключ=значение ...]
 
 ## Как это работает
 
-1. Hydra собирает конфигурацию, команда проверяет ключи, пути записи, группу `evaluation` и отсутствие `all` в `splits`, для YOLO — группу `ultralytics_predict` и то, что задан `weights` или `ultralytics_predict.model`. Затем она создаёт задачу ClearML. Если `output_dir` не задан, он выбирается по имени и ID задачи.
+1. Hydra собирает конфигурацию, команда проверяет ключи, пути записи, группу `evaluation` и отсутствие `all` в `splits`, для YOLO — группу `ultralytics_predict` и то, что задан `weights` или `ultralytics_predict.model`, для других семейств — что задан `weights`. Затем она создаёт задачу ClearML. Если `output_dir` не задан, он выбирается по имени и ID задачи.
 2. Если `ground_truth` ссылается на датасет ClearML, он скачивается.
 3. Выполняется предсказание как в [`cy-predict`](cy-predict.md#как-это-работает) для split `val` и всех split из `splits` (повторы убираются, `val` идёт первым). Результат — `<output_dir>/predictions.csv`.
 4. Пороги уверенности подбираются на `val`, и с подобранными порогами ([selected confidence thresholds](../../GLOSSARY.md#selected-confidence-thresholds)) считаются метрики для каждого split из `splits`, как в [`cy-metrics`](cy-metrics.md). Результаты пишутся в `<output_dir>/metrics/`.
