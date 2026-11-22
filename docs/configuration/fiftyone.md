@@ -20,6 +20,8 @@ Override `fiftyone=null` не поддерживается: команда за�
 fiftyone=null is not supported; use fiftyone.enabled=false to turn FiftyOne publication off
 ```
 
+С тем же сообщением завершается запуск сохранённой конфигурации с `fiftyone: null`: объекта конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `run` клона задачи, который выполняет агент ClearML, или сохранённого YAML. Замените в ней `fiftyone: null` на `fiftyone: {enabled: false}`.
+
 ## Ключи
 
 | Ключ | По умолчанию | Допустимые значения | Описание |
