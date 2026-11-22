@@ -12,6 +12,7 @@ from hydra_zen import store
 from omegaconf import DictConfig, OmegaConf
 
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
+from clearml_yolo.adapters.clearml.session import RemoteReplay, _plain_config_document, sanitize_configuration
 from clearml_yolo.application.use_cases.compare import compare
 from clearml_yolo.application.use_cases.export import export_model
 from clearml_yolo.application.use_cases.ground_truth import ground_truth
@@ -426,3 +427,74 @@ def test_relative_run_dir_is_resolved_like_the_use_case(
     assert owner[-1] == "invocation"
     # The preflight resolves paths only; the run directory is created after the task exists.
     assert not (tmp_path / "runs").exists()
+
+
+def _published_run(name: str, overrides: list[str]) -> dict[str, Any]:
+    """Build the canonical ``run`` the way publish_run_configuration stores it."""
+    published = sanitize_configuration(_plain_config_document(common._publication_inputs(_compose(name, overrides))))
+    assert isinstance(published, dict)
+    return published
+
+
+def _replay(monkeypatch: pytest.MonkeyPatch, canonical: dict[str, Any]) -> None:
+    monkeypatch.setattr(common, "fetch_remote_replay", lambda: RemoteReplay("agent-task", canonical, {}))
+
+
+@pytest.mark.parametrize(("name", "overrides"), VALID)
+def test_valid_agent_snapshot_reaches_the_task(
+    owner: list[str], monkeypatch: pytest.MonkeyPatch, name: str, overrides: list[str]
+) -> None:
+    _replay(monkeypatch, _published_run(name, overrides))
+    # An Agent composes the bare entrypoint; the snapshot supplies every input.
+    config = _compose(name, [])
+    with pytest.raises(TaskCreated):
+        common.execute_owned(name, config, COMMANDS[name])
+    assert owner[-1] == "invocation"
+
+
+INVALID_SNAPSHOTS = [
+    pytest.param(
+        "metrics",
+        ["predictions=p.csv", "ground_truth=truth.csv"],
+        {"calibration_split": "test"},
+        "calibration_split must be exactly 'val'",
+        id="metrics",
+    ),
+    pytest.param(
+        "compare",
+        ["ground_truth=truth.csv", "candidate_model.task_id=candidate", "model=fasterrcnn/resnet50_fpn"],
+        {"q": 2},
+        "q must be a finite probability in [0, 1]",
+        id="compare-detector",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "model=fasterrcnn/resnet50_fpn"],
+        {"weights": "w.pt"},
+        "weights is only valid with skip_train=true; training chooses its model",
+        id="pipeline-detector",
+    ),
+    pytest.param(
+        "predict",
+        ["ground_truth=truth.csv", "weights=w.pt", "model=fcos/resnet50_fpn"],
+        {"weights": None},
+        "Prediction requires weights=<checkpoint> or ultralytics_predict.model",
+        id="predict-detector",
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "overrides", "change", "message"), INVALID_SNAPSHOTS)
+def test_invalid_agent_snapshot_fails_before_the_task(
+    owner: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    overrides: list[str],
+    change: dict[str, Any],
+    message: str,
+) -> None:
+    _replay(monkeypatch, _published_run(name, overrides) | change)
+    config = _compose(name, [])
+    with pytest.raises(ValueError, match=re.escape(message)):
+        common.execute_owned(name, config, COMMANDS[name])
+    assert owner == []
