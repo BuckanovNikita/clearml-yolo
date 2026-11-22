@@ -10,6 +10,7 @@ import pytest
 from hydra import compose, initialize_config_module
 from hydra_zen import store
 from omegaconf import DictConfig, OmegaConf
+from omegaconf.errors import MissingMandatoryValue
 
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
 from clearml_yolo.adapters.clearml.session import RemoteReplay, _plain_config_document, sanitize_configuration
@@ -22,6 +23,7 @@ from clearml_yolo.application.use_cases.predict import predict
 from clearml_yolo.application.use_cases.report import report
 from clearml_yolo.application.use_cases.train import train
 from clearml_yolo.application.use_cases.val import validate
+from clearml_yolo.core.models import ModelConfig, PredictSettings, TrainSettings
 from clearml_yolo.entrypoints.hydra import common, validation
 from clearml_yolo.entrypoints.hydra.validation import validate_pipeline_configuration, validate_wrapper_keys
 
@@ -1040,3 +1042,183 @@ def test_invalid_agent_snapshot_fails_before_the_task(
     with pytest.raises(ValueError, match=re.escape(message)):
         common.execute_owned(name, config, COMMANDS[name])
     assert owner == []
+
+
+def test_detector_native_groups_hold_json_types() -> None:
+    model = ModelConfig(
+        backend="fasterrcnn",
+        preset="resnet50_fpn",
+        train=TrainSettings(imgsz=(320, 480), weights=Path("w/best.pth"), backbone_weights=Path("w/backbone.pth")),
+        predict=PredictSettings(imgsz=(256, 384)),
+    )
+    groups = validation.detector_native_groups(model)
+    train_group = groups["ultralytics"]
+    assert train_group["imgsz"] == [320, 480]
+    assert train_group["weights"] == "w/best.pth"
+    assert train_group["backbone_weights"] == "w/backbone.pth"
+    assert train_group["model"] == "resnet50_fpn"
+    assert groups["ultralytics_predict"]["imgsz"] == [256, 384]
+
+
+@pytest.mark.parametrize(
+    ("skip_train", "admitted"), [pytest.param(1, True, id="one-is-truthy"), pytest.param(0, False, id="zero-is-falsy")]
+)
+def test_direct_preflight_reads_integer_skip_flags_by_truthiness(skip_train: int, admitted: bool) -> None:
+    # Weights are valid only when training is skipped.
+    config = _pipeline([f"skip_train={skip_train}", "weights=w.pt"])
+    if admitted:
+        validate_pipeline_configuration(config, direct=True)
+    else:
+        with pytest.raises(ValueError, match="weights is only valid with skip_train=true"):
+            validate_pipeline_configuration(config, direct=True)
+
+
+@pytest.mark.parametrize("name", ["train", "pipeline"])
+def test_detector_dataset_format_is_validated_as_coco(owner: list[str], name: str) -> None:
+    # The run prepares a COCO copy for a detector, so a format it overrides is never read.
+    overrides = ["ground_truth=truth.csv", "dataset_format=bad"]
+    validation.validate_command_configuration(
+        _compose(name, [*overrides, "model=fasterrcnn/resnet50_fpn"]), COMMANDS[name]
+    )
+    with pytest.raises(ValueError, match="dataset_format"):
+        validation.validate_command_configuration(_compose(name, overrides), COMMANDS[name])
+
+
+def test_a_record_target_that_is_not_a_string_is_unsupported(owner: list[str]) -> None:
+    composed = _compose("metrics", ["predictions=p.csv", "ground_truth=truth.csv"])
+    config = OmegaConf.create(OmegaConf.to_container(composed, resolve=True))
+    assert isinstance(config, DictConfig)
+    for target in (None, 5, ["clearml_yolo.core.publication.FiftyOneConfig"]):
+        config.fiftyone["_target_"] = target
+        with pytest.raises(ValueError, match="Submission requires the supported configuration target"):
+            validation.validate_command_configuration(config, compute_metrics)
+
+
+def test_a_missing_mandatory_value_fails_the_preflight() -> None:
+    config = _compose("metrics", ["predictions=p.csv"])
+    assert OmegaConf.is_missing(config, "ground_truth")
+    with pytest.raises(MissingMandatoryValue, match="ground_truth"):
+        validation.validate_command_configuration(config, compute_metrics)
+
+
+def test_a_model_mapping_without_a_backend_is_an_ultralytics_run() -> None:
+    composed = _compose("train", ["ground_truth=truth.csv", "ultralytics.model=null"])
+    config = OmegaConf.create(OmegaConf.to_container(composed, resolve=True))
+    assert isinstance(config, DictConfig)
+    config.model = {}
+    with pytest.raises(ValueError, match=re.escape("Set ultralytics.model explicitly")):
+        validation.validate_command_configuration(config, train)
+
+
+_VERIFY = ["export.operation=verify", "export.engine=model.engine", "export.device=0"]
+
+
+@pytest.mark.parametrize(
+    ("operation", "weights", "truth", "message"),
+    [
+        pytest.param(_VERIFY, True, True, None, id="verify-both"),
+        pytest.param(
+            _VERIFY, True, False, "Verification requires engine, weights and labeled ground_truth", id="verify-weights"
+        ),
+        pytest.param(
+            _VERIFY, False, True, "Verification requires engine, weights and labeled ground_truth", id="verify-truth"
+        ),
+        pytest.param(
+            _VERIFY, False, False, "Verification requires engine, weights and labeled ground_truth", id="verify-neither"
+        ),
+        pytest.param([], True, True, None, id="onnx-both"),
+        pytest.param([], True, False, None, id="onnx-weights"),
+        pytest.param([], False, True, "ONNX export requires weights", id="onnx-truth"),
+        pytest.param([], False, False, "ONNX export requires weights", id="onnx-neither"),
+    ],
+)
+def test_export_preflight_checks_input_presence(
+    operation: list[str], weights: bool, truth: bool, message: str | None
+) -> None:
+    overrides = [*operation, *(["weights=w.pt"] if weights else []), *(["ground_truth=truth.csv"] if truth else [])]
+    config = _compose("export", overrides)
+    if message is None:
+        validation.validate_command_configuration(config, export_model)
+    else:
+        with pytest.raises(ValueError, match=re.escape(message)):
+            validation.validate_command_configuration(config, export_model)
+
+
+def _cache_outcome(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, overrides: list[str], *, direct: bool
+) -> str | None:
+    """Return the failure message of an admission under CY_HOME=tmp_path, or None when admitted."""
+    monkeypatch.setenv("CY_HOME", str(tmp_path))
+    try:
+        validate_pipeline_configuration(_pipeline(overrides), direct=direct)
+    except ValueError as error:
+        return str(error)
+    return None
+
+
+_INSIDE = "dataset_cache_dir must be outside run_dir"
+
+
+@pytest.mark.parametrize("direct", [False, True], ids=["queue", "direct"])
+def test_cache_is_checked_against_the_run_id_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, direct: bool
+) -> None:
+    home = tmp_path.resolve()
+    inside = ["run_id=abc", f"dataset_cache_dir={home}/runs/abc/cache"]
+    assert _cache_outcome(monkeypatch, tmp_path, inside, direct=direct) == _INSIDE
+    for cache in (f"{home}/cache", f"{home}/runs/abcd/cache", f"{home}/runs/cache"):
+        assert (
+            _cache_outcome(monkeypatch, tmp_path, ["run_id=abc", f"dataset_cache_dir={cache}"], direct=direct) is None
+        )
+
+
+@pytest.mark.parametrize("direct", [False, True], ids=["queue", "direct"])
+def test_native_groups_route_into_the_run_id_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, direct: bool
+) -> None:
+    home = tmp_path.resolve()
+    expected = f"{home}/runs/abc/detect"
+    assert (
+        _cache_outcome(monkeypatch, tmp_path, ["run_id=abc", f"ultralytics.project={expected}"], direct=direct) is None
+    )
+    wrong = _cache_outcome(
+        monkeypatch, tmp_path, ["run_id=abc", f"ultralytics.project={home}/runs/other/detect"], direct=direct
+    )
+    assert wrong is not None
+    assert f"expected {expected}" in wrong
+
+
+@pytest.mark.parametrize(
+    ("overrides", "inside", "outside"),
+    [
+        pytest.param(["run_id=abc"], "runs/abc/cache", "runs/other/cache", id="run-id-only"),
+        pytest.param(["run_dir={home}/work"], "work/cache", "cache", id="run-dir-only"),
+        # run_pipeline reads run_id only without run_dir, so the run_id directory is not the run's.
+        pytest.param(["run_dir={home}/work", "run_id=abc"], "work/cache", "runs/abc/cache", id="both"),
+    ],
+)
+def test_direct_cache_rule_uses_the_directory_the_run_resolves(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, overrides: list[str], inside: str, outside: str
+) -> None:
+    home = tmp_path.resolve()
+    routes = [override.format(home=home) for override in overrides]
+    rejected = _cache_outcome(monkeypatch, tmp_path, [*routes, f"dataset_cache_dir={home}/{inside}"], direct=True)
+    assert rejected == _INSIDE
+    assert _cache_outcome(monkeypatch, tmp_path, [*routes, f"dataset_cache_dir={home}/{outside}"], direct=True) is None
+
+
+@pytest.mark.parametrize("group", ["ultralytics", "ultralytics_predict"])
+@pytest.mark.parametrize("key", ["project", "name", "save_dir"])
+def test_queue_admission_rejects_each_native_output_key_without_a_run_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, group: str, key: str
+) -> None:
+    override = f"{'+' if key == 'save_dir' else ''}{group}.{key}=x"
+    message = _cache_outcome(monkeypatch, tmp_path, [override], direct=False)
+    assert message == "Native pipeline output overrides require an explicit run_dir"
+
+
+@pytest.mark.parametrize("group", ["ultralytics", "ultralytics_predict"])
+def test_non_record_mappings_keep_reserved_looking_keys(group: str) -> None:
+    # Only the record groups are instantiated; a native group keeps its key and fails on it.
+    with pytest.raises(ValueError, match=r"Unknown .*parameters: \['_convert_'\]"):
+        validate_pipeline_configuration(_pipeline([f"+{group}._convert_=all"]), direct=True)
