@@ -477,6 +477,12 @@ _CANDIDATE_NOT_SPECIFIED = (
 )
 
 
+def validate_dataset_format(dataset_format: str) -> None:
+    """Reject a dataset representation the training copy cannot be exported in."""
+    if dataset_format not in {"ndjson", "flat", "coco"}:
+        raise ValueError("dataset_format must be one of: ndjson, flat, coco")
+
+
 def validate_test_fraction(test_fraction: float) -> None:
     """Reject a share of val images that cannot leave both val and test usable."""
     if not 0.0 <= test_fraction < 1.0:

@@ -30,6 +30,7 @@ from clearml_yolo.application.contracts import (
     ClearMLConfig,
     ModelRef,
     require_specified_candidate,
+    validate_dataset_format,
     validate_test_fraction,
 )
 from clearml_yolo.application.ground_truth import normalize_ground_truth
@@ -409,6 +410,10 @@ def _direct_pipeline_values(values: dict[str, Any]) -> dict[str, Any]:
     return values
 
 
+# Without run_dir or run_id the task names the run directory, so no project can match it.
+_TASK_RUN_DIRECTORY = Path("<task run directory>")
+
+
 def _validate_direct_routes(values: dict[str, Any]) -> None:
     directory = None
     if values["run_dir"] or values["run_id"]:
@@ -422,16 +427,12 @@ def _validate_direct_routes(values: dict[str, Any]) -> None:
         ("ultralytics_predict", "native", "predict"),
     ):
         settings = values[group]
-        if directory is None:
-            # The run routes to the task's run directory, which the task names; it
-            # accepts only a native name equal to the stage name.
-            name = settings.get("name")
-            if any(settings.get(key) is not None for key in ("project", "save_dir")) or (
-                name is not None and str(name) != stage
-            ):
-                raise ValueError("Native pipeline output overrides require an explicit run_dir")
-        else:
-            routed_native(settings, directory / relative, stage)
+        try:
+            routed_native(settings, directory / relative if directory else _TASK_RUN_DIRECTORY, stage)
+        except ValueError as error:
+            if directory is not None:
+                raise
+            raise ValueError("Native pipeline output overrides require an explicit run_dir") from error
 
 
 def _resolved_values(config: DictConfig) -> dict[str, Any]:
@@ -469,6 +470,11 @@ def _validate_train(values: dict[str, Any]) -> None:
 
 def _validate_frozen_evaluation(evaluation: object) -> None:
     frozen_evaluation_config(None if evaluation is None else _request_fields(evaluation, EvaluationConfig))
+
+
+def _validate_train_command(values: dict[str, Any]) -> None:
+    validate_dataset_format(values["dataset_format"])
+    _validate_train(values)
 
 
 def _validate_predict(values: dict[str, Any]) -> None:
@@ -515,7 +521,7 @@ def _validate_ground_truth(values: dict[str, Any]) -> None:
 
 # Keyed by the command function, like the wrapper schema checks above.
 _COMMAND_CHECKS: dict[str, Callable[[dict[str, Any]], None]] = {
-    "train": _validate_train,
+    "train": _validate_train_command,
     "predict": _validate_predict,
     "validate": _validate_val,
     "compute_metrics": _validate_metrics,

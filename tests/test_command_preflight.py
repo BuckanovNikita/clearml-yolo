@@ -149,6 +149,18 @@ INVALID = [
     ),
     pytest.param(
         "train",
+        ["ground_truth=truth.csv", "dataset_format=bad"],
+        "dataset_format must be one of: ndjson, flat, coco",
+        id="train-dataset-format",
+    ),
+    pytest.param(
+        "pipeline",
+        ["ground_truth=truth.csv", "+ultralytics.save_dir=null"],
+        "Native pipeline output overrides require an explicit run_dir",
+        id="pipeline-null-save-dir-without-run-dir",
+    ),
+    pytest.param(
+        "train",
         ["ground_truth=truth.csv", "ultralytics.imgsz=0"],
         "ultralytics.imgsz must contain positive integer image dimensions",
         id="train-native-value",

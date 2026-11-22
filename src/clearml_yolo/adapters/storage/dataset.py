@@ -23,6 +23,7 @@ from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.contracts import (
     PreparedDataset as PreparedDataset,  # noqa: PLC0414 - typed adapter interface
 )
+from clearml_yolo.application.contracts import validate_dataset_format
 from clearml_yolo.core.datasets import ValidatedDataset, csv_dataset_policy
 
 _COLUMNS = (
@@ -142,8 +143,7 @@ def prepare_dataset(
     source_bytes: bytes | None = None,
 ) -> PreparedDataset:
     """Reserve fresh output, clean once, and export the requested native representation."""
-    if dataset_format not in {"ndjson", "flat", "coco"}:
-        raise ValueError("dataset_format must be one of: ndjson, flat, coco")
+    validate_dataset_format(dataset_format)
     directory = write_path(directory).absolute()
     # Exclusive reservation rejects stale files and symlinks instead of reusing another run.
     directory.mkdir(parents=True, exist_ok=False)
