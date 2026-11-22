@@ -23,7 +23,7 @@ from clearml_yolo.adapters.storage.filesystem import write_path
 from clearml_yolo.application.contracts import (
     PreparedDataset as PreparedDataset,  # noqa: PLC0414 - typed adapter interface
 )
-from clearml_yolo.core.datasets import ValidatedDataset
+from clearml_yolo.core.datasets import ValidatedDataset, csv_dataset_policy
 
 _COLUMNS = (
     "image_name",
@@ -185,24 +185,7 @@ def apply_dataset_policy(
     data: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Keep CSV membership/class meaning authoritative, recording effective changes."""
-    if settings.get("task") not in {None, "detect"}:
-        raise ValueError("CSV ground-truth training supports task=detect only")
-    owned: dict[str, Any] = {"task": "detect", "classes": None}
-    if data is not None:
-        if settings.get("resume"):
-            raise ValueError("resume is unsupported with ground_truth; use model weights to fine-tune")
-        owned.update(
-            data=str(data),
-            single_cls=False,
-            fraction=1.0,
-            cls_remap=False,
-            split="val",
-        )
-    overrides = {
-        key: {"requested": settings.get(key), "effective": value}
-        for key, value in owned.items()
-        if key not in settings or settings[key] != value
-    }
+    effective, overrides = csv_dataset_policy(settings, data)
     for key, values in overrides.items():
         logger.info("CSV dataset owns {}: {} -> {}", key, values["requested"], values["effective"])
-    return settings | owned, overrides
+    return effective, overrides
