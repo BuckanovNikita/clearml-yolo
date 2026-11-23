@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.51.2 (2026-11-23)
+
+### Bug Fixes
+
+- **cli**: Make help text match behavior and hide internal Hydra groups (SIP-208)
+  ([#24](https://github.com/BuckanovNikita/clearml-yolo/pull/24),
+  [`f591839`](https://github.com/BuckanovNikita/clearml-yolo/commit/f5918399a65306954944f042438dad49db54905d))
+
+### Chores
+
+- **tooling**: Point the local-deps error at the approved revisions and quote it (SIP-208)
+  ([#24](https://github.com/BuckanovNikita/clearml-yolo/pull/24),
+  [`f591839`](https://github.com/BuckanovNikita/clearml-yolo/commit/f5918399a65306954944f042438dad49db54905d))
+
+### Testing
+
+- Observe the Hydra help construction in process (SIP-208)
+  ([#24](https://github.com/BuckanovNikita/clearml-yolo/pull/24),
+  [`f591839`](https://github.com/BuckanovNikita/clearml-yolo/commit/f5918399a65306954944f042438dad49db54905d))
+
+- Register the Hydra configurations in the release-config tests (SIP-271)
+  ([#25](https://github.com/BuckanovNikita/clearml-yolo/pull/25),
+  [`9173f38`](https://github.com/BuckanovNikita/clearml-yolo/commit/9173f38951069ab68a2ea84d1a1339f68e8461ea))
+
+
 ## v0.51.1 (2026-11-23)
 
 ### Bug Fixes
