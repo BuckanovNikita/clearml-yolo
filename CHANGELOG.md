@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.51.5 (2026-11-23)
+
+### Bug Fixes
+
+- **cli**: Name the real cause in four error and log messages (SIP-207)
+  ([#23](https://github.com/BuckanovNikita/clearml-yolo/pull/23),
+  [`5351fe0`](https://github.com/BuckanovNikita/clearml-yolo/commit/5351fe0f18f23e498e3583353d79a2cdcd695ff5))
+
+- **predict**: Say a directory given as weights is not a file and fix the weights rules (SIP-207)
+  ([#23](https://github.com/BuckanovNikita/clearml-yolo/pull/23),
+  [`5351fe0`](https://github.com/BuckanovNikita/clearml-yolo/commit/5351fe0f18f23e498e3583353d79a2cdcd695ff5))
+
+### Testing
+
+- Pin the memory-budget upper bound and the range-error reasons (SIP-207)
+  ([#23](https://github.com/BuckanovNikita/clearml-yolo/pull/23),
+  [`5351fe0`](https://github.com/BuckanovNikita/clearml-yolo/commit/5351fe0f18f23e498e3583353d79a2cdcd695ff5))
+
+
 ## v0.51.4 (2026-11-23)
 
 ### Bug Fixes
