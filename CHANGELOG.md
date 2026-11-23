@@ -1,6 +1,187 @@
 # CHANGELOG
 
 
+## v0.51.1 (2026-11-23)
+
+### Bug Fixes
+
+- **compare**: Say that the candidate is missing when cy-compare gets no candidate reference
+  (SIP-211) ([#27](https://github.com/BuckanovNikita/clearml-yolo/pull/27),
+  [`3c8acd4`](https://github.com/BuckanovNikita/clearml-yolo/commit/3c8acd4a9325c1243f624d79635432286e825d31))
+
+- **config**: Accept a removed inactive Ultralytics group in standalone detector commands (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Bind every direct command's call before the task, cy-report too (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Check cy-compare's bootstrap and seed and cy-report's config path before the task
+  (SIP-205) ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Check cy-train dataset_format and cy native routes with the run's own validators
+  (SIP-205) ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Check only what the direct cy run reads (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Keep a removed fiftyone group absent in the direct preflight (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Keep cy-queue's admission rejecting fiftyone=null as on the stack base (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Leave to the run what the direct commands accepted before the preflight (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Make the direct preflight reject only what the run rejects later (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Reject dataset_format=coco for Ultralytics before the ClearML task (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Reject every invalid setting before the ClearML task, skipped stage or not (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Reject fiftyone=null with a hint to fiftyone.enabled=false (SIP-210)
+  ([#26](https://github.com/BuckanovNikita/clearml-yolo/pull/26),
+  [`92962f3`](https://github.com/BuckanovNikita/clearml-yolo/commit/92962f363481f2a69b5450ccd10eeb7d3f7fd11e))
+
+- **config**: Reject invalid configuration before the ClearML task is created (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Reject unroutable native output keys in cy without a run directory before the task
+  (SIP-205) ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Share every direct preflight rejection with the run or cy-queue (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- **config**: Validate skipped-stage records only with their supported target (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+### Chores
+
+- Remove the session-start hook files and their status script (SIP-247)
+  ([#19](https://github.com/BuckanovNikita/clearml-yolo/pull/19),
+  [`7ef9202`](https://github.com/BuckanovNikita/clearml-yolo/commit/7ef920203616c562b0e5a326d0ebd681ea2753d5))
+
+### Documentation
+
+- Correct three statements about the preflight (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Hold stage records to their _target_ only without training (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- List thresholds among the fields that keep the default candidate lookup (SIP-211)
+  ([#27](https://github.com/BuckanovNikita/clearml-yolo/pull/27),
+  [`3c8acd4`](https://github.com/BuckanovNikita/clearml-yolo/commit/3c8acd4a9325c1243f624d79635432286e825d31))
+
+- Name fiftyone.enabled=false as the replacement for a saved fiftyone: null (SIP-210)
+  ([#26](https://github.com/BuckanovNikita/clearml-yolo/pull/26),
+  [`92962f3`](https://github.com/BuckanovNikita/clearml-yolo/commit/92962f363481f2a69b5450ccd10eeb7d3f7fd11e))
+
+- Name the cy-compare inference check that stays after the task and link the rule's owner (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Name the preflight-only rules and the queue's fiftyone: null admission (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Say that a saved configuration with fiftyone: null fails too (SIP-210)
+  ([#26](https://github.com/BuckanovNikita/clearml-yolo/pull/26),
+  [`92962f3`](https://github.com/BuckanovNikita/clearml-yolo/commit/92962f363481f2a69b5450ccd10eeb7d3f7fd11e))
+
+- Say that cy-compare checks candidate_model before the task exists (SIP-211)
+  ([#27](https://github.com/BuckanovNikita/clearml-yolo/pull/27),
+  [`3c8acd4`](https://github.com/BuckanovNikita/clearml-yolo/commit/3c8acd4a9325c1243f624d79635432286e825d31))
+
+- Say that cy-train checks dataset_format and cy checks a null save_dir key before the task
+  (SIP-205) ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- State the preflight rule once and drop the skipped-stage exceptions (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- State the preflight rule once and say when route errors appear (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- State the preflight rule, its accepted forms and exceptions as implemented (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+### Refactoring
+
+- **dataset**: Keep the CSV dataset policy pure in core (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+### Testing
+
+- Check the SIP-211 candidate cases through the command preflight (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Cover a valid fiftyone group in the null check (SIP-210)
+  ([#26](https://github.com/BuckanovNikita/clearml-yolo/pull/26),
+  [`92962f3`](https://github.com/BuckanovNikita/clearml-yolo/commit/92962f363481f2a69b5450ccd10eeb7d3f7fd11e))
+
+- Cover an interpolated and a null candidate_model (SIP-211)
+  ([#27](https://github.com/BuckanovNikita/clearml-yolo/pull/27),
+  [`3c8acd4`](https://github.com/BuckanovNikita/clearml-yolo/commit/3c8acd4a9325c1243f624d79635432286e825d31))
+
+- Cover the dataset store and the run directory cache rule (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Cover the detector settings projection (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Cover the preflight's routes, records and export inputs (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Feed published Agent run snapshots through the preflight (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Import pycocotools.cocoeval before patching it (SIP-269)
+  ([#20](https://github.com/BuckanovNikita/clearml-yolo/pull/20),
+  [`0d0b1fd`](https://github.com/BuckanovNikita/clearml-yolo/commit/0d0b1fd12e5f9f7a6b46b66821e18404ae20706c))
+
+- Prove an aliased stage record target is left to the run after training (SIP-205)
+  ([#28](https://github.com/BuckanovNikita/clearml-yolo/pull/28),
+  [`ce04bc1`](https://github.com/BuckanovNikita/clearml-yolo/commit/ce04bc1edfa921e750f4445dee22c95c3ac048dd))
+
+- Prove fiftyone=null fails before the ClearML task is created (SIP-210)
+  ([#26](https://github.com/BuckanovNikita/clearml-yolo/pull/26),
+  [`92962f3`](https://github.com/BuckanovNikita/clearml-yolo/commit/92962f363481f2a69b5450ccd10eeb7d3f7fd11e))
+
+- Register the Hydra configurations in the default-candidate test (SIP-211)
+  ([#27](https://github.com/BuckanovNikita/clearml-yolo/pull/27),
+  [`3c8acd4`](https://github.com/BuckanovNikita/clearml-yolo/commit/3c8acd4a9325c1243f624d79635432286e825d31))
+
+
 ## v0.51.0 (2026-11-21)
 
 ### Code Style
