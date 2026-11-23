@@ -112,7 +112,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 
 ## FiftyOne publication
 
-- For `cy`, `cy-predict`, `cy-metrics`; `fiftyone.enabled` (default true), `preflight_timeout_seconds 60`, `publish_timeout_seconds 900`, `lock_timeout_seconds 30`, `dataset_prefix clearml-yolo`. Runs in a bounded worker without GPU, queue or task ownership; failures only warn; cancellation propagates.
+- For `cy`, `cy-predict`, `cy-metrics`; `fiftyone.enabled` (default true), `preflight_timeout_seconds 60`, `publish_timeout_seconds 900`, `lock_timeout_seconds 30`, `dataset_prefix clearml-yolo`. Runs in a bounded worker without GPU, queue or task ownership; failures only warn; cancellation propagates. `fiftyone=null` is rejected before the task is created with a hint to use `fiftyone.enabled=false`; the Python API default `fiftyone=None` still means defaults. A saved configuration with `fiftyone: null` (a replayed `run` or a saved YAML) fails with the same message; replace it with `fiftyone.enabled=false`.
 - Dataset `<dataset_prefix>-v1-<GT SHA-256>`; run fields `run_<sha256(task id)>`; one native evaluation per split (method `digital_metrics`) from CY's matches. Receipt `fiftyone_publication.json` in the output dir, not uploaded. `FIFTYONE_DATABASE_DIR` holds publication locks.
 - App extension `@clearml-yolo/evaluation` installs only via `clearml_yolo.adapters.fiftyone.panel.install_evaluation_plugin()`, into the environment that runs the FiftyOne server; restart the App afterwards.
 - Open a published dataset with the same database (bundled MongoDB or `FIFTYONE_DATABASE_URI`, shared `FIFTYONE_DATABASE_DIR`) and SDK config, with media paths readable: `fo.launch_app(fo.load_dataset(<"dataset_name" from fiftyone_publication.json>))`.
