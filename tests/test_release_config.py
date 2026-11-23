@@ -95,6 +95,53 @@ def test_unknown_inference_settings_are_rejected() -> None:
         validate_wrapper_keys(config, compare)
 
 
+def test_compare_configuration_rejects_a_default_candidate_before_launch() -> None:
+    from hydra import compose, initialize_config_module
+    from hydra_zen import store
+
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - registers the Hydra configurations
+    from clearml_yolo.application.use_cases.compare import compare
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+
+    store.add_to_hydra_store(overwrite_ok=True)
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        defaults = compose(config_name="compare")
+        named = compose(config_name="compare", overrides=["candidate_model.task_id=candidate-task"])
+        tagged = compose(config_name="compare", overrides=["candidate_model.tags=[staging]"])
+    with pytest.raises(ValueError, match="candidate_model is not specified"):
+        validate_wrapper_keys(defaults, compare)
+    validate_wrapper_keys(named, compare)
+    validate_wrapper_keys(tagged, compare)
+
+
+def test_compare_configuration_resolves_candidate_interpolations_before_the_check() -> None:
+    from hydra import compose, initialize_config_module
+    from hydra_zen import store
+
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - register Hydra configs
+    from clearml_yolo.application.use_cases.compare import compare
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+
+    store.add_to_hydra_store(overwrite_ok=True)
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        to_default = compose(config_name="compare", overrides=["candidate_model.task_id='${baseline_model.task_id}'"])
+        to_value = compose(
+            config_name="compare",
+            overrides=["baseline_model.task_id=base-task", "candidate_model.task_id='${baseline_model.task_id}'"],
+        )
+    with pytest.raises(ValueError, match="candidate_model is not specified"):
+        validate_wrapper_keys(to_default, compare)
+    validate_wrapper_keys(to_value, compare)
+
+
+def test_compare_configuration_rejects_a_null_candidate_as_a_non_mapping() -> None:
+    from clearml_yolo.application.use_cases.compare import compare
+    from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
+
+    with pytest.raises(TypeError, match="ModelRef settings must be a mapping"):
+        validate_wrapper_keys(OmegaConf.create({"candidate_model": None}), compare)
+
+
 @pytest.mark.parametrize("key", ["model", "project", "name"])
 def test_comparison_rejects_owned_prediction_overrides(
     tmp_path: Path,

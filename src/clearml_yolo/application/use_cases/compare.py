@@ -27,6 +27,7 @@ from clearml_yolo.application.contracts import (
     ResolvedModel,
     SettledInference,
     VocabularyReport,
+    require_specified_candidate,
 )
 from clearml_yolo.application.evaluation import evaluate_split, identity_links
 from clearml_yolo.application.ground_truth import resolve_ground_truth
@@ -620,6 +621,7 @@ def compare(
         deps.model.stage_settings(ultralytics or {}, "train")
         if isinstance(inference, dict):
             inference = _native_inference(inference, ultralytics_predict, deps=deps)
+        require_specified_candidate(candidate_model)
         task = deps.tracking.init_task(clearml, stage="compare")
         destination = deps.storage.write_path(output_dir)
         deps.storage.mkdir(destination, parents=True, exist_ok=True)
