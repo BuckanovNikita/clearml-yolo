@@ -145,6 +145,7 @@ def _reinfer(
     *,
     split: str = "test",
     reuse_existing: bool = True,
+    role: str = "baseline",
 ) -> tuple[pd.DataFrame, VocabularyReport]:
     return reinfer_split(
         "baseline.pt",
@@ -158,7 +159,7 @@ def _reinfer(
         device=None,
         image_name="name",
         native_project=output.parent / "native",
-        native_name=f"baseline_{split}",
+        native_name=f"{role}_{split}",
         native_kwargs={"agnostic_nms": True},
         reuse_existing=reuse_existing,
         predictor=predictor,
@@ -360,6 +361,21 @@ def test_logs_which_branch_was_taken(ground_truth: pd.DataFrame, tmp_path: Path,
     _reinfer(ground_truth, output, _explode)
 
     assert any("Reusing" in message and str(output) in message for message in info_logs)
+
+
+@pytest.mark.parametrize("role", ["baseline", "candidate"])
+def test_log_lines_name_the_side_that_was_predicted(
+    ground_truth: pd.DataFrame, tmp_path: Path, info_logs: list[str], role: str
+) -> None:
+    other = "candidate" if role == "baseline" else "baseline"
+    output = tmp_path / "preds.csv"
+    _reinfer(ground_truth, output, RecordingPredictor(), role=role)
+    _reinfer(ground_truth, output, _explode, role=role)
+
+    assert len(info_logs) == 2
+    for message in info_logs:
+        assert f"{role}_test" in message
+        assert other not in message
 
 
 def test_empty_split_raises(ground_truth: pd.DataFrame, tmp_path: Path) -> None:

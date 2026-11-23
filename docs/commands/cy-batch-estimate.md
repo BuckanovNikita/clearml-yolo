@@ -133,12 +133,12 @@ cy-batch-estimate: error: argument --devices: Values must be unique nonnegative 
 Те же сообщения выдаёт `--gpu-counts`.
 
 ```text
-cy-batch-estimate: error: 1 validation error for _Options
-imgsz
-  Input should be greater than 0 [type=greater_than, input_value=0, input_type=int]
+cy-batch-estimate: error: argument --memory-budget: must be greater than 0 and at most 1, got 1.5
+cy-batch-estimate: error: argument --search-limit: must be greater than 0, got 0
+cy-batch-estimate: error: argument --trial-timeout: must be a finite number greater than 0, got 0
 ```
 
-Число вне допустимого диапазона. Вместо `imgsz` может стоять `jobs`. Для `--memory-budget`, `--search-limit`, `--trial-timeout` и `--objects-per-image` первая строка называет другую внутреннюю модель проверки, а поле — `memory_fraction`, `max_global_batch`, `trial_timeout_seconds` или `objects_per_image` соответственно.
+Число вне допустимого диапазона. Сообщение называет параметр, который вы указали. Допустимые значения: для `--memory-budget` число больше 0 и не больше 1, для `--trial-timeout` конечное число больше 0, для `--imgsz`, `--jobs`, `--search-limit` и `--objects-per-image` целое больше 0.
 
 ```text
 cy-batch-estimate: error: Batch estimation requires nvidia-smi GPU telemetry

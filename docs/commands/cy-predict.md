@@ -58,7 +58,8 @@ cy-predict [--config-dir configs] [ключ=значение ...]
 1. Существующий локальный файл используется как есть.
 2. Строка из 32 шестнадцатеричных символов, которой нет на диске, считается ID задачи ClearML. CY скачивает выбранный checkpoint этой задачи и, если в задаче записан его SHA-256, сверяет его с файлом.
 3. `clearml://<ID модели>` — модель из реестра моделей ClearML. CY скачивает её и, если в модели записан SHA-256, сверяет его с файлом.
-4. Иное значение (например имя `yolo11n.pt`) передаётся Ultralytics, который ищет или скачивает веса сам.
+4. Имя без разделителя (например `yolo11n.pt`) передаётся Ultralytics, который ищет или скачивает веса сам.
+5. Значение, похожее на путь (абсолютное, начинающееся с `~` или `.` либо содержащее разделитель), которое не является существующим файлом, останавливает команду с ошибкой `FileNotFoundError` (см. [частые ошибки](#частые-ошибки)).
 
 Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит описание модели ([checkpoint descriptor](../../GLOSSARY.md#checkpoint-descriptor)): семейство, preset, классы и предобработку. При `model=` такого семейства checkpoint обязан содержать описание модели, и оно должно совпадать с выбранными семейством и preset (см. [группа `model`](../configuration/model.md)). При `model=ultralytics` checkpoint без такого описания обрабатывается Ultralytics.
 
@@ -147,7 +148,17 @@ ValueError: No ground-truth rows for splits ['test']
 ValueError: Model provenance is unavailable; supply a custom model_label (comparison model references use label)
 ```
 
-Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`. То же сообщение команда печатает, когда файла весов по указанному пути нет: проверьте путь.
+Происхождение модели для локального файла весов неизвестно. Добавьте `model_label=my-model`.
+
+```text
+FileNotFoundError: Weights file does not exist: runs/best.pt
+```
+
+```text
+FileNotFoundError: Weights path is a directory, not a file: runs/exp
+```
+
+Файла весов по указанному пути нет: проверьте путь. Если по пути лежит каталог, команда пишет вторую строку: укажите файл весов, а не каталог. Так команда читает значение, похожее на путь: абсолютное, начинающееся с `~` или `.` либо содержащее разделитель. Имя без разделителя, например `yolo11n.pt`, команда передаёт Ultralytics как есть.
 
 ```text
 ValueError: Native detector weights require a bound checkpoint descriptor; raw comparison weights require explicit ModelRef metadata

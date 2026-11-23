@@ -360,6 +360,34 @@ def test_invalid_selector_creates_no_output(tmp_path: Path) -> None:
     assert not target.exists()
 
 
+def test_unknown_model_lists_every_valid_selection(tmp_path: Path) -> None:
+    from clearml_yolo.entrypoints.hydra.config_tree import dump_config_tree
+    from clearml_yolo.entrypoints.hydra.transforms import model_selections
+
+    target = tmp_path / "new-directory"
+    with pytest.raises(ValueError, match="Unknown model 'nope/x'") as raised:
+        dump_config_tree(target, command="cy", model="nope/x")
+    for selection in model_selections():
+        assert selection in str(raised.value)
+    assert not target.exists()
+
+
+def test_cli_unknown_model_lists_every_valid_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from clearml_yolo.entrypoints.config_tree import main
+    from clearml_yolo.entrypoints.hydra.transforms import model_selections
+
+    monkeypatch.setattr("sys.argv", ["cy-init-config", str(tmp_path / "out"), "--model", "nope/x"])
+    with pytest.raises(SystemExit) as stopped:
+        main()
+    assert stopped.value.code == 2
+    error = capsys.readouterr().err
+    for selection in model_selections():
+        assert selection in error
+    assert "MissingConfigException" not in error
+
+
 def test_cli_selector_and_invalid_choice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from clearml_yolo.entrypoints.config_tree import main
 

@@ -97,9 +97,10 @@ def _predict(
     workflow_dependencies: WorkflowDependencies,
     *,
     model_label: str | None = "fixture detector",
+    weights: str = "best.pt",
 ) -> Any:
     return predict(
-        weights="best.pt",
+        weights=weights,
         ground_truth=_ground_truth(tmp_path),
         output=tmp_path / "predictions.csv",
         clearml=ClearMLConfig(),
@@ -109,6 +110,60 @@ def _predict(
         model_label=model_label,
         deps=workflow_dependencies,
     )
+
+
+@pytest.mark.parametrize("with_label", [False, True])
+def test_missing_local_weights_file_is_reported_as_a_missing_file(
+    tmp_path: Path,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
+    with_label: bool,
+) -> None:
+    """A mistyped path is a missing file, not a question about model provenance."""
+    missing = tmp_path / "runs" / "best.pt"
+    with pytest.raises(FileNotFoundError, match="Weights file does not exist") as raised:
+        _predict(
+            tmp_path,
+            640,
+            workflow_dependencies=workflow_dependencies,
+            model_label="my-model" if with_label else None,
+            weights=str(missing),
+        )
+    assert str(missing) in str(raised.value)
+    assert "provenance" not in str(raised.value)
+
+
+def test_directory_given_as_weights_is_not_reported_as_missing(
+    tmp_path: Path,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    """An existing directory is named as a directory, not as a path that does not exist."""
+    directory = tmp_path / "runs" / "exp"
+    directory.mkdir(parents=True)
+    with pytest.raises(FileNotFoundError, match="is a directory, not a file") as raised:
+        _predict(tmp_path, 640, workflow_dependencies=workflow_dependencies, model_label=None, weights=str(directory))
+    assert str(directory) in str(raised.value)
+    assert "does not exist" not in str(raised.value)
+
+
+def test_relative_weights_path_is_reported_as_a_missing_file(
+    tmp_path: Path,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    with pytest.raises(FileNotFoundError, match=r"runs/best\.pt"):
+        _predict(tmp_path, 640, workflow_dependencies=workflow_dependencies, model_label=None, weights="runs/best.pt")
+
+
+def test_bare_weights_name_keeps_the_provenance_error(
+    tmp_path: Path,
+    published: dict[str, pd.DataFrame],
+    workflow_dependencies: WorkflowDependencies,
+) -> None:
+    """A bare name such as yolo11n.pt may be a library model Ultralytics downloads."""
+    with pytest.raises(ValueError, match="Model provenance is unavailable"):
+        _predict(tmp_path, 640, workflow_dependencies=workflow_dependencies, model_label=None, weights="yolo11n.pt")
 
 
 def test_the_scale_inference_ran_at_reaches_the_run_record(

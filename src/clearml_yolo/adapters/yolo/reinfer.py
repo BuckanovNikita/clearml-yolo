@@ -245,8 +245,9 @@ def reinfer_split(
         with trace_operation("yolo.cache.hit", context={"split": split, "path": str(output)}):
             predictions = cached
             logger.info(
-                "Reusing {} cached baseline predictions for split {!r} from {}",
+                "Reusing {} cached predictions ({}) for split {!r} from {}",
                 len(predictions),
+                native_name,
                 split,
                 output,
             )
@@ -289,8 +290,9 @@ def reinfer_split(
         with trace_operation("yolo.cache.write", context={"path": str(output), "rows": len(predictions)}):
             _write_cache(predictions, output, evidence)
         logger.info(
-            "Re-inferred {} baseline predictions over {} images of split {!r} into {}",
+            "Re-inferred {} predictions ({}) over {} images of split {!r} into {}",
             len(predictions),
+            native_name,
             len(image_paths),
             split,
             output,
