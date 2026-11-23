@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.51.3 (2026-11-23)
+
+### Bug Fixes
+
+- **pipeline**: Skip the report stage when the comparison was skipped and none exists (SIP-212)
+  ([#22](https://github.com/BuckanovNikita/clearml-yolo/pull/22),
+  [`6c619dd`](https://github.com/BuckanovNikita/clearml-yolo/commit/6c619dd06537ef77670a7f7ddbeae38bc6e91ee9))
+
+### Documentation
+
+- Quote the report skip reason and name the comparison manifest (SIP-212)
+  ([#22](https://github.com/BuckanovNikita/clearml-yolo/pull/22),
+  [`6c619dd`](https://github.com/BuckanovNikita/clearml-yolo/commit/6c619dd06537ef77670a7f7ddbeae38bc6e91ee9))
+
+### Testing
+
+- Cover evaluating weights without comparison on a fresh run directory (SIP-212)
+  ([#22](https://github.com/BuckanovNikita/clearml-yolo/pull/22),
+  [`6c619dd`](https://github.com/BuckanovNikita/clearml-yolo/commit/6c619dd06537ef77670a7f7ddbeae38bc6e91ee9))
+
+- Let the metrics fake create its output directory (SIP-212)
+  ([#22](https://github.com/BuckanovNikita/clearml-yolo/pull/22),
+  [`6c619dd`](https://github.com/BuckanovNikita/clearml-yolo/commit/6c619dd06537ef77670a7f7ddbeae38bc6e91ee9))
+
+- Pin the report skip reason when a comparison was expected (SIP-212)
+  ([#22](https://github.com/BuckanovNikita/clearml-yolo/pull/22),
+  [`6c619dd`](https://github.com/BuckanovNikita/clearml-yolo/commit/6c619dd06537ef77670a7f7ddbeae38bc6e91ee9))
+
+
 ## v0.51.2 (2026-11-23)
 
 ### Bug Fixes
