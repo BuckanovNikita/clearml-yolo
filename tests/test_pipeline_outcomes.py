@@ -10,6 +10,7 @@ import pytest
 from clearml_yolo.application.contracts import ClearMLConfig
 from clearml_yolo.application.ports import WorkflowDependencies
 from clearml_yolo.application.use_cases import pipeline
+from clearml_yolo.application.use_cases.compare import MANIFEST_NAME
 from clearml_yolo.core.pipeline_outcome import PipelineOutcome, StageOutcome
 from clearml_yolo.core.publication import FiftyOneConfig
 from native_config_helpers import prediction_config, training_settings
@@ -46,11 +47,13 @@ def pipeline_case(
         return SimpleNamespace(predictions=path)
 
     monkeypatch.setattr(pipeline, "run_prediction", predict)
-    monkeypatch.setattr(
-        pipeline,
-        "compute_metrics",
-        lambda *_a, **_k: SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={}),
-    )
+
+    def metrics(*args: Any, **_kwargs: Any) -> SimpleNamespace:
+        # Like the use case, create the output directory that threshold publication writes into.
+        Path(args[2]).mkdir(parents=True, exist_ok=True)
+        return SimpleNamespace(best_confidences={"val": {"cat": 0.5}}, evaluations={})
+
+    monkeypatch.setattr(pipeline, "compute_metrics", metrics)
     monkeypatch.setattr(pipeline, "_compare_and_report", lambda *_a, **_k: {"comparison": object()})
     monkeypatch.setattr(
         pipeline,
@@ -133,6 +136,98 @@ def test_skip_training_keeps_failure_exit(pipeline_case: dict[str, Any], monkeyp
     monkeypatch.setattr(pipeline, "run_prediction", fail)
     with pytest.raises(ValueError, match="prediction failed"):
         pipeline.run_pipeline(**pipeline_case, skip_train=True, weights="existing.pt")
+
+
+def _cached_report_case(pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    calls: list[Path] = []
+
+    def report(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        calls.append(kwargs["comparison_dir"])
+        return SimpleNamespace(issues=(), dev_reports={}, business_reports={})
+
+    monkeypatch.setattr(pipeline, "run_report", report)
+    pipeline_case.update(
+        skip_train=True, weights="existing.pt", skip_predict=True, skip_metrics=True, skip_compare=True
+    )
+    return calls
+
+
+def test_report_is_skipped_when_comparison_was_skipped_and_none_exists(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _cached_report_case(pipeline_case, monkeypatch)
+    result = pipeline.run_pipeline(**pipeline_case)
+    assert calls == []
+    report_stage = result["outcome"]["stages"]["report"]
+    assert report_stage["status"] == "skipped"
+    assert "skip_report" in report_stage["reason"]
+    assert "no comparison" in report_stage["reason"].lower()
+    written = json.loads((pipeline_case["run_dir"] / "pipeline_outcome.json").read_text())
+    assert written["stages"]["report"]["status"] == "skipped"
+
+
+def test_evaluating_weights_without_comparison_on_a_fresh_run_directory_succeeds(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[Any] = []
+    monkeypatch.setattr(pipeline, "run_report", lambda *_a, **kwargs: calls.append(kwargs))
+    directory = pipeline_case["run_dir"]
+    assert not directory.exists()
+
+    result = pipeline.run_pipeline(**pipeline_case, skip_train=True, weights="existing.pt", skip_compare=True)
+
+    written = json.loads((directory / "pipeline_outcome.json").read_text())
+    for outcome in (result["outcome"], written):
+        assert outcome["status"] == "succeeded"
+        assert outcome["stages"]["prediction"]["status"] == "succeeded"
+        assert outcome["stages"]["metrics"]["status"] == "succeeded"
+        assert outcome["stages"]["comparison"] == {
+            "status": "skipped",
+            "reason": "Disabled by configuration",
+            "artifacts": [],
+        }
+        assert outcome["stages"]["report"] == {
+            "status": "skipped",
+            "reason": "No comparison exists in the run directory; set skip_report=true to disable the report stage",
+            "artifacts": [],
+        }
+    assert calls == []
+
+
+def test_report_uses_comparison_left_by_an_earlier_run(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _cached_report_case(pipeline_case, monkeypatch)
+    comparison = pipeline_case["run_dir"] / pipeline.COMPARISON_DIR
+    comparison.mkdir(parents=True)
+    (comparison / MANIFEST_NAME).write_text("{}", encoding="utf-8")
+    result = pipeline.run_pipeline(**pipeline_case)
+    assert calls == [comparison]
+    assert result["outcome"]["stages"]["report"]["status"] == "succeeded"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        pytest.param({"skip_compare": True}, id="training-run-with-comparison-disabled"),
+        pytest.param({"skip_train": True, "weights": "existing.pt"}, id="existing-weights-without-baseline"),
+    ],
+)
+def test_report_names_the_comparison_producer_when_a_comparison_was_expected(
+    pipeline_case: dict[str, Any], monkeypatch: pytest.MonkeyPatch, overrides: dict[str, Any]
+) -> None:
+    calls: list[Any] = []
+    monkeypatch.setattr(pipeline, "run_report", lambda *_a, **kwargs: calls.append(kwargs))
+    # Without the skip_compare override the comparison stage runs but yields no comparison.
+    monkeypatch.setattr(pipeline, "_compare_and_report", lambda *_a, **_k: {})
+
+    result = pipeline.run_pipeline(**pipeline_case, **overrides)
+
+    assert calls == []
+    reason = result["outcome"]["stages"]["report"]["reason"]
+    assert result["outcome"]["stages"]["report"]["status"] == "skipped"
+    assert "comparison producer" in reason
+    assert "skip_report" not in reason
 
 
 def test_outcome_status_never_claims_failed_stage_succeeded() -> None:

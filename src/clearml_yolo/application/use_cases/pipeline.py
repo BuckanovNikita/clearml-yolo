@@ -21,7 +21,7 @@ from clearml_yolo.application.ports import (
     TaskHandle,
     WorkflowDependencies,
 )
-from clearml_yolo.application.use_cases.compare import NoBaselineModelError
+from clearml_yolo.application.use_cases.compare import MANIFEST_NAME, NoBaselineModelError
 from clearml_yolo.application.use_cases.compare import compare as run_comparison
 from clearml_yolo.application.use_cases.metrics import compute_metrics
 from clearml_yolo.application.use_cases.predict import predict as run_prediction
@@ -36,6 +36,8 @@ PREDICTIONS_NAME = "predictions.csv"
 METRICS_DIR = "metrics"
 REPORTS_DIR = "reports"
 COMPARISON_DIR = "comparison"
+_NO_COMPARISON_PRODUCER = "No successful comparison producer in this attempt"
+_NO_REUSED_COMPARISON = "No comparison exists in the run directory; set skip_report=true to disable the report stage"
 
 
 class _PipelineStages:
@@ -516,7 +518,7 @@ def _run_downstream(
     comparison_ready = False
     if skip_compare:
         stages.skip("comparison", "Disabled by configuration")
-        comparison_ready = skip_train
+        comparison_ready = skip_train and deps.storage.is_file(directory / COMPARISON_DIR / MANIFEST_NAME)
     elif thresholds is None:
         stages.skip("comparison", "Calibration thresholds unavailable in this attempt")
     else:
@@ -543,7 +545,10 @@ def _run_downstream(
             comparison_ready = "comparison" in compared
             if not comparison_ready:
                 stages.skip("comparison", "Automatic baseline unavailable")
-    _pipeline_report(stages, results, directory, clearml, report_cfg, skip_report, comparison_ready, deps)
+    no_comparison_reason = _NO_REUSED_COMPARISON if skip_compare and skip_train else _NO_COMPARISON_PRODUCER
+    _pipeline_report(
+        stages, results, directory, clearml, report_cfg, skip_report, comparison_ready, deps, no_comparison_reason
+    )
     if predictions_ready:
         stages.run(
             "visualization",
@@ -628,11 +633,12 @@ def _pipeline_report(
     skip_report: bool,
     comparison_ready: bool,
     deps: WorkflowDependencies,
+    no_comparison_reason: str,
 ) -> None:
     if skip_report:
         stages.skip("report", "Disabled by configuration")
     elif not comparison_ready:
-        stages.skip("report", "No successful comparison producer in this attempt")
+        stages.skip("report", no_comparison_reason)
     else:
         reported = stages.run(
             "report",

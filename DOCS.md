@@ -12,7 +12,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 - `entrypoints.composition` builds one dependency bundle per invocation; use cases never construct or look up adapters. Importing a package has no runtime effect; the `clearml_yolo` root imports nothing. Hydra, hydra-zen, OmegaConf belong to `entrypoints.hydra`.
 - Heavy SDK imports are plain function-local imports; computed imports only for DEIM namespace loading (`src/ruff.toml` bans `importlib.import_module` and `builtins.__import__`; bare `__import__` needs review).
 - Pinned `digital-metrics` algorithms (matching, AP, confidence ordering) run only in evaluation adapters; results are copied into core records. Only reporting writes workbooks and plots.
-- `cy` flow: train, predict, metrics (val calibration + evaluation), compare on `test` vs baseline, report, optional FiftyOne publication. `skip_<stage>=true` disables a stage.
+- `cy` flow: train, predict, metrics (val calibration + evaluation), compare on `test` vs baseline, report, optional FiftyOne publication. `skip_<stage>=true` disables a stage. With `skip_train=true skip_compare=true` the report reads the `comparison/` already in the run directory; when `comparison_manifest.json` is absent there, the report stage is recorded as skipped with reason `No comparison exists in the run directory; set skip_report=true to disable the report stage`, not failed.
 
 ## Static analysis
 

@@ -23,10 +23,10 @@ cy ground_truth=data/ground_truth.csv run_id=my-run skip_train=true
 Повторяет предсказания, метрики, сравнение и отчёт для checkpoint `runs/my-run/detect/train/weights/best.pt`, обученного ранее.
 
 ```bash
-cy ground_truth=data/ground_truth.csv skip_train=true weights=weights/best.pt model_label=my-model skip_compare=true skip_report=true
+cy ground_truth=data/ground_truth.csv skip_train=true weights=weights/best.pt model_label=my-model skip_compare=true
 ```
 
-Оценивает готовые веса (weights) без обучения, сравнения и отчёта. Без `skip_report=true` этап отчёта при `skip_train=true skip_compare=true` ищет `comparison/` прошлого запуска и в новом каталоге запуска завершается ошибкой.
+Оценивает готовые веса (weights) без обучения и сравнения. При `skip_train=true skip_compare=true` этап отчёта строится по `comparison/` прошлого запуска. Если в каталоге запуска нет файла манифеста сравнения ([comparison manifest](../../GLOSSARY.md#comparison-manifest)) `comparison/comparison_manifest.json`, этап отчёта пропускается, и команда завершается успешно. В итоге пайплайна этап получает причину `No comparison exists in the run directory; set skip_report=true to disable the report stage`. `skip_report=true` отключает этап явно.
 
 ## Синтаксис и аргументы
 
@@ -82,7 +82,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 8. **Сравнение** (если не `skip_compare`) на split `test` пишется в `<каталог запуска>/comparison/`. Модель-кандидат ([candidate model](../../GLOSSARY.md#candidate-model)) — эта задача ClearML, если обучение было в этом запуске, иначе локальный checkpoint с порогами из шага 7 (или из `metrics/frozen_thresholds.json` при `skip_metrics=true`). Предсказания сравнения строятся с `conf`, `iou`, `imgsz`, `batch` и `device` из настроек предсказания. Baseline:
    - по умолчанию — последняя завершённая задача ClearML с тегом `prod` в проекте `clearml.project_name`, кроме текущей. Если такой нет, сравнение пропускается: модель-кандидат оценивается на `test` одна, отчёт не строится, команда продолжается;
    - если `compare.baseline_model` задан иначе и модель не найдена, этап сравнения завершается ошибкой `No completed ClearML task in project 'my-project' tagged ['my-tag']`.
-9. **Отчёт** (если не `skip_report`) строится по `comparison/` и пишется в `<каталог запуска>/reports/` (см. [Книги Excel](../formats/workbooks.md)). Он требует успешного сравнения в этом же запуске; исключение — `skip_train=true skip_compare=true`: тогда отчёт строится по `comparison/`, оставшемуся в каталоге запуска от прошлого запуска.
+9. **Отчёт** (если не `skip_report`) строится по `comparison/` и пишется в `<каталог запуска>/reports/` (см. [Книги Excel](../formats/workbooks.md)). Он требует успешного сравнения в этом же запуске; исключение — `skip_train=true skip_compare=true`: тогда отчёт строится по `comparison/`, оставшемуся в каталоге запуска от прошлого запуска. Если там нет манифеста сравнения `comparison/comparison_manifest.json`, этап пропускается, а не завершается ошибкой.
 10. **Визуализация**: если предсказания доступны, CY публикует разметку, предсказания и оценки в FiftyOne (см. [Публикация](../publication.md#fiftyone)).
 11. После каждого этапа CY обновляет итог пайплайна ([pipeline outcome](../../GLOSSARY.md#pipeline-outcome)) в `pipeline_outcome.json` и `pipeline_outcome.txt` и в задаче ClearML.
 
@@ -93,6 +93,7 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 | Обучение было, `skip_predict=true` | Метрики, сравнение, отчёт, визуализация: файлу `predictions.csv` от прошлого запуска CY не доверяет |
 | Обучение было, `skip_metrics=true` | Сравнение и отчёт: нет порогов |
 | `skip_compare=true` при обучении | Отчёт |
+| `skip_train=true skip_compare=true`, в каталоге запуска нет манифеста сравнения `comparison/comparison_manifest.json` | Отчёт, причина `No comparison exists in the run directory; set skip_report=true to disable the report stage` |
 | Предсказания или метрики завершились ошибкой после успешного обучения | Этапы, которые читают их результат |
 
 ### Сочетания `skip_*`
@@ -103,9 +104,9 @@ cy [--config-dir configs] [--cfg job] [-m] key=value ...
 | `skip_train=true` | Этапы 6–10 для `weights` или для `detect/train/weights/best.pt` из каталога запуска, заданного `run_id` или `run_dir` |
 | `skip_train=true skip_predict=true` | Метрики и далее по `predictions.csv` из каталога запуска |
 | `skip_train=true skip_predict=true skip_metrics=true` | Сравнение с порогами из `metrics/frozen_thresholds.json` и отчёт |
-| `skip_train=true skip_predict=true skip_metrics=true skip_compare=true` | Отчёт по `comparison/` из каталога запуска |
+| `skip_train=true skip_predict=true skip_metrics=true skip_compare=true` | Отчёт по `comparison/` из каталога запуска; если там нет манифеста сравнения, отчёт пропускается |
 | `skip_compare=true` | Обучение, предсказания и метрики, без сравнения и отчёта |
-| `skip_train=true skip_compare=true` | Предсказания, метрики и отчёт по `comparison/` из каталога запуска; если `comparison/` там нет, этап отчёта завершается ошибкой, поэтому для новых весов добавляйте `skip_report=true` |
+| `skip_train=true skip_compare=true` | Предсказания, метрики и отчёт по `comparison/` из каталога запуска; если там нет манифеста сравнения, отчёт пропускается с причиной в итоге |
 | `skip_report=true` | Всё, кроме отчёта |
 
 При `skip_train=true` без `weights` нужен `run_id` или `run_dir` прошлого запуска: в новом каталоге checkpoint нет, и этап предсказания завершается ошибкой.
