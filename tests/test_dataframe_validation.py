@@ -39,6 +39,20 @@ def test_ground_truth_retains_background_numeric_labels_extra_columns_and_index(
     pd.testing.assert_frame_equal(original, frame())
 
 
+def test_raw_ground_truth_rejects_the_reserved_background_label() -> None:
+    original = frame().astype(object)
+    original.loc[17, "instance_label"] = "background"
+    with pytest.raises(validation.DataFrameValidationError, match="reserved_background_label"):
+        validation.validate_dataframe(original, "raw_ground_truth")
+
+
+@pytest.mark.parametrize("label", ["Background", "BACKGROUND", " background"])
+def test_raw_ground_truth_matches_the_reserved_label_exactly(label: str) -> None:
+    original = frame().astype(object)
+    original.loc[17, "instance_label"] = label
+    pd.testing.assert_frame_equal(validation.validate_dataframe(original, "raw_ground_truth"), original)
+
+
 def test_lexical_raw_ground_truth_retains_recoverable_invalid_boxes() -> None:
     original = frame().astype(object)
     original.loc[17, "bbox_x_tl"] = "not numeric"

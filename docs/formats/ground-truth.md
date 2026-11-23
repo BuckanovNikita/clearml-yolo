@@ -25,7 +25,7 @@ cy-train 'ground_truth={project_name:my-project,name:my-dataset,version:"1.0.0"}
 | Колонка | Тип | Правила |
 | --- | --- | --- |
 | `image_name` | строка | Обязательна, не пустая. Должна совпадать с именем файла из `image_path` (последний компонент пути после раскрытия символических ссылок: для ссылки это имя файла, на который она указывает). По ней сопоставляются разметка и [предсказания](predictions.md) |
-| `instance_label` | строка | Имя класса. Пусто только в строке изображения без объектов ([image without objects](../../GLOSSARY.md#image-without-objects), см. ниже). Значение `background` зарезервировано: обучение его принимает, а метрики и сравнение отклоняют |
+| `instance_label` | строка | Имя класса. Пусто только в строке изображения без объектов ([image without objects](../../GLOSSARY.md#image-without-objects), см. ниже). Значение `background` зарезервировано. Совпадение точное, регистр и пробелы важны: `Background` и `background ` допустимы. Где отклоняется такая строка, см. [ниже](#зарезервированное-имя-класса) |
 | `bbox_x_tl` | число | Левая граница рамки в пикселях |
 | `bbox_y_tl` | число | Верхняя граница рамки в пикселях |
 | `bbox_x_br` | число | Правая граница рамки в пикселях, больше `bbox_x_tl` |
@@ -47,6 +47,16 @@ b.jpg,images/train/b.jpg,,,,,,train
 ```
 
 Такая строка оставляет изображение в датасете: при обучении оно получает пустой файл разметки, при метриках остаётся в числе оцениваемых изображений. `cy-ground-truth` пишет такую строку для каждого изображения, у которого нет файла разметки или он пуст. У одного изображения может быть только одна такая строка, и её нельзя смешивать со строками рамок того же изображения.
+
+## Зарезервированное имя класса
+
+Строку с `instance_label`, равным `background`, команды обрабатывают по-разному:
+
+- `cy-train`, этап обучения `cy` и проверка модели в `cy-export` отклоняют файл при чтении CSV, до открытия изображений и до начала обучения. Сообщение: `Invalid raw_ground_truth dataframe: instance_label at 2: reserved_background_label`.
+- `cy-metrics` и `cy-val` отклоняют файл при подсчёте метрик, в каком бы split ни была такая строка. Сообщение зависит от split: `'background' is a reserved class label for unmatched detections.` или `'background' is reserved for unmatched detections.` `cy-val` отклоняет файл уже после предсказаний.
+- `cy-compare` отклоняет файл, только если такая строка есть в сравниваемом split (ключ `split`, по умолчанию `test`). Сообщение: `'background' is a reserved class label for unmatched detections.` В других split имя не проверяется.
+- `cy-predict` имена классов в разметке не проверяет и строит предсказания для такого файла.
+- В `cy` с `skip_train=true` этапы метрик и сравнения ведут себя как `cy-metrics` и `cy-compare`.
 
 ## Правила split
 
@@ -74,13 +84,15 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 
 1. Заголовок: нет повторяющихся колонок, есть все колонки, кроме `source_row_id`.
 2. Каждая строка: `image_name` и `image_path` не пусты, `split` допустим, `image_name` совпадает с именем файла.
-3. Принадлежность изображений split, повторяющиеся строки изображений без объектов и смешение такой строки с рамками.
-4. Каждое изображение открывается. Допустимые расширения: `avif`, `bmp`, `dng`, `heic`, `heif`, `jp2`, `jpeg`, `jpg`, `mpo`, `png`, `tif`, `tiff`, `webp`. Обе стороны не меньше 10 пикселей. Для JPEG с поворотом в EXIF (значения 6 и 8) ширина и высота меняются местами.
-5. Каждая рамка проверяется по размерам изображения.
+3. Принадлежность изображений split и повторяющиеся строки изображений без объектов.
+4. Нет строки с `instance_label`, равным `background` (точное совпадение, регистр важен).
+5. Нет изображения, у которого строка изображения без объектов смешана с рамками.
+6. Каждое изображение открывается. Допустимые расширения: `avif`, `bmp`, `dng`, `heic`, `heif`, `jp2`, `jpeg`, `jpg`, `mpo`, `png`, `tif`, `tiff`, `webp`. Обе стороны не меньше 10 пикселей. Для JPEG с поворотом в EXIF (значения 6 и 8) ширина и высота меняются местами.
+7. Каждая рамка проверяется по размерам изображения.
 
 Рамка с ошибкой не останавливает обучение: она отбрасывается, а в лог пишется `Invalid bounding boxes dropped: N`. Причины для такой рамки: `missing label` (есть координаты, но пустой `instance_label`), `incomplete coordinates`, `coordinates must be numeric`, `coordinates must be finite`, `box width and height must be positive`, `coordinates are outside image bounds 0..W x 0..H`. Список отброшенных рамок с номерами строк попадает в `preparation.json` (см. [Датасеты](datasets.md)). Если в классе не осталось ни одной рамки в `train`, команда пишет предупреждение `Class 'car' has no valid training examples`.
 
-При обучении рабочая копия датасета ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)) привязана к содержимому CSV (см. [Датасеты](datasets.md)). Пока CSV не изменился, повторный запуск берёт готовую копию и шаги 1–5 не повторяет; проверяется только наличие изображений в обязательных split.
+При обучении рабочая копия датасета ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)) привязана к содержимому CSV (см. [Датасеты](datasets.md)). Пока CSV не изменился, повторный запуск берёт готовую копию и шаги 1–7 не повторяет; проверяется только наличие изображений в обязательных split и то, что среди классов копии нет `background`. Копию с таким классом могла собрать версия CY, которая ещё не отклоняла это имя. Тогда команда отклоняет файл тем же сообщением, что и шаг 4, а копию не удаляет.
 
 ## Ошибки
 
@@ -97,6 +109,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `data/ground_truth.csv: row 2 image_name 'x.jpg' must match resolved path basename 'a.jpg'` | `image_name` не совпадает с именем файла |
 | `data/ground_truth.csv: image 'a.jpg' belongs to both split 'train' and 'val' (row 5)` | Одно изображение в двух split |
 | `data/ground_truth.csv: image name 'a.jpg' refers to both /workspace/project/data/a.jpg and /workspace/project/data/images/train/a.jpg (row 5)` | Одно имя у двух разных файлов |
+| `Invalid raw_ground_truth dataframe: instance_label at 2: reserved_background_label` | Класс называется `background`: имя зарезервировано; число после `at` — номер строки файла с заголовком. Сообщение не содержит пути к CSV |
 | `data/ground_truth.csv: Duplicate background row 5` | Две одинаковые строки изображения без объектов |
 | `data/ground_truth.csv: image 'b.jpg' mixes an explicit background row with an annotation row` | У изображения есть и строка изображения без объектов, и рамки |
 | `data/ground_truth.csv: Duplicate box for image 'a.jpg' at row 5; numerically repeats row 2` | Та же рамка того же класса повторяется (сравниваются числа, `240` и `240.0` совпадают) |
@@ -107,6 +120,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `data/ground_truth.csv: required split(s) contain no images: val` | Нет изображений в обязательном split |
 | `data/ground_truth.csv: at least one valid training box is required` | В `train` не осталось ни одной корректной рамки |
 | `Unsupported required split(s): dev; expected train, val, or test` | В `required_splits` указан недопустимый split |
+| `Dataset cache entry records the reserved class label 'background': <каталог>` | Среди классов рабочей копии есть `background`, но в CSV строки с этим именем не нашлось. Такая копия повреждена; удалите её подкаталог |
 | `Cached dataset required split(s) contain no images: test` | Рабочая копия датасета для этого CSV уже есть, но в ней нет изображений split из `required_splits` |
 
 При загрузке разметки из датасета ClearML:
@@ -128,6 +142,7 @@ c.jpg,images/test/c.jpg,car,240,120,400,360,test
 | `No ground-truth rows for calibration split 'val'` | В файле нет `val` (`cy-metrics`) |
 | `A logical image cannot belong to both val and test; overlapping image_name(s): ['a.jpg']` | Изображение есть и в `val`, и в `test` |
 | `'background' is a reserved class label for unmatched detections.` | Класс называется `background` |
+| `'background' is reserved for unmatched detections.` | Класс `background` есть в файле, но не в `val` и не в первом split из ключа `splits` (`cy-metrics`, `cy-val`) |
 | `Ground-truth unlabeled rows must have fully empty boxes.` | Строка без `instance_label`, но с координатами |
 | `Ground-truth boxes must have numeric coordinates.` | Координата не число |
 | `Ground-truth boxes must have ordered corners and positive area.` | Правая или нижняя граница не больше левой или верхней |

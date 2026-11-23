@@ -192,6 +192,11 @@ def _read_rows(source: Path) -> list[_CsvRow]:
     return rows
 
 
+def validate_ground_truth_rows(source: str | Path) -> None:
+    """Run the checks of the first CSV read; never open images."""
+    _read_rows(Path(source).expanduser().resolve())
+
+
 def _group_rows(rows: list[_CsvRow], source: Path) -> dict[str, list[_CsvRow]]:
     grouped: dict[str, list[_CsvRow]] = {}
     for row in rows:

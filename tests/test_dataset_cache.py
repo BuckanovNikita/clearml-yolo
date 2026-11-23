@@ -657,3 +657,65 @@ def test_staging_name_collision_preserves_existing_directory(tmp_path: Path, mon
         pass
 
     assert (collision / "foreign.bin").read_bytes() == b"keep collision"
+
+
+def test_cache_hit_for_a_csv_with_the_reserved_label_is_rejected_like_a_fresh_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import clearml_yolo.adapters.storage.dataset_cache as cache
+    import clearml_yolo.adapters.storage.dataset_records as records
+    from clearml_yolo.core.validation import ValidationStage, validate_dataframe
+
+    source = _source(tmp_path / "input")
+    source.write_text(source.read_text(encoding="utf-8").replace(",cat,", ",background,", 1), encoding="utf-8")
+    cache_dir = tmp_path / "cache"
+
+    def without_raw_ground_truth_checks(frame: Any, stage: Any) -> Any:
+        # Builds the entry an earlier release published before it reserved the label.
+        return frame if stage == ValidationStage.RAW_GROUND_TRUTH else validate_dataframe(frame, stage)
+
+    with monkeypatch.context() as earlier_release:
+        earlier_release.setattr(records, "validate_dataframe", without_raw_ground_truth_checks)
+        with cache.cached_dataset(source, cache_dir) as published:
+            entry = published.data.parent
+    with pytest.raises(ValueError, match="reserved_background_label") as fresh:
+        records.validate_ground_truth(source)
+
+    monkeypatch.setattr(
+        cache,
+        "prepare_dataset",
+        lambda *args, **kwargs: pytest.fail("cache hit must not prepare the dataset again"),
+    )
+    with (
+        pytest.raises(ValueError, match="reserved_background_label") as cached,
+        cache.cached_dataset(source, cache_dir),
+    ):
+        pytest.fail("a cache entry with the reserved label must not reach training")
+
+    assert str(cached.value) == str(fresh.value)
+    assert str(cached.value) == "Invalid raw_ground_truth dataframe: instance_label at 2: reserved_background_label"
+    assert (entry / "completion.json").is_file()
+
+
+def test_cache_hit_with_the_reserved_label_fails_even_if_the_csv_check_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import clearml_yolo.adapters.storage.dataset_cache as cache
+
+    source = _source(tmp_path / "input")
+    cache_dir = tmp_path / "cache"
+    with cache.cached_dataset(source, cache_dir) as published:
+        manifest_path = published.manifest
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["class_names"] = {"0": "background"}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    data_path = published.data
+    data = yaml.safe_load(data_path.read_text(encoding="utf-8"))
+    data["names"] = {0: "background"}
+    data_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    with (
+        pytest.raises(ValueError, match=r"^Dataset cache entry records the reserved class label 'background': "),
+        cache.cached_dataset(source, cache_dir),
+    ):
+        pytest.fail("a cache entry with the reserved label must not reach training")

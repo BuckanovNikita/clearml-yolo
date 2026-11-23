@@ -217,6 +217,7 @@ def schema_for(stage: ValidationStage | str) -> pa.DataFrameSchema:
     if not publication and not results:
         checks.append(pa.Check(_row_indices, name="unique_nonmissing_row_indices"))
     if selected in {
+        ValidationStage.RAW_GROUND_TRUTH,
         ValidationStage.PREPARED_GROUND_TRUTH,
         ValidationStage.RAW_PREDICTIONS,
         ValidationStage.EVALUATION_PREDICTIONS,

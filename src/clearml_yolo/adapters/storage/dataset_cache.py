@@ -2,8 +2,10 @@
 
 An entry's identity hashes the CSV bytes, the ordered resolved image references, the format
 and ``PREPARATION_VERSION``; bump the version whenever prepared output changes so old entries
-are never reused. A hit must not read image contents or mtimes. Every consumer holds a
-native ``filelock`` lock for the whole use; soft locks are never a fallback. Entries are
+are never reused. A hit must not read image contents or mtimes. A hit whose recorded class
+names contain the reserved label ``background`` fails with the error of a fresh CSV read.
+Every consumer holds a native ``filelock`` lock for the whole use; soft locks are never a
+fallback. Entries are
 published by renaming a uniquely named staging directory created with exclusive ``mkdir``,
 which is the only thing a failed build may delete. An existing entry that fails validation
 is preserved and reported, never removed or rebuilt in place.
@@ -27,12 +29,14 @@ from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.dataset import PreparedDataset, prepare_dataset
 from clearml_yolo.adapters.storage.dataset_export import DatasetFormat
+from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth_rows
 from clearml_yolo.adapters.storage.file_io import resolved_image_references
 from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
 
 PREPARATION_VERSION = 2
 _COMPLETION_FILE = "completion.json"
 _SUPPORTED_SPLITS = frozenset({"train", "val", "test"})
+_RESERVED_LABEL = "background"
 
 
 class _Completion(BaseModel):
@@ -286,6 +290,16 @@ def _load_completed(
     )
 
 
+def _reject_reserved_label(entry: Path, source: Path) -> None:
+    """Reject an entry published before the label was reserved, as a fresh read would."""
+    manifest = _read_json_object(entry / "preparation.json")
+    names = None if manifest is None else manifest.get("class_names")
+    if not isinstance(names, dict) or _RESERVED_LABEL not in names.values():
+        return
+    validate_ground_truth_rows(source)
+    raise ValueError(f"Dataset cache entry records the reserved class label {_RESERVED_LABEL!r}: {entry}")
+
+
 def _remove_owned_staging(path: Path) -> None:
     if path.is_symlink() or path.is_file():
         path.unlink(missing_ok=True)
@@ -448,5 +462,5 @@ def cached_dataset(
                         )
             else:
                 with trace_operation("storage.cache.hit", context={"format": dataset_format}):
-                    pass
+                    _reject_reserved_label(entry, source_path)
             yield prepared
