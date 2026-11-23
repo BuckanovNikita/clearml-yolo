@@ -635,6 +635,7 @@ forbidden_modules =
     test_clearml_script
     test_clearml_session
     test_coco_dataset
+    test_command_preflight
     test_comparison_assemble
     test_comparison_identity_cache
     test_comparison_observability

@@ -8,10 +8,21 @@ from zipfile import ZipFile
 import pandas as pd
 import pytest
 
-from clearml_yolo.adapters.integrations.detectors import DetectorRunner
+from clearml_yolo.adapters.integrations.detectors import (
+    DetectorRunner,
+    native_prediction_settings,
+    native_stage_settings,
+)
 from clearml_yolo.adapters.storage.checkpoint import bind_checkpoint
 from clearml_yolo.application.contracts import ModelRef
-from clearml_yolo.core.models import CheckpointMetadata, Preprocessing, model_preset
+from clearml_yolo.core.models import (
+    CheckpointMetadata,
+    ModelConfig,
+    PredictSettings,
+    Preprocessing,
+    TrainSettings,
+    model_preset,
+)
 from clearml_yolo.entrypoints.composition import build_dependencies
 
 
@@ -22,6 +33,49 @@ def test_prediction_settings_use_selected_recipe_and_explicit_weights() -> None:
     assert settings["imgsz"] is None  # Resolve the recorded training size after downloading weights.
     assert settings["batch"] == 2
     assert settings["device"] == "cpu"
+
+
+def _detector(*, predict_imgsz: tuple[int, int] | None = None) -> ModelConfig:
+    """A detector configuration whose python values are tuples and paths, not JSON types."""
+    return ModelConfig(
+        backend="fasterrcnn",
+        preset="resnet50_fpn",
+        train=TrainSettings(imgsz=(320, 480), weights=Path("w/best.pth"), backbone_weights=Path("w/backbone.pth")),
+        predict=PredictSettings(imgsz=predict_imgsz),
+    )
+
+
+def test_native_stage_settings_project_json_types() -> None:
+    config = _detector(predict_imgsz=(256, 384))
+    train = native_stage_settings(config.train.model_dump(), "train")
+    assert train["imgsz"] == [320, 480]
+    assert train["weights"] == "w/best.pth"
+    assert train["backbone_weights"] == "w/backbone.pth"
+    predict = native_stage_settings(config.predict.model_dump(), "predict")
+    assert predict["imgsz"] == [256, 384]
+
+
+def test_native_prediction_settings_carry_the_backend_and_preset() -> None:
+    result = native_prediction_settings(_detector(predict_imgsz=(256, 384)), {})
+    assert result["backend"] == "fasterrcnn"
+    assert result["preset"] == "resnet50_fpn"
+    assert result["imgsz"] == [256, 384]
+
+
+def test_native_prediction_settings_keep_the_native_model_without_weights() -> None:
+    config = _detector()
+    assert native_prediction_settings(config, {"model": "native.pth"})["model"] == "native.pth"
+    assert native_prediction_settings(config, {})["model"] is None
+    assert native_prediction_settings(config, {"model": "native.pth"}, "native.pth")["model"] == "native.pth"
+    with pytest.raises(ValueError, match="weights conflicts with the native prediction model"):
+        native_prediction_settings(config, {"model": "native.pth"}, "other.pth")
+
+
+def test_native_prediction_settings_take_the_train_size_only_without_weights() -> None:
+    config = _detector()
+    assert native_prediction_settings(config, {})["imgsz"] == [320, 480]
+    assert native_prediction_settings(config, {}, "best.pth")["imgsz"] is None
+    assert native_prediction_settings(config, {"imgsz": 128})["imgsz"] == 128
 
 
 def test_checkpoint_selects_backend_and_restores_image_join_keys(

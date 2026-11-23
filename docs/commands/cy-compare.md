@@ -48,7 +48,7 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 | `inference.image_name` | `name` | Как сопоставлять изображения разметки и предсказаний. Допустимо только `name`. |
 | `q` | `0.05` | Уровень значимости после поправки Benjamini-Hochberg; конечное число от 0 до 1. |
 | `bootstrap_iterations` | `10000` | Число bootstrap-выборок; положительное целое. |
-| `seed` | `0` | Seed генератора bootstrap-выборок. |
+| `seed` | `0` | Seed генератора bootstrap-выборок; неотрицательное целое или `null`. |
 | `evaluation` | см. [страницу группы](../configuration/evaluation.md) | Правила сопоставления рамок (bounding box) и вычисления метрик; ключ `evaluation.backend` должен оставаться `null`. |
 | `clearml` | см. [страницу группы](../configuration/clearml.md) | Проект, имя и теги задачи ClearML (task) этого запуска. Проект также служит проектом поиска моделей по умолчанию. |
 
@@ -83,8 +83,8 @@ cy-compare [--config-dir DIR] [--cfg job] [-m] [КЛЮЧ=ЗНАЧЕНИЕ ...]
 
 ## Как это работает
 
-1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет поля `candidate_model` и их сочетания (например, `source=local` без `weights`), отклоняет `candidate_model` только со значениями по умолчанию и значение `inference.image_name`, отличное от `name`.
-2. Команда создаёт задачу ClearML с именем и тегами из группы `clearml` и проверяет поля `baseline_model`, `inference`, `ultralytics_predict`, `q`.
+1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет поля `baseline_model`, `candidate_model`, `q`, `bootstrap_iterations`, `seed`, группу `evaluation`, ключи `inference` и, для YOLO, группу `ultralytics_predict`. `baseline_model`, `q`, `bootstrap_iterations` и `seed` проверяются по тем же правилам и с теми же сообщениями, что и группа `compare` в [`cy`](cy.md), например `bootstrap_iterations must be a positive integer` и `Comparison seed must be a nonnegative integer or null`. Значение `inference.image_name`, отличное от `name`, и `candidate_model` только со значениями по умолчанию тоже отклоняются на этом шаге. Правило то же, что у [`cy`](cy.md#как-это-работает) (шаг 1, там полный список): до создания задачи отклоняется каждое значение, которое отклонил бы запуск или cy-queue (кроме значений `inference`, см. шаг 2), и принимаются те же допустимые формы — ключ, удалённый через `~`, получает значение по умолчанию; для других семейств моделей допустима сохранённая конфигурация без группы `ultralytics` или `ultralytics_predict`; `_target_`, который указывает на тот же класс под другим путём импорта, и служебные ключи Hydra `_convert_`, `_recursive_`, `_args_` и `_partial_` в группах принимаются. Группы `fiftyone` и флагов `skip_*` у команды нет. Отклоняются и две формы, которые выглядят допустимыми: обязательный ключ, которого нет в сохранённой конфигурации, даёт ошибку `missing a required argument: '<ключ>'`; `_target_` в `baseline_model`, `candidate_model` или `evaluation`, который указывает на другой класс, даёт ошибку `Submission requires the supported configuration target <класс>`. После создания задачи остаются проверка значений `inference` (шаг 2) и проверки, которым нужны задача, файлы или загрузки: разметка, checkpoint и поиск моделей в ClearML.
+2. Команда создаёт задачу ClearML с именем и тегами из группы `clearml` и проверяет значения `inference`.
 3. Команда читает разметку и проверяет, что каждое изображение относится к одному split.
 4. Выбирается модель baseline:
    - `source=local` — файл `weights`; если его нет, команда завершается ошибкой.

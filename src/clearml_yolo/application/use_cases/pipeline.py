@@ -135,16 +135,27 @@ def _as_dict(config: Any) -> dict[str, Any]:
     return {key: value for key, value in values.items() if key != "defaults"}
 
 
+def reject_fixed_native_routes(settings: dict[str, Any], name: str) -> None:
+    """Reject the native output keys ``routed_native`` rejects whatever the run directory is."""
+    if settings.get("name") is not None and str(settings["name"]) != name:
+        raise ValueError(f"name={settings['name']!r} conflicts with pipeline run_dir; expected {name}")
+    if "save_dir" in settings:
+        raise ValueError("save_dir conflicts with pipeline run_dir; use run_dir to route outputs")
+
+
 def routed_native(settings: dict[str, Any], project: Path, name: str) -> dict[str, Any]:
     """Reject conflicting native output keys instead of silently overwriting them."""
     chosen = dict(settings)
-    expected = {"project": str(project), "name": name}
-    for key, value in expected.items():
-        if key in chosen and chosen[key] is not None and (str(chosen[key]) != value):
-            raise ValueError(f"{key}={chosen[key]!r} conflicts with pipeline run_dir; expected {value}")
-    if "save_dir" in chosen:
-        raise ValueError("save_dir conflicts with pipeline run_dir; use run_dir to route outputs")
-    return chosen | expected
+    if chosen.get("project") is not None and str(chosen["project"]) != str(project):
+        raise ValueError(f"project={chosen['project']!r} conflicts with pipeline run_dir; expected {project}")
+    reject_fixed_native_routes(chosen, name)
+    return chosen | {"project": str(project), "name": name}
+
+
+def reject_cache_inside_run_dir(cache_root: Path, directory: Path) -> None:
+    """Reject a dataset cache inside the run directory; run directories are reused, never cleared."""
+    if cache_root.is_relative_to(directory):
+        raise ValueError("dataset_cache_dir must be outside run_dir")
 
 
 def _stage_values(config: Any, allowed: set[str], stage: str) -> dict[str, Any]:
@@ -355,8 +366,7 @@ def run_pipeline(
             if run_dir or run_id
             else deps.storage.task_run_dir(deps.storage.runs_root(), *deps.tracking.task_identity(task))
         )
-        if deps.dataset.dataset_cache_root(dataset_cache_dir).is_relative_to(deps.storage.resolve(directory)):
-            raise ValueError("dataset_cache_dir must be outside run_dir")
+        reject_cache_inside_run_dir(deps.dataset.dataset_cache_root(dataset_cache_dir), deps.storage.resolve(directory))
         metrics_cfg, report_cfg, compare_cfg = pipeline_stage_settings(metrics, report, compare)
         train_params = routed_native(ultralytics, directory / "detect", "train")
         prediction_overrides = dict(ultralytics_predict)

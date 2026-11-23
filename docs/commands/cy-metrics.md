@@ -47,7 +47,7 @@ cy-metrics [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE ...]
 
 ## Как это работает
 
-1. Команда создаёт задачу ClearML и находит разметку. Локальный CSV используется как есть, с предупреждением `Using local ground-truth CSV ...; prefer a ClearML dataset reference for versioned annotations.`; ссылка на ClearML Dataset разрешается в CSV этого датасета.
+1. До создания задачи ClearML команда проверяет `calibration_split`, отсутствие `all` в `splits` и значения групп `evaluation` и `fiftyone`. Затем она создаёт задачу ClearML и находит разметку. Локальный CSV используется как есть, с предупреждением `Using local ground-truth CSV ...; prefer a ClearML dataset reference for versioned annotations.`; ссылка на ClearML Dataset разрешается в CSV этого датасета.
 2. Если `fiftyone.enabled=true`, выполняет предварительную проверку ([FiftyOne preflight](../../GLOSSARY.md#fiftyone-preflight)) FiftyOne (см. [FiftyOne](../publication.md#fiftyone)).
 3. Определяет происхождение модели ([model provenance](../../GLOSSARY.md#model-provenance)): из `<predictions>.provenance.json`, иначе из `model_label`. Если этот файл есть, он должен соответствовать текущему содержимому CSV предсказаний: после правки CSV команда завершается ошибкой.
 4. Проверяет правила split:

@@ -49,7 +49,13 @@ from clearml_yolo.adapters.storage import (
 from clearml_yolo.adapters.yolo import config as yolo_config
 from clearml_yolo.adapters.yolo import ground_truth as yolo_ground_truth
 from clearml_yolo.adapters.yolo import inference, reinfer
-from clearml_yolo.application.contracts import DatasetFormat, ModelRef, PreparedDataset, TrainResult
+from clearml_yolo.application.contracts import (
+    DatasetFormat,
+    ModelRef,
+    PreparedDataset,
+    TrainResult,
+    require_ultralytics_dataset_format,
+)
 from clearml_yolo.application.ports import (
     Publisher,
     WorkflowDependencies,
@@ -75,8 +81,7 @@ class _DatasetStore:
         dataset_format: DatasetFormat = "ndjson",
         required_splits: tuple[str, ...] = ("train", "val"),
     ) -> AbstractContextManager[PreparedDataset]:
-        if dataset_format == "coco":
-            raise ValueError("Ultralytics training requires ndjson or flat dataset_format")
+        require_ultralytics_dataset_format(dataset_format)
         return dataset_cache.cached_dataset(ground_truth, cache_dir, dataset_format, required_splits=required_splits)
 
 

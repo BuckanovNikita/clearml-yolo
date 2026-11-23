@@ -18,6 +18,7 @@ from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, exif_size, im
 from clearml_yolo.adapters.observability.progress import track
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.filesystem import write_path
+from clearml_yolo.application.contracts import validate_test_fraction
 
 GROUND_TRUTH_COLUMNS = [
     "image_name",
@@ -216,8 +217,7 @@ def build_ground_truth(
     Datasets that ship only train and val get a test split carved out of val, since
     thresholds are calibrated on val and reported on test.
     """
-    if not 0.0 <= test_fraction < 1.0:
-        raise ValueError(f"test_fraction must be within [0.0, 1.0), got {test_fraction}")
+    validate_test_fraction(test_fraction)
 
     yaml_path = Path(data_yaml).expanduser()
     dataset = check_det_dataset(str(yaml_path.resolve()) if yaml_path.exists() else str(data_yaml))

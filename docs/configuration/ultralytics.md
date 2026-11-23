@@ -33,10 +33,10 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 - ключ, которого Ultralytics не знает, отклоняется: `ValueError: Unknown Ultralytics parameters: ['foo']`;
 - `cfg` должен оставаться `null`: `ValueError: Native cfg must be null`;
 - известный ключ, который к обучению детектора не относится (например `source`, `dropout`, `format`), принимается и молча отбрасывается;
-- `save_dir` в `cy` отклоняется (`save_dir conflicts with pipeline run_dir; use run_dir to route outputs`), в `cy-train` отбрасывается; в обоих случаях путь сначала проверяется на нахождение внутри `CY_HOME`;
+- `save_dir` в `cy` отклоняется до создания задачи ClearML (task). С `run_dir` или `run_id` любое значение даёт ошибку `save_dir conflicts with pipeline run_dir; use run_dir to route outputs`. Без них путь даёт ошибку `Native pipeline output overrides require an explicit run_dir`, а `null` — ошибку `save_dir conflicts with pipeline run_dir; use run_dir to route outputs`. В `cy-train` `save_dir` отбрасывается; в обоих случаях путь сначала проверяется на нахождение внутри `CY_HOME`;
 - `augmentations` (список преобразований Albumentations для нативного загрузчика) передаётся в Ultralytics как есть. Собственный пайплайн аугментаций CY настраивается в группе [`transforms`](transforms.md); профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) `transforms=albumentations` сам обнуляет встроенные аугментации Ultralytics (`hsv_*`, `degrees`, `translate`, `scale`, `shear`, `perspective`, `flipud`, `fliplr`, `bgr`, `mosaic` и другие).
 
-Когда начинается обучение, CY проверяет полную группу: все ключи обучения должны присутствовать, типы и диапазоны должны совпадать с ожиданиями Ultralytics. Ошибки имеют вид `ultralytics.epochs must be an integer`, `ultralytics.lr0 must be between 0 and 1`, `ultralytics.epochs must be at least 1`, `ultralytics.amp must not be null`.
+При запуске `cy-train` и `cy` (в `cy` — и при `skip_train=true`), до создания задачи ClearML (task), CY проверяет полную группу: все ключи обучения должны присутствовать, типы и диапазоны должны совпадать с ожиданиями Ultralytics. Ошибки имеют вид `ultralytics.epochs must be an integer`, `ultralytics.lr0 must be between 0 and 1`, `ultralytics.epochs must be at least 1`, `ultralytics.amp must not be null`.
 
 ## Ключи
 
@@ -48,7 +48,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 | --- | --- | --- |
 | `task` | `detect` | Тип задачи Ultralytics. CY поддерживает только `detect`; другое значение отклоняется (`ultralytics.task must be detect`). |
 | `mode` | `train` | Режим Ultralytics. Должен быть `train` (`ultralytics.mode must be train`). |
-| `model` | `yolo11n.pt` | Модель для обучения: имя предобученных весов (weights), путь к `.pt` или к `.yaml` архитектуры. В Ultralytics по умолчанию пусто; CY подставляет `yolo11n.pt`. Пустое значение отклоняется: `Set ultralytics.model explicitly; no training model fallback is provided`. Загруженная модель должна быть детектором. |
+| `model` | `yolo11n.pt` | Модель для обучения: имя предобученных весов (weights), путь к `.pt` или к `.yaml` архитектуры. В Ultralytics по умолчанию пусто; CY подставляет `yolo11n.pt`. Пустое значение отклоняется до создания задачи ClearML (task), в `cy` — и при `skip_train=true`: `Set ultralytics.model explicitly; no training model fallback is provided`. Загруженная модель должна быть детектором. |
 | `data` | `null` | Файл описания датасета. CY всегда подменяет его рабочей копией датасета ([prepared dataset copy](../../GLOSSARY.md#prepared-dataset-copy)), подготовленной из разметки ([ground truth](../../GLOSSARY.md#ground-truth)) `ground_truth` (см. [форматы датасетов](../formats/datasets.md)); собственное значение не используется. |
 | `epochs` | `100` | Число эпох обучения. Целое, не меньше 1. |
 | `time` | `null` | Максимальная длительность обучения в часах; если задано, заменяет `epochs`. |
@@ -65,8 +65,8 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 
 | Ключ | По умолчанию | Описание |
 | --- | --- | --- |
-| `project` | `null` | Корень результатов обучения. В `cy-train` при `null` это `detect` внутри каталога запуска ([run directory](../../GLOSSARY.md#run-directory)) задачи в рабочем каталоге ([workspace](../../GLOSSARY.md#workspace)) под `CY_HOME/runs` (см. [Рабочий каталог](../workspace.md)). Заданный путь должен лежать внутри `CY_HOME`, иначе команда завершается ошибкой `Project write destination ... must be contained beneath CY_HOME=...`. В `cy` значение задаёт каталог запуска пайплайна (`run_dir`, иначе каталог задачи под `CY_HOME/runs`): допустимо только `null` или `<каталог запуска>/detect`; другое значение отклоняется (`project=... conflicts with pipeline run_dir; expected ...`). |
-| `name` | `null` | Имя подкаталога внутри `project`. В `cy-train` при `null` — имя задачи ClearML, приведённое к безопасному виду. В `cy` допустимо только `null` или `train`; другое значение отклоняется (`name=... conflicts with pipeline run_dir; expected train`). |
+| `project` | `null` | Корень результатов обучения. В `cy-train` при `null` это `detect` внутри каталога запуска ([run directory](../../GLOSSARY.md#run-directory)) задачи в рабочем каталоге ([workspace](../../GLOSSARY.md#workspace)) под `CY_HOME/runs` (см. [Рабочий каталог](../workspace.md)). Заданный путь должен лежать внутри `CY_HOME`, иначе команда завершается ошибкой `Project write destination ... must be contained beneath CY_HOME=...`. В `cy` допустимо только `null` или полный путь `<каталог запуска>/detect`; другое значение отклоняется до создания задачи: с `run_dir` или `run_id` — ошибкой `project=... conflicts with pipeline run_dir; expected ...`, без них — ошибкой `Native pipeline output overrides require an explicit run_dir`, потому что каталог запуска тогда зависит от задачи и заранее его не задать. |
+| `name` | `null` | Имя подкаталога внутри `project`. В `cy-train` при `null` — имя задачи ClearML, приведённое к безопасному виду. В `cy` допустимо только `null` или `train`. Другое значение отклоняется до создания задачи ошибкой `name=... conflicts with pipeline run_dir; expected train`, с `run_dir` и без него. |
 | `exist_ok` | `false` | Писать в существующий каталог `project/name`, а не создавать новый с номером. Передаётся как есть. |
 
 ### Обучение
@@ -83,7 +83,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 | `rect` | `false` | Прямоугольные batch при обучении. |
 | `cos_lr` | `false` | Косинусный планировщик learning rate. |
 | `close_mosaic` | `10` | Отключить mosaic на последних N эпохах (`0` — не отключать). |
-| `resume` | `false` | Продолжить обучение с последнего checkpoint. CY не поддерживает: при `true` обучение на разметке завершается ошибкой `resume is unsupported with ground_truth; use model weights to fine-tune`. Чтобы дообучить модель, укажите её веса в `model`. |
+| `resume` | `false` | Продолжить обучение с последнего checkpoint. CY не поддерживает: при `true` `cy-train` и `cy` (в `cy` — и при `skip_train=true`) завершаются до создания задачи ClearML (task) ошибкой `resume is unsupported with ground_truth; use model weights to fine-tune`. Чтобы дообучить модель, укажите её веса в `model`. |
 | `amp` | `true` | Точность обучения: `true`/`fp16` (AMP), `bf16`, `false`/`fp32`. `null` отклоняется. |
 | `fraction` | `1.0` | Доля или число обучающих изображений. При обучении на разметке CY принудительно ставит `1.0`: состав split задаёт CSV. |
 | `profile` | `false` | Профилировать скорость ONNX/TensorRT во время обучения для логгеров. |

@@ -51,7 +51,7 @@ cy-predict [--config-dir configs] [ключ=значение ...]
 - ключом `weights`;
 - для Ultralytics YOLO — ключом `ultralytics_predict.model`.
 
-Если заданы оба и они различаются, команда останавливается: `weights conflicts with ultralytics_predict.model` (для других семейств — `weights conflicts with the native prediction model`). Если не задан ни один: `Prediction requires weights=<checkpoint> or ultralytics_predict.model`.
+Если заданы оба и они различаются, команда останавливается: `weights conflicts with ultralytics_predict.model` (для других семейств — `weights conflicts with the native prediction model`). Если не задан ни один: `Prediction requires weights=<checkpoint> or ultralytics_predict.model`. Для других семейств веса задаёт только `weights`.
 
 Значение разбирается так:
 
@@ -77,7 +77,7 @@ Checkpoint семейств DEIMv2, RF-DETR, Faster R-CNN и FCOS хранит �
 
 ## Как это работает
 
-1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет ключи, форму значения `ground_truth`, неактивные группы семейства и пути записи по правилу записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)).
+1. Hydra собирает конфигурацию. До создания задачи ClearML команда проверяет ключи, форму значения `ground_truth`, неактивные группы семейства, пути записи по правилу записи внутри `CY_HOME` ([write containment rule](../../GLOSSARY.md#write-containment-rule)) (см. [Рабочий каталог](../workspace.md#правило-записи-внутри-cy_home)) и значения группы `fiftyone`. Для YOLO здесь же проверяются значения группы `ultralytics_predict` и то, что задан `weights` или `ultralytics_predict.model`; для других семейств — что задан `weights`.
 2. Создаётся задача ClearML. Если `output` не задан, путь CSV выбирается после этого, по имени и ID задачи.
 3. Если `ground_truth` ссылается на датасет ClearML, он скачивается.
 4. Веса разрешаются (см. выше) и для них определяется происхождение модели.
