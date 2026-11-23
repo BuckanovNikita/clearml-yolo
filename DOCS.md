@@ -25,6 +25,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 
 - Commands -> Hydra configs: `cy`->`pipeline`, `cy-train`->`train`, `cy-predict`->`predict`, `cy-val`->`val`, `cy-metrics`->`metrics`, `cy-compare`->`compare`, `cy-report`->`report`, `cy-ground-truth`->`ground_truth`, `cy-export`->`export`. No-task tools: `cy-init-config`, `cy-dedup`, `cy-download-weights`, `cy-batch-estimate`.
 - `cy-init-config DIR [--command NAME] [--model PRESET] [--force]` writes an editable tree; run it with `<command> --config-dir DIR --config-name <command>` (Python `dump_config_tree(directory, *, command="cy", model=None, overwrite=False)`).
+- Help: `<command> --help` is a custom `hydra.help` set per launch (`configs.register_command_help`). The banner is the public command name. `== Configuration groups ==` lists only groups the command's packaged defaults let the user select (`model/<backend>`, `transforms`); `_cy_schemas`, `defaults` and `transform_overrides` are not shown. `--hydra-help` is unchanged.
 - Composition: packaged defaults, then `--config-dir`, then CLI overrides; `hydra.job.chdir=false`; logs `CY_HOME/outputs/<date>/<time>-<host>-<pid>`, sweeps `CY_HOME/multirun/...`; all routes are containment-checked before the first job.
 - Required `???` inputs: `ground_truth` (cy, train, predict, val, metrics, compare), `predictions` (metrics), `comparison_dir` (report), `data_yaml` (ground-truth). Unknown top-level keys fail `Unsupported wrapper settings: [...]`.
 - Rejected everywhere (CLI, saved YAML, defaults lists, replay): `queue.*`, `autogpu.*`, `auto_gpu.*`, `hydra/launcher=cy_queue`, `clearml.enabled`. Sweeps need `-m`/`hydra.mode=MULTIRUN` and run sequentially (BasicLauncher); each MULTIRUN adds tag `multirun-YYYYMMDD-HHMMSS-<six-word-phrase>` (UTC).
@@ -163,7 +164,7 @@ rules for changing the code are in [AGENTS.md](AGENTS.md).
 
 - Python `>=3.12.13,<3.14`, Linux with pidfd APIs; ClearML server with remote storage is required; no extras; not on PyPI. Commands never install packages at run time.
 - `digital-metrics` (`6e801be1564dce458294eb23592cc1aa0939c4d9`, github.com/Wasilkas/digital-metrics) and `report-generator` (`4fd58628670da7f98a896d41eb149e7bf6a9b110`, github.com/Wasilkas/report-generator) are ignored copies under `external/`. `pyproject.toml` declares them by version; `uv.lock` records `source = { registry = "external/wheelhouse" }` and does not enforce revisions. Git-link installs resolve both from the user's index.
-- `task local-deps` builds sdists into `external/wheelhouse` and creates `uv.toml` with `find-links = ["external/wheelhouse"]`; it never overwrites `uv.toml` and fails if the entry is missing.
+- `task local-deps` builds sdists into `external/wheelhouse` and creates `uv.toml` with `find-links = ["external/wheelhouse"]`; it never overwrites `uv.toml` and fails if the entry is missing. When a checkout is missing it names the `external/` paths and the rerun command.
 - Changing a dependency floor: test an isolated `lowest-direct` resolution on each supported minor, separate from `uv.lock`.
 
 ## Release

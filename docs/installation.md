@@ -49,7 +49,13 @@ uv pip install "clearml-yolo @ git+https://github.com/BuckanovNikita/clearml-yol
 
 В клоне репозитория пакеты `digital-metrics` и `report-generator` собираются из их исходников:
 
-1. Положите исходники нужных ревизий в `external/digital-metrics` и `external/report-generator`. Без них задача останавливается с сообщением `local-deps: missing approved checkouts: ...`.
+1. Положите исходники нужных ревизий в `external/digital-metrics` и `external/report-generator`. Без них задача останавливается с сообщением `local-deps: missing approved checkouts: ...`; вторая строка:
+
+   ```text
+   local-deps: put the approved digital-metrics and report-generator checkouts under external/ (copy or symlink, never commit them), then rerun: uvx --from go-task-bin task local-deps (approved revisions: DOCS.md, Installation and dependencies)
+   ```
+
+   Одобренные ревизии записаны в разделе «Installation and dependencies» файла `DOCS.md`; не кладите туда произвольный checkout.
 2. Соберите архивы и настройте `uv`:
 
    ```bash

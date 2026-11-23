@@ -61,3 +61,13 @@ def test_resolver_reports_malformed_json(tmp_path: Path) -> None:
     path.write_text("{broken}")
     with pytest.raises(ValueError, match=r"broken\.json"):
         resolve_transform_config(TransformConfig(mode="albumentations", pipeline_file=path))
+
+
+def test_pipeline_file_documentation_names_the_json_format_that_is_read() -> None:
+    from clearml_yolo.core.transforms import TransformConfig
+
+    field = TransformConfig.model_fields["pipeline_file"]
+    assert field.description is not None
+    assert "JSON" in field.description
+    assert "YAML" not in field.description
+    assert field.examples == ["augmentations.json"]

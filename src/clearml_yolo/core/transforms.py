@@ -55,7 +55,7 @@ class TransformSnapshot(BaseModel):
     )
     source: Annotated[str, Field(min_length=1)] = Field(
         description=("Сохранённое непустое имя источника pipeline; служит происхождением при replay."),
-        examples=["augmentations.yaml"],
+        examples=["augmentations.json"],
         json_schema_extra={
             "shapes": "Annotated[str, Field(min_length=1)]",
             "applicability": "TransformSnapshot",
@@ -99,10 +99,10 @@ class TransformConfig(BaseModel):
     pipeline_file: Path | None = Field(
         default=None,
         description=(
-            "Путь к YAML/JSON Albumentations; допустим только в режиме "
-            "albumentations. Читается при запуске, но не при preview."
+            "Путь к JSON-файлу Albumentations (результат A.save); допустим "
+            "только в режиме albumentations. Читается при запуске, но не при preview."
         ),
-        examples=["augmentations.yaml"],
+        examples=["augmentations.json"],
         json_schema_extra={
             "shapes": "Path | None",
             "applicability": "TransformConfig",

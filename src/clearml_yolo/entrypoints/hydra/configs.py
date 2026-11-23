@@ -5,8 +5,9 @@ import socket
 from importlib.resources import files
 from typing import Any, override
 
-from hydra.conf import HydraConf, JobConf, RunDir, SweepDir
+from hydra.conf import HelpConf, HydraConf, JobConf, RunDir, SweepDir
 from hydra.core.config_search_path import ConfigSearchPath
+from hydra.core.config_store import ConfigStore
 from hydra.core.plugins import Plugins
 from hydra.plugins.search_path_plugin import SearchPathPlugin
 from hydra_zen import make_config, store
@@ -62,18 +63,84 @@ def _token() -> str:
     return f"{socket.gethostname()}-{os.getpid()}"
 
 
+def _hydra_conf(help_config: HelpConf | None = None) -> HydraConf:
+    conf = HydraConf(
+        job=JobConf(chdir=False),
+        run=RunDir(dir=HYDRA_RUN_DIR),
+        sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"),
+    )
+    if help_config is not None:
+        conf.help = help_config
+    return conf
+
+
+def _selectable_group_lines(name: str) -> list[str]:
+    """List the groups a user can pick for one command, in Hydra's `group: options` style."""
+    template = files(CONFIG_MODULE).joinpath(f"{name}.yaml").read_text(encoding="utf-8")
+    document = OmegaConf.create(template)
+    if not isinstance(document, DictConfig):
+        raise TypeError("Built-in command defaults must be a mapping")
+    entries = document.get("defaults", [])
+    composed = {key for entry in entries if isinstance(entry, DictConfig) for key in entry}
+    lines: dict[str, str] = {}
+    if "model" in composed:
+        for backend, presets in PRESETS.items():
+            # cy-export executes Faster R-CNN only; other presets are rejected at validation.
+            if name == "export" and backend != "fasterrcnn":
+                continue
+            group = "model" if backend == "ultralytics" else f"model/{backend}"
+            lines[group] = "ultralytics" if backend == "ultralytics" else ", ".join(sorted(presets))
+    if "transforms" in composed:
+        lines["transforms"] = ", ".join(sorted(("default", "albumentations")))
+    return [f"{group}: {options}" for group, options in sorted(lines.items())]
+
+
+def command_help(name: str, command: str) -> HelpConf:
+    """Build `--help` text that names the public command and lists only selectable groups.
+
+    Hydra lists every registered group except `hydra/*`, which would expose the internal
+    schema and packaged-default groups. Its template is a `string.Template`, so literal
+    text escapes `$`.
+    """
+    lines = _selectable_group_lines(name)
+    groups = "\n".join(lines) if lines else "This command has no selectable groups."
+    template = (
+        "${hydra.help.header}\n"
+        "== Configuration groups ==\n"
+        "Compose your configuration from those groups (group=option)\n\n"
+        f"{groups.replace('$', '$$')}\n\n"
+        "== Config ==\n"
+        "Override anything in the config (foo.bar=value)\n\n"
+        "$CONFIG\n"
+        "${hydra.help.footer}\n"
+    )
+    return HelpConf(
+        app_name=command,
+        header="${hydra.help.app_name}\n",
+        footer="Use --hydra-help to view Hydra specific help\n",
+        template=template,
+    )
+
+
+def register_command_help(name: str, command: str) -> None:
+    """Replace the Hydra configuration in Hydra's own store with one whose help belongs to `command`.
+
+    Call it after `store.add_to_hydra_store`, which writes the import-time entry.
+    """
+    ConfigStore.instance().store(
+        name="config",
+        group="hydra",
+        node=_hydra_conf(command_help(name, command)),
+        provider="clearml-yolo",
+    )
+
+
 def register_configs() -> None:
     """Register application commands without importing model runtime dependencies."""
     Plugins.instance().register(ApplicationSearchPath)
     OmegaConf.register_new_resolver(RUN_STAMP_RESOLVER, _token, replace=True)
     OmegaConf.register_new_resolver("cy_home", lambda: str(cy_home()), replace=True)
-    store(
-        HydraConf(
-            job=JobConf(chdir=False),
-            run=RunDir(dir=HYDRA_RUN_DIR),
-            sweep=SweepDir(dir="${cy_home:}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-${cy_run_token:}"),
-        )
-    )
+    store(_hydra_conf())
     # Hydra composes the default group before expanding multirun model choices.
     # Keep native override paths available in that root; YOLO still uses its own groups.
     _schema(
