@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.51.4 (2026-11-23)
+
+### Bug Fixes
+
+- **dataset-cache**: Reject a cached dataset whose classes include the reserved label (SIP-218)
+  ([#21](https://github.com/BuckanovNikita/clearml-yolo/pull/21),
+  [`dd4a202`](https://github.com/BuckanovNikita/clearml-yolo/commit/dd4a202fdb7d0020cccb0451ff07a80a4e9fe31e))
+
+- **ground-truth**: Reject the reserved label "background" when the ground truth is first read
+  (SIP-218) ([#21](https://github.com/BuckanovNikita/clearml-yolo/pull/21),
+  [`dd4a202`](https://github.com/BuckanovNikita/clearml-yolo/commit/dd4a202fdb7d0020cccb0451ff07a80a4e9fe31e))
+
+### Code Style
+
+- Apply ruff import order and formatting (SIP-218)
+  ([#21](https://github.com/BuckanovNikita/clearml-yolo/pull/21),
+  [`dd4a202`](https://github.com/BuckanovNikita/clearml-yolo/commit/dd4a202fdb7d0020cccb0451ff07a80a4e9fe31e))
+
+### Documentation
+
+- State both errors of a cache hit that records the reserved label (SIP-218)
+  ([#21](https://github.com/BuckanovNikita/clearml-yolo/pull/21),
+  [`dd4a202`](https://github.com/BuckanovNikita/clearml-yolo/commit/dd4a202fdb7d0020cccb0451ff07a80a4e9fe31e))
+
+- State where each command rejects the reserved label (SIP-218)
+  ([#21](https://github.com/BuckanovNikita/clearml-yolo/pull/21),
+  [`dd4a202`](https://github.com/BuckanovNikita/clearml-yolo/commit/dd4a202fdb7d0020cccb0451ff07a80a4e9fe31e))
+
+### Testing
+
+- Import the dataframe validator from its owning module (SIP-218)
+  ([#21](https://github.com/BuckanovNikita/clearml-yolo/pull/21),
+  [`dd4a202`](https://github.com/BuckanovNikita/clearml-yolo/commit/dd4a202fdb7d0020cccb0451ff07a80a4e9fe31e))
+
+
 ## v0.51.3 (2026-11-23)
 
 ### Bug Fixes
