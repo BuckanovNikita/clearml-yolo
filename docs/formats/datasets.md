@@ -12,7 +12,7 @@
 | `train` | Обязателен. Каталог изображений, файл `.txt` со списком изображений или список таких значений, относительно корня |
 | `val` | Обязателен. Тот же формат |
 | `test` | Необязателен. Тот же формат |
-| `names` | Имена классов: словарь `индекс: имя` или список. Можно вместо него задать `nc` |
+| `names` | Имена классов: словарь `индекс: имя` или список. Можно вместо него задать `nc` (тогда классы называются `class_0`, `class_1`, ...). Имена вроде `yes`, `off` или `1e3` пишите в кавычках (`"yes"`): без кавычек разные версии Ultralytics читают их по-разному (`True` или `yes`, `1e3` или `1000.0`), и CY отклоняет такой файл, если установленная версия читает их не так, как YAML 1.1 (Ultralytics 8.4.184) |
 
 Файл `.txt` со списком содержит по одному пути на строку; относительные пути отсчитываются от каталога этого файла, пустые строки пропускаются. Из каталога берутся все изображения во вложенных каталогах с расширениями, которые знает Ultralytics.
 
@@ -53,6 +53,7 @@ names:
 | `data/labels/train/a.txt:1 has a non-positive box size (0.0 x 0.2); such a box has no top-left/bottom-right corner` | Нулевая или отрицательная ширина или высота |
 | `data/labels/train/a.txt:1 has nonfinite or out-of-bounds normalized coordinates` | Координата вне диапазона от -0.01 до 1.01 |
 | `data/labels/train/a.txt:1 references class 5, but the dataset defines classes 0..1` | Индекс класса не из `names` |
+| `Ultralytics reads class names in data/dataset.yaml unlike YAML 1.1: 0 'yes' (YAML 1.1: 'True'); write these names in quotes so every Ultralytics version reads the same text` | Установленная версия Ultralytics читает имя класса без кавычек иначе, чем YAML 1.1. Запишите имена из сообщения в кавычках |
 | `1 image name(s) refer to more than one file, which digital-metrics cannot tell apart: a.jpg (data/images/train/a.jpg and data/images/val/a.jpg)` | Одно имя файла у двух изображений |
 | `Cannot read the pixel size of data/images/train/a.jpg` | Изображение с рамками не читается. Если файл не декодируется как изображение, Ultralytics сначала пытается установить пакет `pi-heif`; без доступа к сети вместо этого сообщения вы получите `No module named 'pi_heif'` |
 

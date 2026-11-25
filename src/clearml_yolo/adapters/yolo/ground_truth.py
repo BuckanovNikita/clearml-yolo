@@ -7,13 +7,16 @@ ultralytics' own helpers so a plain ``data=`` yaml behaves exactly as it does in
 """
 
 import math
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 from loguru import logger
 from PIL import Image
 from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, exif_size, img2label_paths
+from ultralytics.nn.autobackend import check_class_names
 
 from clearml_yolo.adapters.observability.progress import track
 from clearml_yolo.adapters.observability.tracing import trace_operation
@@ -34,6 +37,9 @@ SPLITS = ("train", "val", "test")
 DETECTION_LABEL_FIELDS = 5
 NORMALIZED_MIN = -0.01
 NORMALIZED_MAX = 1.01
+
+# Characters Ultralytics 8.4.184 strips from data.yaml before its second PyYAML attempt.
+_UNREADABLE_YAML_CHARACTERS = re.compile(r"[^\x09\x0A\x0D\x20-\x7E\x85\xA0-\uD7FF\uE000-\uFFFD\U00010000-\U0010ffff]+")
 
 GroundTruthRow = dict[str, str | float | None]
 YoloBox = tuple[str, float, float, float, float]
@@ -204,6 +210,47 @@ def _reject_duplicate_image_names(images: dict[str, list[Path]]) -> None:
         )
 
 
+def _yaml_1_1_class_names(yaml_file: Path) -> dict[int, str] | None:
+    """Read ``names`` the way Ultralytics 8.4.184 does: PyYAML (YAML 1.1), then check_class_names."""
+    text = yaml_file.read_text(encoding="utf-8", errors="ignore")
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        try:
+            data = yaml.safe_load(_UNREADABLE_YAML_CHARACTERS.sub("", text))
+        except yaml.YAMLError as error:
+            raise ValueError(
+                f"{yaml_file} is not YAML 1.1, so CY cannot confirm that its class names read the same "
+                "under every Ultralytics version"
+            ) from error
+    names = data.get("names") if isinstance(data, dict) else None
+    if names is None:
+        return None
+    return check_class_names(names)
+
+
+def _reject_reader_dependent_names(yaml_file: Path, names: dict[int, str]) -> None:
+    """Refuse class names whose text depends on the YAML reader of the installed Ultralytics.
+
+    Ultralytics 8.4.184 reads data.yaml with PyYAML (YAML 1.1); 8.4.218 uses its own YAML 1.2
+    core reader. An unquoted ``yes`` or ``1e3`` then becomes the label ``'yes'`` or ``'1000.0'``
+    instead of ``'True'`` or ``'1e3'``, and a CSV rebuilt from the same file would silently stop
+    matching models trained on the old one.
+    """
+    expected = _yaml_1_1_class_names(yaml_file)
+    if expected is None or expected == names:
+        return
+    differences = ", ".join(
+        f"{index} {names.get(index)!r} (YAML 1.1: {expected.get(index)!r})"
+        for index in sorted(expected.keys() | names.keys())
+        if names.get(index) != expected.get(index)
+    )
+    raise ValueError(
+        f"Ultralytics reads class names in {yaml_file} unlike YAML 1.1: {differences}; "
+        "write these names in quotes so every Ultralytics version reads the same text"
+    )
+
+
 @trace_operation("yolo.ground_truth.build")
 def build_ground_truth(
     data_yaml: str | Path,
@@ -222,6 +269,7 @@ def build_ground_truth(
     yaml_path = Path(data_yaml).expanduser()
     dataset = check_det_dataset(str(yaml_path.resolve()) if yaml_path.exists() else str(data_yaml))
     names: dict[int, str] = {int(index): str(name) for index, name in dataset["names"].items()}
+    _reject_reader_dependent_names(Path(dataset["yaml_file"]), names)
 
     images: dict[str, list[Path]] = {}
     for split in SPLITS:

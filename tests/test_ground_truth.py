@@ -1,9 +1,11 @@
 """Ground-truth conversion tests over a synthetic YOLO dataset."""
 
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
+import yaml
 from PIL import Image
 
 from clearml_yolo.adapters.yolo.ground_truth import GROUND_TRUTH_COLUMNS, build_ground_truth
@@ -86,6 +88,74 @@ def test_schema_and_pixel_conversion(dataset_yaml: Path, tmp_path: Path) -> None
 def test_class_indices_become_names(dataset_yaml: Path, tmp_path: Path) -> None:
     frame = _build(dataset_yaml, tmp_path)
     assert set(frame["instance_label"]) == {"cat", "dog"}
+
+
+def _rename_classes(dataset_yaml: Path, names: str) -> None:
+    text = dataset_yaml.read_text(encoding="utf-8")
+    dataset_yaml.write_text(text[: text.index("names:")] + f"names: {names}\n", encoding="utf-8")
+
+
+def test_quoted_class_names_keep_their_text(dataset_yaml: Path, tmp_path: Path) -> None:
+    # Unquoted, YAML 1.1 reads yes as true and YAML 1.2 reads 1e3 as a float; quoted, both keep the text.
+    _rename_classes(dataset_yaml, '{0: "yes", 1: "1e3"}')
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"yes", "1e3"}
+
+
+def test_class_names_without_names_key_come_from_nc(dataset_yaml: Path, tmp_path: Path) -> None:
+    text = dataset_yaml.read_text(encoding="utf-8")
+    dataset_yaml.write_text(text[: text.index("names:")] + "nc: 2\n", encoding="utf-8")
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"class_0", "class_1"}
+
+
+def test_class_names_the_installed_reader_reads_unlike_yaml_1_1_are_refused(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ultralytics.data.utils import check_det_dataset
+
+    def yaml_1_2_reader(dataset: str) -> dict[str, Any]:
+        # What Ultralytics 8.4.218, which reads data.yaml with YAML 1.2 core rules, returns.
+        return check_det_dataset(dataset) | {"names": {0: "yes", 1: "1000.0"}}
+
+    monkeypatch.setattr("clearml_yolo.adapters.yolo.ground_truth.check_det_dataset", yaml_1_2_reader)
+    _rename_classes(dataset_yaml, "{0: yes, 1: 1e3}")
+
+    message = (
+        "Ultralytics reads class names in .*data.yaml unlike YAML 1.1: "
+        "0 'yes' \\(YAML 1.1: 'True'\\), 1 '1000.0' \\(YAML 1.1: '1e3'\\); "
+        "write these names in quotes"
+    )
+    with pytest.raises(ValueError, match=message):
+        _build(dataset_yaml, tmp_path)
+    assert not (tmp_path / "gt.csv").exists()
+
+
+def test_a_data_yaml_yaml_1_1_cannot_read_is_refused(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ultralytics.data.utils import check_det_dataset
+
+    def lenient_reader(dataset: str) -> dict[str, Any]:
+        # A newer reader accepted a file that PyYAML rejects, so the names cannot be compared.
+        checked = check_det_dataset(dataset)
+        Path(dataset).write_text("names: [cat, dog\n", encoding="utf-8")
+        return checked
+
+    monkeypatch.setattr("clearml_yolo.adapters.yolo.ground_truth.check_det_dataset", lenient_reader)
+    with pytest.raises(ValueError, match=r"is not YAML 1\.1, so CY cannot confirm"):
+        _build(dataset_yaml, tmp_path)
+
+
+def test_unquoted_class_names_keep_their_yaml_1_1_labels_or_are_refused(dataset_yaml: Path, tmp_path: Path) -> None:
+    from ultralytics.utils import YAML
+
+    _rename_classes(dataset_yaml, "{0: yes, 1: 1e3}")
+    # Ultralytics leaves YAML.load unannotated.
+    native = YAML.load(dataset_yaml)["names"]  # type: ignore[no-untyped-call]
+    if native == yaml.safe_load(dataset_yaml.read_text(encoding="utf-8"))["names"]:
+        assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"True", "1e3"}
+    else:
+        with pytest.raises(ValueError, match="write these names in quotes"):
+            _build(dataset_yaml, tmp_path)
 
 
 def test_splits_are_disjoint_by_image_name(dataset_yaml: Path, tmp_path: Path) -> None:
