@@ -26,7 +26,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 
 ## Как задавать ключи
 
-Ключи из таблицы меняются обычным override: `ultralytics_predict.batch=8`. Синтаксис override описан на странице [Конфигурация](README.md). Нативный ключ Ultralytics, которого нет в собранной группе, добавляется через `+`. Правила те же, что у группы [`ultralytics`](ultralytics.md#как-задавать-ключи): неизвестный ключ отклоняется (`Unknown Ultralytics parameters: [...]`), `cfg` должен быть `null`, известный ключ, который к предсказанию детектора не относится, молча отбрасывается. `embed` отклоняется: `embed is unsupported for detection records; remove its override`.
+Ключи из таблицы меняются обычным override: `ultralytics_predict.batch=8`. Синтаксис override описан на странице [Конфигурация](README.md). Нативный ключ Ultralytics, которого нет в собранной группе, добавляется через `+`. Правила те же, что у группы [`ultralytics`](ultralytics.md#как-задавать-ключи): неизвестный ключ отклоняется (`Unknown Ultralytics parameters: [...]`), `cfg` должен быть `null`, известный ключ, который к предсказанию детектора не относится, молча отбрасывается. Отбрасываются и `tile`, `tile_overlap` (нарезка изображения на фрагменты при предсказании, есть в Ultralytics 8.4.218 и новее): CY предсказывает по целому изображению, без нарезки. `embed` отклоняется: `embed is unsupported for detection records; remove its override`.
 
 Пути `project` и `name` CY проверяет при запуске команды, ещё до задачи ClearML, даже с `--cfg job`: они должны лежать внутри `CY_HOME`, иначе `Project write destination ... must be contained beneath CY_HOME=...` (см. [правило записи внутри `CY_HOME`](../workspace.md#правило-записи-внутри-cy_home) ([write containment rule](../../GLOSSARY.md#write-containment-rule))).
 
@@ -54,7 +54,7 @@ ValueError: Changed ultralytics_predict settings ['conf'] are inactive for rfdet
 | `compile` | из `ultralytics` (`true`) | `torch.compile()`: `true`, `false` или строка режима. |
 | `channels_last` | из `ultralytics` (`null`) | Формат памяти channels-last; `null` — Ultralytics решает сам. |
 | `conf` | `0.001` | Порог уверенности (confidence threshold). От 0 до 1. В Ultralytics по умолчанию для предсказания `0.25`. |
-| `iou` | из `ultralytics` (`0.7`) | Порог IoU для NMS. От 0 до 1. |
+| `iou` | из `ultralytics` (`0.7`) | Порог IoU для NMS. От 0 до 1. В Ultralytics 8.4.218 и новее по умолчанию пусто, и для предсказания Ultralytics взял бы `0.5`; CY при любой версии Ultralytics ставит `0.7`. `null` отклоняется: `ultralytics_predict.iou must not be null`. |
 | `max_det` | из `ultralytics` (`300`) | Максимум детекций на изображение. |
 | `quantize` | из `ultralytics` (`null`) | Точность вычислений: `16`/`fp16` — половинная, `32`/`fp32`/`null` — полная. |
 | `dnn` | `false` | Использовать OpenCV DNN для ONNX. |
