@@ -102,7 +102,7 @@ Results: /workspace/project/.config/clearml-yolo/batch-sizes.yaml; evidence: /wo
 | --- | --- |
 | `0` | `--list` выполнен или все измерения удачны и рекомендации получены. |
 | `1` | Хотя бы одно измерение не удалось или для какой-то рекомендации нет записи (`unavailable`). |
-| `2` | Ошибка аргументов, нет GPU-телеметрии, недопустимые `--devices` или `--gpu-counts`, испорченный файл таблицы или результатов. |
+| `2` | Ошибка аргументов, нет GPU-телеметрии, недопустимые `--devices` или `--gpu-counts`, испорченный файл таблицы или результатов, неизвестный CY ключ `default.yaml` установленной версии Ultralytics (только при модели Ultralytics; после опроса GPU, до первого измерения). |
 
 ## Частые ошибки
 
@@ -151,6 +151,12 @@ cy-batch-estimate: error: No visible CUDA GPUs; batch estimation requires idle G
 ```
 
 На хосте нет видимых GPU (например, пустой `CUDA_VISIBLE_DEVICES`).
+
+```text
+cy-batch-estimate: error: Unclassified Ultralytics parameters: [...]
+```
+
+В `default.yaml` установленной версии Ultralytics есть ключ, который CY не относит ни к обучению, ни к предсказанию, ни к неактивным. Ошибка возникает только для моделей Ultralytics, после опроса GPU и до первого измерения. Установите версию Ultralytics, которую поддерживает CY, или обновите CY; подробнее — в [группе `ultralytics`](../configuration/ultralytics.md).
 
 ```text
 cy-batch-estimate: error: --devices must select GPUs inside the inherited CUDA visibility
