@@ -129,6 +129,13 @@ def test_class_names_the_installed_reader_reads_unlike_yaml_1_1_are_refused(
     assert not (tmp_path / "gt.csv").exists()
 
 
+def test_a_data_yaml_with_a_control_character_keeps_its_class_names(dataset_yaml: Path, tmp_path: Path) -> None:
+    # PyYAML rejects the character; Ultralytics 8.4.184 strips it and reads again, and so must CY.
+    text = dataset_yaml.read_text(encoding="utf-8")
+    dataset_yaml.write_text("# exported \x01 by a labelling tool\n" + text, encoding="utf-8")
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+
+
 def test_a_data_yaml_yaml_1_1_cannot_read_is_refused(
     dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -54,6 +54,7 @@ names:
 | `data/labels/train/a.txt:1 has nonfinite or out-of-bounds normalized coordinates` | Координата вне диапазона от -0.01 до 1.01 |
 | `data/labels/train/a.txt:1 references class 5, but the dataset defines classes 0..1` | Индекс класса не из `names` |
 | `Ultralytics reads class names in data/dataset.yaml unlike YAML 1.1: 0 'yes' (YAML 1.1: 'True'); write these names in quotes so every Ultralytics version reads the same text` | Установленная версия Ultralytics читает имя класса без кавычек иначе, чем YAML 1.1. Запишите имена из сообщения в кавычках |
+| `data/dataset.yaml is not YAML 1.1, so CY cannot confirm that its class names read the same under every Ultralytics version` | Установленная версия Ultralytics прочла файл, а YAML 1.1 (PyYAML) — нет, поэтому CY не может сравнить имена классов. Исправьте синтаксис YAML |
 | `1 image name(s) refer to more than one file, which digital-metrics cannot tell apart: a.jpg (data/images/train/a.jpg and data/images/val/a.jpg)` | Одно имя файла у двух изображений |
 | `Cannot read the pixel size of data/images/train/a.jpg` | Изображение с рамками не читается. Если файл не декодируется как изображение, Ultralytics сначала пытается установить пакет `pi-heif`; без доступа к сети вместо этого сообщения вы получите `No module named 'pi_heif'` |
 
