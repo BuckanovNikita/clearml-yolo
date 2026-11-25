@@ -267,12 +267,75 @@ def test_class_names_yaml_1_1_cannot_use_are_refused(
     assert not (tmp_path / "gt.csv").exists()
 
 
-@pytest.mark.parametrize("text", ["", "# no keys\n", "nc: 2\n", "names: None\n"])
-def test_a_yaml_1_1_view_without_names_is_not_compared(
-    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        ("", "neither 'names' nor 'nc'"),
+        ("# no keys\n", "neither 'names' nor 'nc'"),
+        ("names: None\n", "neither 'names' nor 'nc'"),
+        ("names:\nnc:\n", "'nc: None' is not an integer"),
+        ("nc: 2.5\n", "'nc: 2.5' is not an integer"),
+        ("nc: two\n", "'nc: two' is not an integer"),
+        ("nc: .inf\n", "'nc: inf' is not an integer"),
+        ("nc: 010\nnames: [a, b, c, d, e, f, g, h, i, j]\n", "'names' length 10 and 'nc: 8' differ"),
+    ],
+)
+def test_a_yaml_1_1_view_ultralytics_8_4_184_derives_no_classes_from_is_refused(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str, reason: str
 ) -> None:
     _rewrite_after_reading(monkeypatch, text)
+    message = (
+        rf"^YAML 1\.1 reads no usable class names in .*data\.yaml \({reason}\), so CY cannot confirm "
+        r"that its class names read the same under every Ultralytics version$"
+    )
+    with pytest.raises(ValueError, match=message):
+        _build(dataset_yaml, tmp_path)
+    assert not (tmp_path / "gt.csv").exists()
+
+
+def test_classes_yaml_1_1_names_from_nc_are_compared(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _rewrite_after_reading(monkeypatch, "nc: 2\n")
+    message = r"unlike YAML 1\.1: 0 'cat' \(YAML 1\.1: 'class_0'\), 1 'dog' \(YAML 1\.1: 'class_1'\); "
+    with pytest.raises(ValueError, match=message):
+        _build(dataset_yaml, tmp_path)
+
+
+def test_a_class_count_the_installed_reader_reads_unlike_yaml_1_1_is_refused(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # YAML 1.1 reads nc: 010 as octal 8; the YAML 1.2 reader of Ultralytics 8.4.218 reads 10.
+    _installed_names(monkeypatch, {index: f"class_{index}" for index in range(10)})
+    _rename_classes(dataset_yaml, "None\nnc: 010")
+    message = (
+        r"^Ultralytics reads 10 classes in .*data\.yaml where YAML 1\.1 reads 'nc' as 8; write 'nc' as a "
+        r"decimal integer without leading zeros so every Ultralytics version reads the same class count$"
+    )
+    with pytest.raises(ValueError, match=message):
+        _build(dataset_yaml, tmp_path)
+    assert not (tmp_path / "gt.csv").exists()
+
+
+@pytest.mark.parametrize("nc", ["2", "2.0", "'2'", "+2", "0_2"])
+def test_a_class_count_both_readers_agree_on_keeps_the_classes(dataset_yaml: Path, tmp_path: Path, nc: str) -> None:
+    _rename_classes(dataset_yaml, f"[cat, dog]\nnc: {nc}")
     assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+
+
+def test_an_octal_looking_class_count_keeps_its_yaml_1_1_classes_or_is_refused(
+    dataset_yaml: Path, tmp_path: Path
+) -> None:
+    from ultralytics.utils import YAML
+
+    _rename_classes(dataset_yaml, "None\nnc: 010")
+    # Ultralytics leaves YAML.load unannotated; 8.4.184 reads 8 classes, 8.4.218 reads 10.
+    native = YAML.load(dataset_yaml)["nc"]  # type: ignore[no-untyped-call]
+    if native == yaml.safe_load(dataset_yaml.read_text(encoding="utf-8"))["nc"]:
+        assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"class_0", "class_1"}
+    else:
+        with pytest.raises(ValueError, match=r"reads 10 classes in .* where YAML 1\.1 reads 'nc' as 8; "):
+            _build(dataset_yaml, tmp_path)
 
 
 def test_a_top_level_none_elsewhere_keeps_the_class_names_compared(
