@@ -762,9 +762,17 @@ def test_published_class_names_read_back_as_strings_in_the_native_reader(
     with cached_dataset(source, tmp_path / "cache", dataset_format) as prepared:
         # Ultralytics leaves YAML.load unannotated.
         native = check_class_names(YAML.load(prepared.data)["names"])  # type: ignore[no-untyped-call]
-        written = yaml.safe_load(prepared.data.read_text(encoding="utf-8"))["names"]
+        text = prepared.data.read_text(encoding="utf-8")
+        written = yaml.safe_load(text)["names"]
     with cached_dataset(source, tmp_path / "cache", dataset_format) as reused:
         assert reused.data == prepared.data
 
     assert sorted(native.values()) == sorted(_YAML_SENSITIVE_LABELS)
     assert written == native
+    # The locked Ultralytics reads data.yaml with PyYAML, which keeps a plain 1e3 as text; the
+    # written quoting is what keeps it text for a YAML 1.2 reader, so check it on the text.
+    document = yaml.compose(text)
+    assert isinstance(document, yaml.MappingNode)
+    names = next(value for key, value in document.value if key.value == "names")
+    assert isinstance(names, yaml.MappingNode)
+    assert {value.style for _, value in names.value} == {'"'}

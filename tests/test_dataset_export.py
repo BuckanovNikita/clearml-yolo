@@ -8,7 +8,7 @@ import yaml
 from PIL import Image
 from ultralytics.data.utils import check_det_dataset
 
-from clearml_yolo.adapters.storage.dataset_export import DatasetFormat, export_dataset
+from clearml_yolo.adapters.storage.dataset_export import DatasetFormat, dataset_yaml_text, export_dataset
 from clearml_yolo.core.datasets import Box, ImageRecord, Split, ValidatedDataset
 
 
@@ -262,3 +262,71 @@ def test_ndjson_rejects_same_split_label_stem_collisions_before_copy(tmp_path: P
         export_dataset(records, directory, "ndjson")
 
     assert not (directory / "images").exists()
+
+
+# Plain strings under PyYAML's YAML 1.1 rules but numbers under YAML 1.2 core rules, which
+# Ultralytics 8.4.218 applies to data.yaml; plus an escape, non-ASCII text and a long name.
+_YAML_1_2_NUMBERS = ("1e3", "-1e3", "1e-3", "1.0e3", "0e0")
+_AWKWARD_NAMES = ('say "hi"', "back\\slash", "Класс 1", "a long class name with many words " * 4)
+
+
+def _names_scalar_styles(text: str) -> dict[int, str | None]:
+    """Map each ``names`` key to the YAML style its value is written in (None means plain).
+
+    The check reads the written text, not a parser's result, so it holds whichever
+    Ultralytics version, and therefore whichever YAML reader, is installed.
+    """
+    document = yaml.compose(text)
+    assert isinstance(document, yaml.MappingNode)
+    names = next(value for key, value in document.value if key.value == "names")
+    assert isinstance(names, yaml.MappingNode)
+    return {int(key.value): value.style for key, value in names.value}
+
+
+def test_dataset_yaml_text_double_quotes_every_class_name() -> None:
+    names = dict(enumerate(_YAML_1_2_NUMBERS + _AWKWARD_NAMES))
+    data: dict[str, object] = {"path": "/data/prepared", "names": names, "train": "images/train", "val": "images/val"}
+
+    text = dataset_yaml_text(data)
+
+    assert _names_scalar_styles(text) == dict.fromkeys(names, '"')
+    assert yaml.safe_load(text) == data
+    assert list(yaml.safe_load(text)) == ["path", "names", "train", "val"]
+    assert '  5: "say \\"hi\\""' in text.splitlines()
+    assert '  7: "Класс 1"' in text.splitlines()
+    assert f'  8: "{_AWKWARD_NAMES[-1]}"' in text.splitlines()
+    assert data["names"] is names
+
+
+def test_dataset_yaml_text_keeps_non_string_names_and_documents_without_names() -> None:
+    data: dict[str, object] = {"path": "/data/prepared", "names": {0: 5}}
+    text = dataset_yaml_text(data)
+    assert yaml.safe_load(text) == data
+    assert _names_scalar_styles(text) == {0: None}
+    assert yaml.safe_load(dataset_yaml_text({"path": "/data/prepared", "nc": 2})) == {"path": "/data/prepared", "nc": 2}
+
+
+@pytest.mark.parametrize("dataset_format", ["ndjson", "flat", "coco"])
+def test_exported_data_yaml_double_quotes_names_a_yaml_1_2_reader_would_take_for_numbers(
+    tmp_path: Path, dataset_format: DatasetFormat
+) -> None:
+    records, _, _ = _records(tmp_path)
+    renamed = {"alpha": "1e3", "zeta": "-1e3"}
+    records = records.model_copy(
+        update={
+            "names": {0: "-1e3", 1: "1e3"},
+            "images": [
+                image.model_copy(
+                    update={"boxes": [box.model_copy(update={"label": renamed[box.label]}) for box in image.boxes]}
+                )
+                for image in records.images
+            ],
+        }
+    )
+    directory = tmp_path / "prepared"
+    directory.mkdir()
+
+    text = export_dataset(records, directory, dataset_format).read_text(encoding="utf-8")
+
+    assert _names_scalar_styles(text) == {0: '"', 1: '"'}
+    assert yaml.safe_load(text)["names"] == {0: "-1e3", 1: "1e3"}
