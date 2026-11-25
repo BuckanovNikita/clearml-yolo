@@ -250,7 +250,8 @@ def _rewrite_after_reading(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
     [
         ("names: cat\n", "'names' is str, not list or dict"),
         ("- cat\n- dog\n", "not a mapping"),
-        ("names: {0: cat, 5: dog}\n", "2-class dataset requires class indices 0-1"),
+        ("names: {0: cat, 5: dog}\n", "KeyError: '2-class dataset requires class indices 0-1, "),
+        ("names: {x: cat}\n", "ValueError: invalid literal for int\\(\\) with base 10: 'x'"),
     ],
 )
 def test_class_names_yaml_1_1_cannot_use_are_refused(
@@ -264,6 +265,32 @@ def test_class_names_yaml_1_1_cannot_use_are_refused(
     with pytest.raises(ValueError, match=message):
         _build(dataset_yaml, tmp_path)
     assert not (tmp_path / "gt.csv").exists()
+
+
+@pytest.mark.parametrize("text", ["", "# no keys\n", "nc: 2\n", "names: None\n"])
+def test_a_yaml_1_1_view_without_names_is_not_compared(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str
+) -> None:
+    _rewrite_after_reading(monkeypatch, text)
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+
+
+def test_a_top_level_none_elsewhere_keeps_the_class_names_compared(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Ultralytics 8.4.184 reads only the top-level 'None' values as null; names stay compared.
+    _installed_names(monkeypatch, {0: "cat", 1: "1000.0"})
+    _rename_classes(dataset_yaml, "{0: cat, 1: 1e3}\ntest: None")
+    with pytest.raises(ValueError, match=r"unlike YAML 1\.1: 1 '1000\.0' \(YAML 1\.1: '1e3'\); "):
+        _build(dataset_yaml, tmp_path)
+
+
+def test_class_names_are_compared_without_libyaml(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Without libyaml, Ultralytics 8.4.184 reads data.yaml with the pure-Python SafeLoader.
+    monkeypatch.delattr(yaml, "CSafeLoader")
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
 
 
 def test_unquoted_class_names_keep_their_yaml_1_1_labels_or_are_refused(dataset_yaml: Path, tmp_path: Path) -> None:

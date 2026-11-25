@@ -259,8 +259,7 @@ def _yaml_1_1_class_names(yaml_file: Path) -> dict[int, str] | None:
     try:
         return check_class_names(names)
     except (KeyError, TypeError, ValueError) as error:
-        reason = " ".join(str(argument) for argument in error.args) or type(error).__name__
-        raise _unusable_names(yaml_file, reason) from error
+        raise _unusable_names(yaml_file, f"{type(error).__name__}: {error}") from error
 
 
 def _reject_reader_dependent_names(yaml_file: Path, names: dict[int, str]) -> None:
