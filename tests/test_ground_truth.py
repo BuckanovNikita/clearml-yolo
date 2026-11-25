@@ -152,6 +152,64 @@ def test_a_data_yaml_yaml_1_1_cannot_read_is_refused(
         _build(dataset_yaml, tmp_path)
 
 
+def test_tab_separated_class_names_read_like_ultralytics(dataset_yaml: Path, tmp_path: Path) -> None:
+    from ultralytics.utils import YAML
+
+    _rename_classes(dataset_yaml, "\n  0:\tcat\n  1:\tdog")
+    # Ultralytics 8.4.184 reads data.yaml with libyaml, which accepts a tab after the colon; the
+    # pure-Python PyYAML reader and the YAML 1.2 reader of 8.4.218 do not read it as a mapping.
+    native = YAML.load(dataset_yaml)["names"]  # type: ignore[no-untyped-call]
+    if isinstance(native, dict):
+        assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+    else:
+        with pytest.raises(TypeError, match="'names' must be list or dict, not str"):
+            _build(dataset_yaml, tmp_path)
+
+
+def test_tab_separated_class_name_list_keeps_its_names(dataset_yaml: Path, tmp_path: Path) -> None:
+    _rename_classes(dataset_yaml, "[cat,\tdog]")
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+
+
+def test_class_names_none_come_from_nc(dataset_yaml: Path, tmp_path: Path) -> None:
+    # Ultralytics reads the word None as null and names the classes from nc.
+    _rename_classes(dataset_yaml, "None\nnc: 2")
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"class_0", "class_1"}
+
+
+def _rewrite_after_reading(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
+    from ultralytics.data.utils import check_det_dataset
+
+    def rewriting_reader(dataset: str) -> dict[str, Any]:
+        # The installed reader accepted the file; YAML 1.1 then sees other content.
+        checked = check_det_dataset(dataset)
+        Path(dataset).write_text(text, encoding="utf-8")
+        return checked
+
+    monkeypatch.setattr("clearml_yolo.adapters.yolo.ground_truth.check_det_dataset", rewriting_reader)
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        ("names: cat\n", "'names' is str, not list or dict"),
+        ("- cat\n- dog\n", "not a mapping"),
+        ("names: {0: cat, 5: dog}\n", "2-class dataset requires class indices 0-1"),
+    ],
+)
+def test_class_names_yaml_1_1_cannot_use_are_refused(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str, reason: str
+) -> None:
+    _rewrite_after_reading(monkeypatch, text)
+    message = (
+        rf"^YAML 1\.1 reads no usable class names in .*data\.yaml \({reason}.*\), so CY cannot confirm "
+        r"that its class names read the same under every Ultralytics version$"
+    )
+    with pytest.raises(ValueError, match=message):
+        _build(dataset_yaml, tmp_path)
+    assert not (tmp_path / "gt.csv").exists()
+
+
 def test_unquoted_class_names_keep_their_yaml_1_1_labels_or_are_refused(dataset_yaml: Path, tmp_path: Path) -> None:
     from ultralytics.utils import YAML
 

@@ -210,23 +210,57 @@ def _reject_duplicate_image_names(images: dict[str, list[Path]]) -> None:
         )
 
 
-def _yaml_1_1_class_names(yaml_file: Path) -> dict[int, str] | None:
-    """Read ``names`` the way Ultralytics 8.4.184 does: PyYAML (YAML 1.1), then check_class_names."""
+def _yaml_1_1_data(yaml_file: Path) -> object:
+    """Load data.yaml exactly as Ultralytics 8.4.184 ``YAML.load`` does (ultralytics/utils/__init__.py).
+
+    That version prefers libyaml (``CSafeLoader``), which accepts some text the pure-Python
+    ``SafeLoader`` rejects (a tab after ``0:``), retries once without the characters below after
+    any failure, and turns top-level ``'None'`` strings into ``None``.
+    """
+    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
     text = yaml_file.read_text(encoding="utf-8", errors="ignore")
     try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError:
+        data = yaml.load(text, Loader=loader)  # noqa: S506 - loader is CSafeLoader or SafeLoader
+    # BLE001: 8.4.184 retries after any exception; PyYAML raises plain ValueError on impossible dates.
+    except Exception:  # noqa: BLE001
         try:
-            data = yaml.safe_load(_UNREADABLE_YAML_CHARACTERS.sub("", text))
-        except yaml.YAMLError as error:
+            data = yaml.load(_UNREADABLE_YAML_CHARACTERS.sub("", text), Loader=loader)  # noqa: S506 - as above
+        except Exception as error:  # as above; re-raised with its cause
             raise ValueError(
                 f"{yaml_file} is not YAML 1.1, so CY cannot confirm that its class names read the same "
                 "under every Ultralytics version"
             ) from error
-    names = data.get("names") if isinstance(data, dict) else None
+    if isinstance(data, dict) and "None" in data.values():
+        data = {key: None if value == "None" else value for key, value in data.items()}
+    return {} if data is None else data
+
+
+def _unusable_names(yaml_file: Path, reason: str) -> ValueError:
+    return ValueError(
+        f"YAML 1.1 reads no usable class names in {yaml_file} ({reason}), so CY cannot confirm that its "
+        "class names read the same under every Ultralytics version"
+    )
+
+
+def _yaml_1_1_class_names(yaml_file: Path) -> dict[int, str] | None:
+    """Return ``names`` as Ultralytics 8.4.184 reads them, or ``None`` when ``nc`` names the classes.
+
+    Each refusal here mirrors one in Ultralytics 8.4.184 (``YAML.load``, ``check_det_dataset``,
+    ``check_class_names``), so it never stops a file that version accepts.
+    """
+    data = _yaml_1_1_data(yaml_file)
+    if not isinstance(data, dict):
+        raise _unusable_names(yaml_file, "not a mapping")
+    names = data.get("names")
     if names is None:
         return None
-    return check_class_names(names)
+    if not isinstance(names, list | dict):
+        raise _unusable_names(yaml_file, f"'names' is {type(names).__name__}, not list or dict")
+    try:
+        return check_class_names(names)
+    except (KeyError, TypeError, ValueError) as error:
+        reason = " ".join(str(argument) for argument in error.args) or type(error).__name__
+        raise _unusable_names(yaml_file, reason) from error
 
 
 def _reject_reader_dependent_names(yaml_file: Path, names: dict[int, str]) -> None:
