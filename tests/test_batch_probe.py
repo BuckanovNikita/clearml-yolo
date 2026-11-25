@@ -1153,3 +1153,14 @@ def test_failing_nvidia_smi_output_reaches_the_trial_diagnostic(
     assert "returned non-zero exit status 12" in result.diagnostic
     assert "Failed to initialize NVML: Generic operating system error" in result.diagnostic
     assert len(workers.requests) == 1
+
+
+def test_validation_dataset_counts_global_images_not_this_rank(tmp_path: Path) -> None:
+    import torch
+
+    request = _validation_request(tmp_path)
+    batch = yolo._batch(request, 4, torch.device("cpu"), validation=True)
+    # Two ranks of four images each: the dataset counts all eight, but names only this rank's files.
+    dataset = yolo._ValidationLoader(batch, 8).dataset
+    assert len(dataset) == 8
+    assert list(dataset.im_files) == batch["im_file"]

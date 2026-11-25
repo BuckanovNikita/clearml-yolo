@@ -136,6 +136,58 @@ def test_a_data_yaml_with_a_control_character_keeps_its_class_names(dataset_yaml
     assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
 
 
+def test_a_control_character_inside_a_class_name_is_read_like_ultralytics_8_4_184(
+    dataset_yaml: Path, tmp_path: Path
+) -> None:
+    from ultralytics.nn.autobackend import check_class_names
+    from ultralytics.utils import YAML
+
+    _rename_classes(dataset_yaml, "{0: ca\x01t, 1: dog}")
+    # 8.4.184 strips the character and reads again; a YAML 1.2 reader keeps it, which CY refuses.
+    native = check_class_names(YAML.load(dataset_yaml)["names"])  # type: ignore[no-untyped-call]
+    if native == {0: "cat", 1: "dog"}:
+        assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+    else:
+        with pytest.raises(ValueError, match=r"unlike YAML 1\.1: 0 'ca\\x01t' \(YAML 1\.1: 'cat'\); "):
+            _build(dataset_yaml, tmp_path)
+
+
+def test_a_data_yaml_with_invalid_utf8_keeps_its_class_names(dataset_yaml: Path, tmp_path: Path) -> None:
+    # Ultralytics reads data.yaml with errors="ignore"; CY must read the same text.
+    dataset_yaml.write_bytes(b"# exported \xff by a labelling tool\n" + dataset_yaml.read_bytes())
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"cat", "dog"}
+
+
+def _installed_names(monkeypatch: pytest.MonkeyPatch, names: dict[int, str]) -> None:
+    from ultralytics.data.utils import check_det_dataset
+
+    def reader(dataset: str) -> dict[str, Any]:
+        return check_det_dataset(dataset) | {"names": names}
+
+    monkeypatch.setattr("clearml_yolo.adapters.yolo.ground_truth.check_det_dataset", reader)
+
+
+def test_refusal_names_only_the_classes_that_differ(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _installed_names(monkeypatch, {0: "cat", 1: "1000.0"})
+    _rename_classes(dataset_yaml, "{0: cat, 1: 1e3}")
+    message = (
+        r"^Ultralytics reads class names in .*data\.yaml unlike YAML 1\.1: 1 '1000\.0' \(YAML 1\.1: '1e3'\); "
+        r"write these names in quotes so every Ultralytics version reads the same text$"
+    )
+    with pytest.raises(ValueError, match=message):
+        _build(dataset_yaml, tmp_path)
+
+
+def test_refusal_names_a_class_only_the_installed_reader_has(
+    dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _installed_names(monkeypatch, {0: "cat", 1: "dog", 2: "bird"})
+    with pytest.raises(ValueError, match=r"unlike YAML 1\.1: 2 'bird' \(YAML 1\.1: None\); "):
+        _build(dataset_yaml, tmp_path)
+
+
 def test_a_data_yaml_yaml_1_1_cannot_read_is_refused(
     dataset_yaml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -148,7 +200,11 @@ def test_a_data_yaml_yaml_1_1_cannot_read_is_refused(
         return checked
 
     monkeypatch.setattr("clearml_yolo.adapters.yolo.ground_truth.check_det_dataset", lenient_reader)
-    with pytest.raises(ValueError, match=r"is not YAML 1\.1, so CY cannot confirm"):
+    message = (
+        r"^.*data\.yaml is not YAML 1\.1, so CY cannot confirm that its class names read the same "
+        r"under every Ultralytics version$"
+    )
+    with pytest.raises(ValueError, match=message):
         _build(dataset_yaml, tmp_path)
 
 

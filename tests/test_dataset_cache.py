@@ -736,6 +736,20 @@ _YAML_SENSITIVE_LABELS = (
 )
 
 
+def test_entries_prepared_before_name_quoting_are_not_reused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from clearml_yolo.adapters.storage import dataset_cache as cache
+
+    source = _source(tmp_path / "input")
+    current = cache.PREPARATION_VERSION
+    # Version 2 wrote class names unquoted; its entries must never be reused.
+    monkeypatch.setattr(cache, "PREPARATION_VERSION", 2)
+    with cache.cached_dataset(source, tmp_path / "cache") as old:
+        old_data = old.data
+    monkeypatch.setattr(cache, "PREPARATION_VERSION", current)
+    with cache.cached_dataset(source, tmp_path / "cache") as new:
+        assert new.data != old_data
+
+
 @pytest.mark.parametrize("dataset_format", ["ndjson", "flat", "coco"])
 def test_published_class_names_read_back_as_strings_in_the_native_reader(
     tmp_path: Path, dataset_format: Literal["ndjson", "flat", "coco"]

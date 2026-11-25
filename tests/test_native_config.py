@@ -333,3 +333,12 @@ def test_real_native_prediction_records_renderable_arguments_with_the_pinned_nms
     rendered = yaml.safe_load(render_native_yaml(effective, "predict"))
     assert rendered["iou"] == 0.7
     assert rendered["mode"] == "predict"
+
+
+def test_an_unclassified_upstream_key_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    from clearml_yolo.adapters.yolo import config as native_config
+
+    template = native_config.native_template() + "brand_new_key: 1 # (int) added upstream\n"
+    monkeypatch.setattr(native_config, "native_template", lambda: template)
+    with pytest.raises(ValueError, match=r"^Unclassified Ultralytics parameters: \['brand_new_key'\]$"):
+        native_config.native_defaults()

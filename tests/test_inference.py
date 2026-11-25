@@ -418,6 +418,22 @@ def test_recorded_arguments_omit_the_predictor_prompts_and_render_as_predict_set
     assert "prompts" not in yaml.safe_load(render_native_yaml(effective, "predict"))
 
 
+def test_recorded_arguments_keep_every_native_argument_but_the_prompts(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = FakeYolo.predict
+    native_args: dict[str, Any] = {}
+
+    def with_prompts(self: FakeYolo, source: str, **kwargs: Any) -> Iterator[FakeResult]:
+        native_args.update({key: value for key, value in kwargs.items() if key != "stream"}, source=source)
+        self.predictor = SimpleNamespace(  # type: ignore[attr-defined]
+            args=SimpleNamespace(**native_args, prompts=None), imgsz=[64, 64], save_dir="native/predict"
+        )
+        return original(self, source, **kwargs)
+
+    monkeypatch.setattr(FakeYolo, "predict", with_prompts)
+    frame = _predict("best.pt", ["a.png"])
+    assert frame.attrs["effective_args"] == native_args | {"model": "best.pt"}
+
+
 @pytest.mark.parametrize("task", ["segment", "pose", "classify", "obb"])
 def test_non_detection_checkpoint_fails_before_prediction(monkeypatch: pytest.MonkeyPatch, task: str) -> None:
     original = FakeYolo.__init__
