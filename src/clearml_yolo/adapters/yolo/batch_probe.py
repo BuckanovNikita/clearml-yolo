@@ -233,13 +233,29 @@ def _optimize(
 
 
 @dataclass(frozen=True)
+class _ValidationImages:
+    """Synthetic validation dataset: the global image count and this rank's image files.
+
+    Native detection validation counts images with ``len(dataset)`` and, since Ultralytics
+    8.4.218, resolves every batch ``im_file`` relative to the common directory of
+    ``dataset.im_files``; both files and batch names live beneath the probe output.
+    """
+
+    size: int
+    im_files: tuple[str, ...]
+
+    def __len__(self) -> int:
+        return self.size
+
+
+@dataclass(frozen=True)
 class _ValidationLoader:
     batch: dict[str, Any]
     global_images: int
 
     @property
-    def dataset(self) -> range:
-        return range(self.global_images)
+    def dataset(self) -> _ValidationImages:
+        return _ValidationImages(self.global_images, tuple(self.batch["im_file"]))
 
     def __iter__(self) -> Iterator[dict[str, Any]]:
         yield self.batch

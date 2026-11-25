@@ -28,11 +28,11 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 
 ## Как задавать ключи
 
-Ключи из таблицы ниже меняются обычным override: `ultralytics.epochs=50`. Нативный ключ Ultralytics, которого нет в собранной группе, добавляется через `+` (например `+ultralytics.dropout=0.1`). CY знает все ключи `default.yaml` установленной версии Ultralytics, а также `augmentations` и `save_dir`:
+Ключи из таблицы ниже меняются обычным override: `ultralytics.epochs=50`. Нативный ключ Ultralytics, которого нет в собранной группе, добавляется через `+` (например `+ultralytics.dropout=0.1`). CY знает ключи `default.yaml` Ultralytics, а также `augmentations` и `save_dir`. Каждый ключ `default.yaml` CY заранее относит к обучению, к предсказанию или к неактивным; если в новой версии Ultralytics появился ключ, которого CY ещё не знает, `cy`, `cy-train`, `cy-predict`, `cy-val`, `cy-metrics`, `cy-compare`, `cy-report`, `cy-ground-truth`, `cy-export` и `cy-init-config` завершаются ошибкой `ValueError: Unclassified Ultralytics parameters: [...]`, а [`cy-batch-estimate`](../commands/cy-batch-estimate.md) с моделью Ultralytics — ошибкой `cy-batch-estimate: error: Unclassified Ultralytics parameters: [...]` (код 2) после опроса GPU, до первого измерения. Правила для ключей группы:
 
 - ключ, которого Ultralytics не знает, отклоняется: `ValueError: Unknown Ultralytics parameters: ['foo']`;
 - `cfg` должен оставаться `null`: `ValueError: Native cfg must be null`;
-- известный ключ, который к обучению детектора не относится (например `source`, `dropout`, `format`), принимается и молча отбрасывается;
+- известный ключ, который к обучению детектора не относится (например `source`, `dropout`, `format`), принимается и молча отбрасывается. Так же отбрасываются `tile` и `tile_overlap` (нарезка изображений на фрагменты при обучении, валидации и предсказании; есть, например, в Ultralytics 8.4.218): CY их не передаёт, и Ultralytics работает со своим значением по умолчанию `tile=false`, без нарезки;
 - `save_dir` в `cy` отклоняется до создания задачи ClearML (task). С `run_dir` или `run_id` любое значение даёт ошибку `save_dir conflicts with pipeline run_dir; use run_dir to route outputs`. Без них путь даёт ошибку `Native pipeline output overrides require an explicit run_dir`, а `null` — ошибку `save_dir conflicts with pipeline run_dir; use run_dir to route outputs`. В `cy-train` `save_dir` отбрасывается; в обоих случаях путь сначала проверяется на нахождение внутри `CY_HOME`;
 - `augmentations` (список преобразований Albumentations для нативного загрузчика) передаётся в Ultralytics как есть. Собственный пайплайн аугментаций CY настраивается в группе [`transforms`](transforms.md); профиль ([transforms profile](../../GLOSSARY.md#transforms-profile)) `transforms=albumentations` сам обнуляет встроенные аугментации Ultralytics (`hsv_*`, `degrees`, `translate`, `scale`, `shear`, `perspective`, `flipud`, `fliplr`, `bgr`, `mosaic` и другие).
 
@@ -100,7 +100,7 @@ ValueError: Changed model.train settings ['epochs'] are inactive for ultralytics
 | `split` | `val` | Split для валидации. При обучении на разметке CY принудительно ставит `val`. |
 | `save_json` | `false` | Сохранять результаты валидации в COCO JSON. |
 | `conf` | `null` | Порог уверенности (confidence threshold) для валидации внутри обучения; `null` — значение Ultralytics. От 0 до 1. |
-| `iou` | `0.7` | Порог IoU для NMS. От 0 до 1. |
+| `iou` | `0.7` | Порог IoU для NMS. От 0 до 1. В Ultralytics 8.4.218 по умолчанию пусто (тогда Ultralytics берёт `0.5` при предсказании и экспорте и `0.7` при валидации); CY при любой версии Ultralytics ставит `0.7`. Комментарий рядом с `iou` в файле, который пишет [`cy-init-config`](../commands/cy-init-config.md), взят из Ultralytics и описывает её значения по умолчанию, а не значение CY. `null` отклоняется: `ultralytics.iou must not be null`. |
 | `max_det` | `300` | Максимум детекций на изображение. Целое, не меньше 1. |
 | `quantize` | `null` | Точность. При обучении `8`/`int8` включает quantization-aware training. Допустимы `8`, `16`, `32`, `int8`, `fp16`, `fp32`, `w8a8`, `w16a16`, `w32a32`, `w8a16`, `w8a32`. |
 | `plots` | `true` | Сохранять графики и изображения обучения и валидации. |

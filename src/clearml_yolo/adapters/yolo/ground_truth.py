@@ -7,13 +7,16 @@ ultralytics' own helpers so a plain ``data=`` yaml behaves exactly as it does in
 """
 
 import math
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 from loguru import logger
 from PIL import Image
 from ultralytics.data.utils import IMG_FORMATS, check_det_dataset, exif_size, img2label_paths
+from ultralytics.nn.autobackend import check_class_names
 
 from clearml_yolo.adapters.observability.progress import track
 from clearml_yolo.adapters.observability.tracing import trace_operation
@@ -34,6 +37,9 @@ SPLITS = ("train", "val", "test")
 DETECTION_LABEL_FIELDS = 5
 NORMALIZED_MIN = -0.01
 NORMALIZED_MAX = 1.01
+
+# Characters Ultralytics 8.4.184 strips from data.yaml before its second PyYAML attempt.
+_UNREADABLE_YAML_CHARACTERS = re.compile(r"[^\x09\x0A\x0D\x20-\x7E\x85\xA0-\uD7FF\uE000-\uFFFD\U00010000-\U0010ffff]+")
 
 GroundTruthRow = dict[str, str | float | None]
 YoloBox = tuple[str, float, float, float, float]
@@ -204,6 +210,109 @@ def _reject_duplicate_image_names(images: dict[str, list[Path]]) -> None:
         )
 
 
+def _yaml_1_1_data(yaml_file: Path) -> object:
+    """Load data.yaml exactly as Ultralytics 8.4.184 ``YAML.load`` does (ultralytics/utils/__init__.py).
+
+    That version prefers libyaml (``CSafeLoader``), which accepts some text the pure-Python
+    ``SafeLoader`` rejects (a tab after ``0:``), retries once without the characters below after
+    any failure, and turns top-level ``'None'`` strings into ``None``.
+    """
+    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+    text = yaml_file.read_text(encoding="utf-8", errors="ignore")
+    try:
+        data = yaml.load(text, Loader=loader)  # noqa: S506 - loader is CSafeLoader or SafeLoader
+    # BLE001: 8.4.184 retries after any exception; PyYAML raises plain ValueError on impossible dates.
+    except Exception:  # noqa: BLE001
+        try:
+            data = yaml.load(_UNREADABLE_YAML_CHARACTERS.sub("", text), Loader=loader)  # noqa: S506 - as above
+        except Exception as error:  # as above; re-raised with its cause
+            raise ValueError(
+                f"{yaml_file} is not YAML 1.1, so CY cannot confirm that its class names read the same "
+                "under every Ultralytics version"
+            ) from error
+    if isinstance(data, dict) and "None" in data.values():
+        data = {key: None if value == "None" else value for key, value in data.items()}
+    return {} if data is None else data
+
+
+def _unusable_names(yaml_file: Path, reason: str) -> ValueError:
+    return ValueError(
+        f"YAML 1.1 reads no usable class names in {yaml_file} ({reason}), so CY cannot confirm that its "
+        "class names read the same under every Ultralytics version"
+    )
+
+
+def _yaml_1_1_class_count(yaml_file: Path, data: dict[object, object]) -> int | None:
+    """Return ``nc`` as Ultralytics 8.4.184 ``check_det_dataset`` coerces it, or ``None`` without ``nc``."""
+    if "nc" not in data:
+        return None
+    count = data["nc"]
+    if isinstance(count, int):
+        return count
+    try:
+        number = float(count)  # type: ignore[arg-type] # 8.4.184 tries any value; TypeError is refused below
+        if number != int(number):
+            raise ValueError(number)  # noqa: TRY301 - 8.4.184 refuses a fractional count in the same handler
+        return int(number)
+    # OverflowError: int(inf), which 8.4.184 lets escape and so also refuses.
+    except (OverflowError, TypeError, ValueError) as error:
+        raise _unusable_names(yaml_file, f"'nc: {count}' is not an integer") from error
+
+
+def _yaml_1_1_class_names(yaml_file: Path, installed_count: int) -> dict[int, str]:
+    """Return the class names Ultralytics 8.4.184 derives from data.yaml, from ``names`` or from ``nc``.
+
+    Each refusal here mirrors one in Ultralytics 8.4.184 (``YAML.load``, ``check_det_dataset``,
+    ``check_class_names``), so it never stops a file that version accepts. A class count that
+    differs from the installed reader's is refused before the ``class_<i>`` names are built.
+    """
+    data = _yaml_1_1_data(yaml_file)
+    if not isinstance(data, dict):
+        raise _unusable_names(yaml_file, "not a mapping")
+    names = data.get("names")
+    if names is not None and not isinstance(names, list | dict):
+        raise _unusable_names(yaml_file, f"'names' is {type(names).__name__}, not list or dict")
+    if names is None and "nc" not in data:
+        raise _unusable_names(yaml_file, "neither 'names' nor 'nc'")
+    count = _yaml_1_1_class_count(yaml_file, data)
+    if names is not None and count is not None and len(names) != count:
+        raise _unusable_names(yaml_file, f"'names' length {len(names)} and 'nc: {count}' differ")
+    if names is None:
+        if count != installed_count:
+            raise ValueError(
+                f"Ultralytics reads {installed_count} classes in {yaml_file} where YAML 1.1 reads 'nc' as "
+                f"{count}; write 'nc' as a decimal integer without leading zeros so every Ultralytics "
+                "version reads the same class count"
+            )
+        names = [f"class_{index}" for index in range(installed_count)]
+    try:
+        return check_class_names(names)
+    except (KeyError, TypeError, ValueError) as error:
+        raise _unusable_names(yaml_file, f"{type(error).__name__}: {error}") from error
+
+
+def _reject_reader_dependent_names(yaml_file: Path, names: dict[int, str]) -> None:
+    """Refuse class names whose text depends on the YAML reader of the installed Ultralytics.
+
+    Ultralytics 8.4.184 reads data.yaml with PyYAML (YAML 1.1); 8.4.218 uses its own YAML 1.2
+    core reader. An unquoted ``yes`` or ``1e3`` then becomes the label ``'yes'`` or ``'1000.0'``
+    instead of ``'True'`` or ``'1e3'``, and ``nc: 010`` gives 10 classes instead of 8; a CSV
+    rebuilt from the same file would silently stop matching models trained on the old one.
+    """
+    expected = _yaml_1_1_class_names(yaml_file, len(names))
+    if expected == names:
+        return
+    differences = ", ".join(
+        f"{index} {names.get(index)!r} (YAML 1.1: {expected.get(index)!r})"
+        for index in sorted(expected.keys() | names.keys())
+        if names.get(index) != expected.get(index)
+    )
+    raise ValueError(
+        f"Ultralytics reads class names in {yaml_file} unlike YAML 1.1: {differences}; "
+        "write these names in quotes so every Ultralytics version reads the same text"
+    )
+
+
 @trace_operation("yolo.ground_truth.build")
 def build_ground_truth(
     data_yaml: str | Path,
@@ -222,6 +331,7 @@ def build_ground_truth(
     yaml_path = Path(data_yaml).expanduser()
     dataset = check_det_dataset(str(yaml_path.resolve()) if yaml_path.exists() else str(data_yaml))
     names: dict[int, str] = {int(index): str(name) for index, name in dataset["names"].items()}
+    _reject_reader_dependent_names(Path(dataset["yaml_file"]), names)
 
     images: dict[str, list[Path]] = {}
     for split in SPLITS:

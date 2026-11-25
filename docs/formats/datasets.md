@@ -12,7 +12,7 @@
 | `train` | Обязателен. Каталог изображений, файл `.txt` со списком изображений или список таких значений, относительно корня |
 | `val` | Обязателен. Тот же формат |
 | `test` | Необязателен. Тот же формат |
-| `names` | Имена классов: словарь `индекс: имя` или список. Можно вместо него задать `nc` |
+| `names` | Имена классов: словарь `индекс: имя` или список. Можно вместо него задать `nc` (тогда классы называются `class_0`, `class_1`, ...). Имена вроде `yes`, `off` или `1e3` пишите в кавычках (`"yes"`): без кавычек разные версии Ultralytics читают их по-разному (`True` или `yes`, `1e3` или `1000.0`), и CY отклоняет такой файл, если установленная версия читает их не так, как YAML 1.1 (Ultralytics 8.4.184). `nc` пишите десятичным числом без ведущих нулей: `nc: 010` Ultralytics 8.4.184 читает как 8, а 8.4.218 — как 10, и CY отклоняет файл, если установленная версия насчитывает другое число классов |
 
 Файл `.txt` со списком содержит по одному пути на строку; относительные пути отсчитываются от каталога этого файла, пустые строки пропускаются. Из каталога берутся все изображения во вложенных каталогах с расширениями, которые знает Ultralytics.
 
@@ -53,6 +53,10 @@ names:
 | `data/labels/train/a.txt:1 has a non-positive box size (0.0 x 0.2); such a box has no top-left/bottom-right corner` | Нулевая или отрицательная ширина или высота |
 | `data/labels/train/a.txt:1 has nonfinite or out-of-bounds normalized coordinates` | Координата вне диапазона от -0.01 до 1.01 |
 | `data/labels/train/a.txt:1 references class 5, but the dataset defines classes 0..1` | Индекс класса не из `names` |
+| `Ultralytics reads class names in data/dataset.yaml unlike YAML 1.1: 0 'yes' (YAML 1.1: 'True'); write these names in quotes so every Ultralytics version reads the same text` | Установленная версия Ultralytics читает имя класса без кавычек иначе, чем YAML 1.1. Запишите имена из сообщения в кавычках |
+| `Ultralytics reads 10 classes in data/dataset.yaml where YAML 1.1 reads 'nc' as 8; write 'nc' as a decimal integer without leading zeros so every Ultralytics version reads the same class count` | Имён классов нет, а `nc` установленная версия Ultralytics читает иначе, чем YAML 1.1 (например, `010`). Запишите `nc` десятичным числом без ведущих нулей |
+| `data/dataset.yaml is not YAML 1.1, so CY cannot confirm that its class names read the same under every Ultralytics version` | Установленная версия Ultralytics прочла файл, а YAML 1.1 (PyYAML так, как его вызывает Ultralytics 8.4.184) — нет, поэтому CY не может сравнить имена классов. Исправьте синтаксис YAML |
+| `YAML 1.1 reads no usable class names in data/dataset.yaml ('names' is str, not list or dict), so CY cannot confirm that its class names read the same under every Ultralytics version` | Установленная версия Ultralytics прочла имена классов, а при чтении по YAML 1.1 файл не словарь, `names` не список и не словарь, нет ни `names`, ни `nc`, `nc` не целое число, длина `names` не равна `nc` или имена не проходят проверку Ultralytics (причина в скобках). Ultralytics 8.4.184 такой файл не принимает. Исправьте `names` или `nc` |
 | `1 image name(s) refer to more than one file, which digital-metrics cannot tell apart: a.jpg (data/images/train/a.jpg and data/images/val/a.jpg)` | Одно имя файла у двух изображений |
 | `Cannot read the pixel size of data/images/train/a.jpg` | Изображение с рамками не читается. Если файл не декодируется как изображение, Ultralytics сначала пытается установить пакет `pi-heif`; без доступа к сети вместо этого сообщения вы получите `No module named 'pi_heif'` |
 
@@ -80,7 +84,7 @@ names:
 
 | Файл | Содержимое |
 | --- | --- |
-| `data.yaml` | Описание датасета для обучения: абсолютный `path`, `names` и split, в которых есть изображения |
+| `data.yaml` | Описание датасета для обучения: абсолютный `path`, `names` и split, в которых есть изображения. Имена классов в `names` записаны в двойных кавычках, чтобы любая версия Ultralytics прочла имя вроде `1e3` как строку, а не как число |
 | `ground_truth.csv` | Разметка после проверки: только корректные рамки, абсолютные пути, по одной строке на изображение без объектов |
 | `preparation.json` | Источник, `input_sha256` (SHA-256 исходного CSV), `dataset_format`, `class_names`, `counts` (`input_boxes`, `valid_boxes`, `invalid_boxes`), число изображений по split, список `invalid_boxes` (номер строки, `image_name`, причина) и список изображений с размерами, числом рамок и `generated_path` |
 | `labels.zip` | Архив файлов разметки (`labels/**/*.txt` или `*/_annotations.coco.json`) |

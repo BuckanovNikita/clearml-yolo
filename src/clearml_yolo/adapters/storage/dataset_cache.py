@@ -28,12 +28,12 @@ from pydantic import BaseModel, ValidationError
 from clearml_yolo.adapters.observability.diagnostics import log_exception
 from clearml_yolo.adapters.observability.tracing import trace_operation
 from clearml_yolo.adapters.storage.dataset import PreparedDataset, prepare_dataset
-from clearml_yolo.adapters.storage.dataset_export import DatasetFormat
+from clearml_yolo.adapters.storage.dataset_export import DatasetFormat, dataset_yaml_text
 from clearml_yolo.adapters.storage.dataset_records import validate_ground_truth_rows
 from clearml_yolo.adapters.storage.file_io import resolved_image_references
 from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
 
-PREPARATION_VERSION = 2
+PREPARATION_VERSION = 3
 _COMPLETION_FILE = "completion.json"
 _SUPPORTED_SPLITS = frozenset({"train", "val", "test"})
 _RESERVED_LABEL = "background"
@@ -314,7 +314,7 @@ def _rewrite_final_paths(staging: Path, entry: Path) -> None:
     if not isinstance(data, dict):
         raise TypeError(f"Prepared dataset configuration is not a mapping: {data_path}")
     data["path"] = str(entry.resolve())
-    data_path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    data_path.write_text(dataset_yaml_text(data), encoding="utf-8")
 
     manifest_path = staging / "preparation.json"
     manifest = _read_json_object(manifest_path)

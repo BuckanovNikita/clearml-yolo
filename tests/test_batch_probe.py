@@ -773,6 +773,19 @@ def test_yolo_validation_runs_real_loss_and_metrics_at_nominal_size_and_raw_dens
     assert model.observed == {"shape": (4, 3, 32, 32), "objects": [2, 2, 2, 2]}
 
 
+def test_yolo_validation_dataset_names_the_validated_images_beneath_the_probe_output(tmp_path: Path) -> None:
+    import torch
+
+    # Ultralytics 8.4.218 detection validation reads dataset.im_files on every run and
+    # resolves each batch image relative to their common directory.
+    request = _validation_request(tmp_path)
+    batch = yolo._batch(request, 4, torch.device("cpu"), validation=True)
+    dataset = yolo._ValidationLoader(batch, request.global_batch * 2).dataset
+    assert len(dataset) == request.global_batch * 2
+    assert list(dataset.im_files) == batch["im_file"]
+    assert all(Path(name).is_relative_to(request.output) for name in dataset.im_files)
+
+
 def test_yolo_validation_nonfinite_loss_fails_before_a_success_receipt(tmp_path: Path) -> None:
     import torch
 
@@ -1140,3 +1153,14 @@ def test_failing_nvidia_smi_output_reaches_the_trial_diagnostic(
     assert "returned non-zero exit status 12" in result.diagnostic
     assert "Failed to initialize NVML: Generic operating system error" in result.diagnostic
     assert len(workers.requests) == 1
+
+
+def test_validation_dataset_counts_global_images_not_this_rank(tmp_path: Path) -> None:
+    import torch
+
+    request = _validation_request(tmp_path)
+    batch = yolo._batch(request, 4, torch.device("cpu"), validation=True)
+    # Two ranks of four images each: the dataset counts all eight, but names only this rank's files.
+    dataset = yolo._ValidationLoader(batch, 8).dataset
+    assert len(dataset) == 8
+    assert list(dataset.im_files) == batch["im_file"]

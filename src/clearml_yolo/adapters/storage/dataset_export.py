@@ -10,6 +10,8 @@ conversion.
 
 import json
 import shutil
+import sys
+from collections import UserString
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +25,36 @@ from clearml_yolo.application.contracts import (
 from clearml_yolo.core.datasets import ImageRecord, ValidatedDataset
 
 _SPLITS = ("train", "val", "test")
+
+
+class _QuotedName(UserString):
+    """A class name that the dataset YAML writes double-quoted."""
+
+
+class _DatasetYamlDumper(yaml.SafeDumper):
+    """Safe dumper that writes every class name as a double-quoted string."""
+
+
+_DatasetYamlDumper.add_representer(
+    _QuotedName,
+    lambda dumper, value: dumper.represent_scalar("tag:yaml.org,2002:str", value.data, style='"'),
+)
+
+
+def dataset_yaml_text(data: dict[str, object]) -> str:
+    """Render a native dataset description whose class names every YAML reader keeps as strings.
+
+    PyYAML leaves names such as ``1e3`` unquoted, a string under its YAML 1.1 rules, while
+    Ultralytics 8.4.218 reads data.yaml with its own YAML 1.2 core reader and turns them into
+    floats. Double quotes keep each name a string for both; the unbounded width keeps a long
+    name on one line.
+    """
+    names = data.get("names")
+    if isinstance(names, dict):
+        data = data | {
+            "names": {key: _QuotedName(value) if isinstance(value, str) else value for key, value in names.items()}
+        }
+    return yaml.dump(data, Dumper=_DatasetYamlDumper, sort_keys=False, allow_unicode=True, width=sys.maxsize)
 
 
 @dataclass(frozen=True)
@@ -109,7 +141,7 @@ def _export_coco(records: ValidatedDataset, directory: Path) -> Path:
         if images:
             data[split] = folder
     path = directory / "data.yaml"
-    write_path(path).write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    write_path(path).write_text(dataset_yaml_text(data), encoding="utf-8")
     return path
 
 
@@ -251,7 +283,7 @@ def _write_yaml(directory: Path, names: dict[int, str], images: tuple[_ExportIma
     for split in _SPLITS:
         if split in present_splits:
             data[split] = f"images/{split}"
-    write_path(data_path).write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    write_path(data_path).write_text(dataset_yaml_text(data), encoding="utf-8")
     return data_path
 
 
