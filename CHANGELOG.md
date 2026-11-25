@@ -1,6 +1,87 @@
 # CHANGELOG
 
 
+## v0.51.6 (2026-11-25)
+
+### Bug Fixes
+
+- **storage**: Double-quote class names in prepared data.yaml (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Classify Ultralytics 8.4.218 tile keys and pin NMS IoU 0.7 (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Compare ground-truth classes from nc as Ultralytics 8.4.184 derives them (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Give the batch-probe validation dataset its image files (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Keep CY working and NMS IoU at 0.7 under Ultralytics 8.4.218 (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Name the exception type when YAML 1.1 class names are unusable (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Omit the native predictor prompts attribute from recorded arguments (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Read ground-truth class names exactly as Ultralytics 8.4.184 does (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Refuse ground-truth class names the installed YAML reader changes (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+### Documentation
+
+- **yolo**: Correct tiling scope and the commands an unclassified key stops (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Name cy-batch-estimate among the commands an unclassified key stops (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Place the cy-init-config and cy-batch-estimate unclassified-key failures (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Say cy-init-config still parses arguments before an unclassified key fails (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+### Testing
+
+- **storage**: Check data.yaml class-name quoting on the written text (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Keep ground-truth names readable after the YAML 1.1 retry (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Pin the refusal messages and the SIP-325 fixes against their mutants (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Prove recorded prediction arguments omit predictor prompts (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+- **yolo**: Register Hydra configurations in the template-change preflight test (SIP-325)
+  ([#30](https://github.com/BuckanovNikita/clearml-yolo/pull/30),
+  [`a8f3e2b`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8f3e2b62420e619d087be3bf5819568a7a5abde))
+
+
 ## v0.51.5 (2026-11-23)
 
 ### Bug Fixes
