@@ -13,6 +13,7 @@ from typing import Any, Self
 
 import numpy as np
 import pytest
+import yaml
 from loguru import logger
 
 from clearml_yolo.adapters.yolo.inference import (
@@ -389,6 +390,32 @@ def test_native_normalization_is_separate_from_requested_settings(
     assert FakeYolo.last is not None
     assert FakeYolo.last.calls[0]["compile"] is True
     assert FakeYolo.last.calls[0]["nms"] is True
+
+
+def test_recorded_arguments_omit_the_predictor_prompts_and_render_as_predict_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clearml_yolo.adapters.yolo.config import render_native_yaml
+
+    original = FakeYolo.predict
+
+    def with_prompts(self: FakeYolo, source: str, **kwargs: Any) -> Iterator[FakeResult]:
+        # Native arguments are the call's configuration (stream is a call option, not one of
+        # them); Ultralytics 8.4.218 Model.predict also attaches the call's SAM prompts, which
+        # are not a default.yaml parameter.
+        native = {key: value for key, value in kwargs.items() if key != "stream"}
+        self.predictor = SimpleNamespace(  # type: ignore[attr-defined]
+            args=SimpleNamespace(**native, source=source, prompts=None), imgsz=[64, 64], save_dir="native/predict"
+        )
+        return original(self, source, **kwargs)
+
+    monkeypatch.setattr(FakeYolo, "predict", with_prompts)
+    frame = _predict("best.pt", ["a.png"])
+
+    effective = frame.attrs["effective_args"]
+    assert "prompts" not in effective
+    assert effective["iou"] == 0.7
+    assert "prompts" not in yaml.safe_load(render_native_yaml(effective, "predict"))
 
 
 @pytest.mark.parametrize("task", ["segment", "pose", "classify", "obb"])
