@@ -172,7 +172,7 @@ def test_classification_covers_template_once_and_preserves_detection_losses() ->
     assert "dnn" not in train
 
 
-# Ultralytics 8.4.218 added predict-time tiling keys and left the NMS IoU null, which
+# Ultralytics 8.4.218 ships image tiling keys and a null NMS IoU, which
 # upstream resolves per stage (predict/export 0.5, val 0.7). Both upstream layouts are
 # derived from the installed template so the checks hold on either installed version.
 _OLD_IOU = "iou: 0.7 # (float) IoU threshold used for NMS"

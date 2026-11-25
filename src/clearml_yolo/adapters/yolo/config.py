@@ -154,7 +154,8 @@ INACTIVE_KEYS = frozenset(
         "embed",
         "save_frames",
         "retina_masks",
-        # Predict-time tiling (Ultralytics 8.4.218+); its native default disables tiling.
+        # Native image tiling for datasets and prediction (present in Ultralytics 8.4.218);
+        # CY never forwards it, so the native default (no tiling) applies.
         "tile",
         "tile_overlap",
         "format",
@@ -340,7 +341,7 @@ def native_defaults() -> dict[str, Any]:
     unknown = set(loaded) - KNOWN_KEYS
     if unknown:
         raise ValueError(f"Unclassified Ultralytics parameters: {sorted(unknown)}")
-    # Ultralytics 8.4.218 left iou null (predict/export resolve 0.5, val 0.7); pin the
+    # Ultralytics 8.4.218 ships iou null (predict/export resolve 0.5, val 0.7); pin the
     # NMS IoU so every stage keeps 0.7 whatever the installed version.
     return loaded | {"imgsz": 960, "compile": True, "nms": True, "model": "yolo11n.pt", "iou": 0.7}
 
