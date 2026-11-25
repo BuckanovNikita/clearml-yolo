@@ -296,6 +296,7 @@ def test_detector_preflight_accepts_unchanged_yolo_groups_across_template_change
     from hydra_zen import store
     from omegaconf import OmegaConf
 
+    import clearml_yolo.entrypoints.hydra.configs  # noqa: F401 - registers the Hydra configurations
     from clearml_yolo.adapters.yolo.config import prediction_defaults
     from clearml_yolo.application.use_cases.train import train
     from clearml_yolo.entrypoints.hydra.validation import validate_wrapper_keys
