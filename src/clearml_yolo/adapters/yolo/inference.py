@@ -41,6 +41,10 @@ PREDICTION_COLUMNS = [
 
 _MAX_REPORTED_PATHS = 5
 
+# Ultralytics 8.4.218 Model.predict attaches its per-call SAM prompts to the predictor
+# arguments. They are runtime state, not default.yaml parameters, so the record omits them.
+_PREDICTOR_RUNTIME_ATTRIBUTES = frozenset({"prompts"})
+
 
 def trained_imgsz(weights: str | Path) -> int | None:
     """Read checkpoint training resolution for diagnostics, never configuration defaults."""
@@ -223,7 +227,9 @@ def predict_on_images(
     # Opaque native predictor objects carry the arguments after native normalization.
     predictor: Any = getattr(model, "predictor", None)
     if predictor is not None:
-        frame.attrs["effective_args"] = dict(vars(predictor.args))
+        frame.attrs["effective_args"] = {
+            key: value for key, value in vars(predictor.args).items() if key not in _PREDICTOR_RUNTIME_ATTRIBUTES
+        }
         frame.attrs["save_dir"] = str(predictor.save_dir)
         frame.attrs["normalized_imgsz"] = predictor.imgsz
     frame.attrs.setdefault("effective_args", settings.copy())

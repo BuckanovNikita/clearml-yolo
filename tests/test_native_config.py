@@ -308,3 +308,27 @@ def test_detector_preflight_accepts_unchanged_yolo_groups_across_template_change
     config.ultralytics_predict = OmegaConf.create(prediction_defaults())
     _install_template(monkeypatch, installed)
     validate_wrapper_keys(config, train)
+
+
+def test_real_native_prediction_records_renderable_arguments_with_the_pinned_nms_iou(tmp_path: Path) -> None:
+    import cv2
+    import numpy as np
+
+    from clearml_yolo.adapters.yolo.config import render_native_yaml
+    from clearml_yolo.adapters.yolo.inference import predict_on_images
+    from native_config_helpers import prediction_config
+
+    # Unmocked: an untrained model built from the packaged architecture, scored on CPU.
+    image = tmp_path / "image.png"
+    assert cv2.imwrite(str(image), np.zeros((64, 64, 3), dtype=np.uint8))
+    settings = prediction_config(
+        device="cpu", compile=False, imgsz=64, batch=1, project=str(tmp_path / "native"), name="predict"
+    )
+    for key in ("model", "source"):
+        settings.pop(key)
+    frame = predict_on_images("yolo11n.yaml", [str(image)], **settings)
+    effective = frame.attrs["effective_args"]
+    assert effective["iou"] == 0.7
+    rendered = yaml.safe_load(render_native_yaml(effective, "predict"))
+    assert rendered["iou"] == 0.7
+    assert rendered["mode"] == "predict"
