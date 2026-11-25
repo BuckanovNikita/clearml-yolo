@@ -11,7 +11,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import pytest
 import yaml
@@ -719,3 +719,52 @@ def test_cache_hit_with_the_reserved_label_fails_even_if_the_csv_check_passes(
         cache.cached_dataset(source, cache_dir),
     ):
         pytest.fail("a cache entry with the reserved label must not reach training")
+
+
+# Plain under PyYAML's YAML 1.1 dump but numbers under YAML 1.2 core rules, plus names that
+# need escapes, non-ASCII text and a name longer than PyYAML's default line width.
+_YAML_SENSITIVE_LABELS = (
+    "1e3",
+    "-1e3",
+    "1e-3",
+    "1.0e3",
+    "0e0",
+    'say "hi"',
+    "back\\slash",
+    "Класс 1",
+    "a long class name with many words " * 4,
+)
+
+
+@pytest.mark.parametrize("dataset_format", ["ndjson", "flat", "coco"])
+def test_published_class_names_read_back_as_strings_in_the_native_reader(
+    tmp_path: Path, dataset_format: Literal["ndjson", "flat", "coco"]
+) -> None:
+    from ultralytics.nn.autobackend import check_class_names
+    from ultralytics.utils import YAML
+
+    from clearml_yolo.adapters.storage.dataset_cache import cached_dataset
+
+    directory = tmp_path / "input"
+    directory.mkdir()
+    source = directory / "truth.csv"
+    with source.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(
+            ["image_name", "image_path", "instance_label", "bbox_x_tl", "bbox_y_tl", "bbox_x_br", "bbox_y_br", "split"]
+        )
+        for split in ("train", "val"):
+            image = directory / f"{split}.png"
+            Image.new("RGB", (16, 12), (20, 30, 40)).save(image)
+            for label in _YAML_SENSITIVE_LABELS:
+                writer.writerow([image.name, image.name, label, 1, 2, 10, 9, split])
+
+    with cached_dataset(source, tmp_path / "cache", dataset_format) as prepared:
+        # Ultralytics leaves YAML.load unannotated.
+        native = check_class_names(YAML.load(prepared.data)["names"])  # type: ignore[no-untyped-call]
+        written = yaml.safe_load(prepared.data.read_text(encoding="utf-8"))["names"]
+    with cached_dataset(source, tmp_path / "cache", dataset_format) as reused:
+        assert reused.data == prepared.data
+
+    assert sorted(native.values()) == sorted(_YAML_SENSITIVE_LABELS)
+    assert written == native
