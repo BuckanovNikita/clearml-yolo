@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from clearml_yolo.adapters.assets import bundles
 from clearml_yolo.adapters.assets.resolver import asset_destination
 from clearml_yolo.adapters.assets.validation import validate_asset
+from clearml_yolo.adapters.torchvision import assets as torchvision_assets
 from clearml_yolo.core.assets import AssetSpec
 from clearml_yolo.core.weight_bundles import BundleArchive, BundleAsset, BundleManifest
 
@@ -322,6 +323,18 @@ def test_resnet_bundle_matches_same_content_across_torchvision_versions() -> Non
         override="model.train.backbone_weights",
     )
     assert not bundles._matches(changed_source, deim)
+
+
+@pytest.mark.parametrize("preset", sorted(torchvision_assets.TIMM_MODELS))
+def test_pinned_release_matches_timm_backbone_of_installed_timm(preset: str) -> None:
+    # The pin and the exact timm requirement move together: a timm upgrade
+    # without a new weight release leaves these backbones unrestorable.
+    manifest = bundles.load_manifest()
+    assert manifest is not None
+    spec = torchvision_assets.pretrained_asset(preset)
+    matches = [asset for asset in manifest.assets if bundles._matches(spec, asset)]
+    recorded = [asset.source_revision for asset in manifest.assets if asset.preset == preset]
+    assert len(matches) == 1, f"{manifest.release_tag} records {recorded}; installed timm requests {spec.revision}"
 
 
 def test_bulk_release_failure_never_contacts_upstream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

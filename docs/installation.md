@@ -32,6 +32,8 @@
 
 Все семейства моделей ([detector family](../GLOSSARY.md#detector-family)) входят в стандартную установку: PyTorch, Ultralytics, RF-DETR, ONNX и ONNX Runtime — прямые зависимости пакета, отдельных extras нет. Среди зависимостей есть пакеты `digital-metrics` и `report-generator`; они должны быть доступны в индексе пакетов, из которого вы ставите `clearml-yolo`.
 
+Версия `timm` закреплена точно (`timm==1.0.31`): это версия, с которой собран закреплённый GitHub release весов. Backbone ConvNeXt, Swin, DINOv2 и DINOv3 восстанавливаются из release только при этой версии `timm`, поэтому не устанавливайте поверх неё другую версию. См. [`cy-download-weights`](commands/cy-download-weights.md).
+
 ### Как установить
 
 В публичном PyPI пакета `clearml-yolo` нет. Установите его по Git-ссылке в окружение с поддерживаемой версией Python, например через `uv`:

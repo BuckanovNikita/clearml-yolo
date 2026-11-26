@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
   "repository": "BuckanovNikita/clearml-yolo",
-  "release_tag": "weights-2026-10-31",
+  "release_tag": "weights-2026-11-25",
   "archives": [
     {
       "name": "weights-001.tar",
-      "size": 1888911360,
-      "sha256": "7d188773e5ef738b5a9f0b76d20c1f2c3ad17933b98eeb3ae7b272c3b9bcc9ad"
+      "size": 1890498560,
+      "sha256": "bc3a31ddd3ae9f334609c6503ace3695ed8e3378b4579a39a7655f640f32d387"
     },
     {
       "name": "weights-002.tar",
-      "size": 1815398400,
-      "sha256": "9df3198c30282914587c157533a56a2caa45d69343423a67eabfd1b37d3980bb"
+      "size": 1752145920,
+      "sha256": "67e6aadf3c7193f1b0e52676e4933759e753d6e30aece5431fa6838ff07e09ec"
     },
     {
       "name": "weights-003.tar",
-      "size": 1164830720,
-      "sha256": "f2271cad2442968514b428166dfdd1a5487a22a3a4b711a1e10842e14023b857"
+      "size": 1226485760,
+      "sha256": "12a5221a97dcc4c6a3b9f2b32164c15c101f8ec6aa2830c29174671c3cd692c2"
     },
     {
       "name": "deim-noncommercial-001.tar",
@@ -194,32 +194,6 @@
       "hub": null
     },
     {
-      "identity": "3c4739f8884a2cc75413f18a",
-      "backend": "fasterrcnn",
-      "preset": "convnext_tiny",
-      "filename": "convnext_tiny_22k_1k_224.pth",
-      "source_url": "https://dl.fbaipublicfiles.com/convnext/convnext_tiny_22k_1k_224.pth",
-      "source_revision": "1.0.30:convnext_tiny.fb_in22k_ft_in1k",
-      "kind": "weights",
-      "archive": "weights-001.tar",
-      "member": "assets/3c4739f8884a2cc75413f18a/model.safetensors",
-      "size": 114374272,
-      "sha256": "77b619e187de71bce58721689da0c009e84cc20677293d7d43105307e34d868a",
-      "hub": {
-        "repository": "timm/convnext_tiny.fb_in22k_ft_in1k",
-        "revision": "main",
-        "commit": "bc48a87f119bae1b06418f5340bfa97ef75d4609",
-        "filename": "model.safetensors",
-        "etag": "77b619e187de71bce58721689da0c009e84cc20677293d7d43105307e34d868a",
-        "config": {
-          "member": "assets/3c4739f8884a2cc75413f18a/config.json",
-          "size": 666,
-          "sha256": "05b31a3e4e2f16a1ad61f64ea4b34ba2e17fb10e72c48490de088b92b97a6151",
-          "etag": "8f645ab74da51c27a2963fd83b2d1f5833ba689e"
-        }
-      }
-    },
-    {
       "identity": "3cae592f292c4fc9b7f3bf5c",
       "backend": "ultralytics",
       "preset": "yolov10x",
@@ -262,32 +236,6 @@
       "hub": null
     },
     {
-      "identity": "5d3932c5eebf75488f534a18",
-      "backend": "fasterrcnn",
-      "preset": "dinov3_small",
-      "filename": "pytorch_model.bin",
-      "source_url": "https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m/resolve/main/pytorch_model.bin",
-      "source_revision": "1.0.30:vit_small_patch16_dinov3.lvd1689m",
-      "kind": "weights",
-      "archive": "weights-001.tar",
-      "member": "assets/5d3932c5eebf75488f534a18/model.safetensors",
-      "size": 86362376,
-      "sha256": "2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040",
-      "hub": {
-        "repository": "timm/vit_small_patch16_dinov3.lvd1689m",
-        "revision": "main",
-        "commit": "3bf4720a82ec2066db88137180ff1f83a675cef0",
-        "filename": "model.safetensors",
-        "etag": "2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040",
-        "config": {
-          "member": "assets/5d3932c5eebf75488f534a18/config.json",
-          "size": 670,
-          "sha256": "8eb1eeb3a94a3faddfcdd9ae693607a9cd9c8b91c34381578f7f0a48ce454eef",
-          "etag": "3ffe9c85d38c30e7920af2d98ca629b03143c905"
-        }
-      }
-    },
-    {
       "identity": "6020ae1fe9771b3cffd46956",
       "backend": "ultralytics",
       "preset": "yolo12m",
@@ -302,32 +250,6 @@
       "hub": null
     },
     {
-      "identity": "6653765cb45ee583f3586c9f",
-      "backend": "fasterrcnn",
-      "preset": "swin_tiny",
-      "filename": "swin_tiny_patch4_window7_224.pth",
-      "source_url": "https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth",
-      "source_revision": "1.0.30:swin_tiny_patch4_window7_224.ms_in1k",
-      "kind": "weights",
-      "archive": "weights-001.tar",
-      "member": "assets/6653765cb45ee583f3586c9f/model.safetensors",
-      "size": 114286722,
-      "sha256": "fb01861f793143135fa0d6cd97b1631e4b33eaa3ee162bbea9e62de1c76ebac1",
-      "hub": {
-        "repository": "timm/swin_tiny_patch4_window7_224.ms_in1k",
-        "revision": "main",
-        "commit": "4cc3a7275b50b53a7bec45f32c236ebe64227cff",
-        "filename": "model.safetensors",
-        "etag": "fb01861f793143135fa0d6cd97b1631e4b33eaa3ee162bbea9e62de1c76ebac1",
-        "config": {
-          "member": "assets/6653765cb45ee583f3586c9f/config.json",
-          "size": 637,
-          "sha256": "9f5258c03dd50edd60c3a5d994ad6929e72d18fb3aa202a4cd670be8b8ec7642",
-          "etag": "13c3eb26f41f64052a308ff3b6d4777e453fd279"
-        }
-      }
-    },
-    {
       "identity": "6baec8b3dad5301a85e6c469",
       "backend": "ultralytics",
       "preset": "yolov10n",
@@ -340,6 +262,32 @@
       "size": 5860383,
       "sha256": "11287ed0735678e7ba1ac2a9b3098c049155b3fde123992e724c1264bcc16b6f",
       "hub": null
+    },
+    {
+      "identity": "6bf46cf73bd135cd1b434f81",
+      "backend": "fasterrcnn",
+      "preset": "swin_tiny",
+      "filename": "swin_tiny_patch4_window7_224.pth",
+      "source_url": "https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth",
+      "source_revision": "1.0.31:swin_tiny_patch4_window7_224.ms_in1k",
+      "kind": "weights",
+      "archive": "weights-001.tar",
+      "member": "assets/6bf46cf73bd135cd1b434f81/model.safetensors",
+      "size": 114286722,
+      "sha256": "fb01861f793143135fa0d6cd97b1631e4b33eaa3ee162bbea9e62de1c76ebac1",
+      "hub": {
+        "repository": "timm/swin_tiny_patch4_window7_224.ms_in1k",
+        "revision": "main",
+        "commit": "4cc3a7275b50b53a7bec45f32c236ebe64227cff",
+        "filename": "model.safetensors",
+        "etag": "fb01861f793143135fa0d6cd97b1631e4b33eaa3ee162bbea9e62de1c76ebac1",
+        "config": {
+          "member": "assets/6bf46cf73bd135cd1b434f81/config.json",
+          "size": 637,
+          "sha256": "9f5258c03dd50edd60c3a5d994ad6929e72d18fb3aa202a4cd670be8b8ec7642",
+          "etag": "13c3eb26f41f64052a308ff3b6d4777e453fd279"
+        }
+      }
     },
     {
       "identity": "6c6cce7b6afce0d691e9545d",
@@ -461,7 +409,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov5m6u.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-002.tar",
+      "archive": "weights-001.tar",
       "member": "assets/88b083c6f67977f950697f3d/yolov5m6u.pt",
       "size": 83003066,
       "sha256": "c30fd1128a9c255b614ca3415c637499048387b45d488cd9193a2e0fccc6d780",
@@ -475,7 +423,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo12x.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-002.tar",
+      "archive": "weights-001.tar",
       "member": "assets/88dea4be66b748326497cfff/yolo12x.pt",
       "size": 119322638,
       "sha256": "682ce8dadee004dbe964950f1bf3eda451671815a6ed62db80b398916b9b7c6f",
@@ -741,7 +689,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11x.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-003.tar",
+      "archive": "weights-002.tar",
       "member": "assets/d34773e4bf34c2c295055c85/yolo11x.pt",
       "size": 114636239,
       "sha256": "7bc158aa95c0ebfdd87f70f01653c1131b93e92522dbe15c228bcd742e773a24",
@@ -755,7 +703,7 @@
       "source_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov3-tinyu.pt",
       "source_revision": "v8.4.0",
       "kind": "weights",
-      "archive": "weights-003.tar",
+      "archive": "weights-002.tar",
       "member": "assets/d9110bde746c328e362e09d2/yolov3-tinyu.pt",
       "size": 24440067,
       "sha256": "def5c43360675b9666fe9a3add6a1be849cea2bec3cf20d32b75b85840ed4887",
@@ -790,6 +738,58 @@
       "hub": null
     },
     {
+      "identity": "de5429d697bc173d115254cf",
+      "backend": "fasterrcnn",
+      "preset": "dinov2_small",
+      "filename": "dinov2_vits14_pretrain.pth",
+      "source_url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vits14/dinov2_vits14_pretrain.pth",
+      "source_revision": "1.0.31:vit_small_patch14_dinov2.lvd142m",
+      "kind": "weights",
+      "archive": "weights-003.tar",
+      "member": "assets/de5429d697bc173d115254cf/model.safetensors",
+      "size": 88240510,
+      "sha256": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081",
+      "hub": {
+        "repository": "timm/vit_small_patch14_dinov2.lvd142m",
+        "revision": "main",
+        "commit": "4610ca143709d58a633b6397a74412c2c3842454",
+        "filename": "model.safetensors",
+        "etag": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081",
+        "config": {
+          "member": "assets/de5429d697bc173d115254cf/config.json",
+          "size": 615,
+          "sha256": "b651fc1b08edf7d1c15a121cbb3270c802bd87901cfd4860d7ecb286e7d52a05",
+          "etag": "9b1787d3cf795650e5674cd7e523bab31cd45bf0"
+        }
+      }
+    },
+    {
+      "identity": "dec3c77c383d14f30964f8e9",
+      "backend": "fasterrcnn",
+      "preset": "dinov3_small",
+      "filename": "pytorch_model.bin",
+      "source_url": "https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m/resolve/main/pytorch_model.bin",
+      "source_revision": "1.0.31:vit_small_patch16_dinov3.lvd1689m",
+      "kind": "weights",
+      "archive": "weights-003.tar",
+      "member": "assets/dec3c77c383d14f30964f8e9/model.safetensors",
+      "size": 86362376,
+      "sha256": "2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040",
+      "hub": {
+        "repository": "timm/vit_small_patch16_dinov3.lvd1689m",
+        "revision": "main",
+        "commit": "3bf4720a82ec2066db88137180ff1f83a675cef0",
+        "filename": "model.safetensors",
+        "etag": "2a1ec16ae28ffa07bc0ead0241ee7df9fc26451fe6f9f839b7b3afa0a906b040",
+        "config": {
+          "member": "assets/dec3c77c383d14f30964f8e9/config.json",
+          "size": 670,
+          "sha256": "8eb1eeb3a94a3faddfcdd9ae693607a9cd9c8b91c34381578f7f0a48ce454eef",
+          "etag": "3ffe9c85d38c30e7920af2d98ca629b03143c905"
+        }
+      }
+    },
+    {
       "identity": "e3fdb672b746d3b7827023be",
       "backend": "rfdetr",
       "preset": "nano",
@@ -802,32 +802,6 @@
       "size": 366287238,
       "sha256": "d8d6b9ee57d4d0ed2b1f305163624712a0532cb7bce0c747317984fc5457440d",
       "hub": null
-    },
-    {
-      "identity": "ec8f8f1c466bc5f00a849b8e",
-      "backend": "fasterrcnn",
-      "preset": "dinov2_small",
-      "filename": "dinov2_vits14_pretrain.pth",
-      "source_url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vits14/dinov2_vits14_pretrain.pth",
-      "source_revision": "1.0.30:vit_small_patch14_dinov2.lvd142m",
-      "kind": "weights",
-      "archive": "weights-003.tar",
-      "member": "assets/ec8f8f1c466bc5f00a849b8e/model.safetensors",
-      "size": 88240510,
-      "sha256": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081",
-      "hub": {
-        "repository": "timm/vit_small_patch14_dinov2.lvd142m",
-        "revision": "main",
-        "commit": "4610ca143709d58a633b6397a74412c2c3842454",
-        "filename": "model.safetensors",
-        "etag": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081",
-        "config": {
-          "member": "assets/ec8f8f1c466bc5f00a849b8e/config.json",
-          "size": 615,
-          "sha256": "b651fc1b08edf7d1c15a121cbb3270c802bd87901cfd4860d7ecb286e7d52a05",
-          "etag": "9b1787d3cf795650e5674cd7e523bab31cd45bf0"
-        }
-      }
     },
     {
       "identity": "f4e9d951270a71635cbcf784",
@@ -856,6 +830,32 @@
       "size": 19006455,
       "sha256": "e915c2c4286e3f6f8610ef106fa3f94a7b8c19b30eccede5887e22c33ef75f58",
       "hub": null
+    },
+    {
+      "identity": "f9dea8cc9f6b33bfdc834835",
+      "backend": "fasterrcnn",
+      "preset": "convnext_tiny",
+      "filename": "convnext_tiny_22k_1k_224.pth",
+      "source_url": "https://dl.fbaipublicfiles.com/convnext/convnext_tiny_22k_1k_224.pth",
+      "source_revision": "1.0.31:convnext_tiny.fb_in22k_ft_in1k",
+      "kind": "weights",
+      "archive": "weights-003.tar",
+      "member": "assets/f9dea8cc9f6b33bfdc834835/model.safetensors",
+      "size": 114374272,
+      "sha256": "77b619e187de71bce58721689da0c009e84cc20677293d7d43105307e34d868a",
+      "hub": {
+        "repository": "timm/convnext_tiny.fb_in22k_ft_in1k",
+        "revision": "main",
+        "commit": "bc48a87f119bae1b06418f5340bfa97ef75d4609",
+        "filename": "model.safetensors",
+        "etag": "77b619e187de71bce58721689da0c009e84cc20677293d7d43105307e34d868a",
+        "config": {
+          "member": "assets/f9dea8cc9f6b33bfdc834835/config.json",
+          "size": 666,
+          "sha256": "05b31a3e4e2f16a1ad61f64ea4b34ba2e17fb10e72c48490de088b92b97a6151",
+          "etag": "8f645ab74da51c27a2963fd83b2d1f5833ba689e"
+        }
+      }
     },
     {
       "identity": "fc14ddb5f25d63e0bf6568aa",
