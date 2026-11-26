@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.51.7 (2026-11-26)
+
+### Bug Fixes
+
+- **weights**: Pin timm 1.0.31 exactly with the weights-2026-11-25 release (SIP-327)
+  ([#31](https://github.com/BuckanovNikita/clearml-yolo/pull/31),
+  [`c800b8f`](https://github.com/BuckanovNikita/clearml-yolo/commit/c800b8f1f04f9eaf5ab23f99de0ff879991dd899))
+
+### Documentation
+
+- **weights**: Say the timm guard test compares the installed timm (SIP-327)
+  ([#31](https://github.com/BuckanovNikita/clearml-yolo/pull/31),
+  [`c800b8f`](https://github.com/BuckanovNikita/clearml-yolo/commit/c800b8f1f04f9eaf5ab23f99de0ff879991dd899))
+
+
 ## v0.51.6 (2026-11-25)
 
 ### Bug Fixes
