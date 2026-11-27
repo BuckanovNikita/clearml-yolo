@@ -365,7 +365,7 @@ class NativeDDPRelay:
             sdk_deadline(self._callback_seconds),
             trace_operation("ddp.callback", context={"event": str(record["event"]), "stage": "train"}),
             _recorded_model_info(record.get("model_info")),
-            replayed_scalars(bool(record.get("scalar_journaled", False))),
+            replayed_scalars(bool(record.get("scalar_journaled"))),
         ):
             self._callbacks()[str(record["event"])](view)
 

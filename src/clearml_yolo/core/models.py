@@ -502,7 +502,7 @@ class ModelConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def native_resolution(cls, value: Any) -> Any:
+    def native_resolution(cls, value: object) -> object:
         if not isinstance(value, Mapping):
             return value
         values = dict(value)

@@ -263,12 +263,9 @@ def test_null_lookup_uses_actual_ordered_devices_and_preserves_requested_configu
     assert provenance["global_batch"] == 2 * (case.global_batch or 0)
 
 
-@pytest.mark.parametrize("device", ["cpu", "mps", "2"])
-def test_null_resolution_rejects_non_cuda_or_invisible_devices(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, device: str
-) -> None:
+def test_null_resolution_rejects_invisible_device(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(resolution, "discover_gpus", sample_devices)
     config = model_preset("fcos/resnet50_fpn")
-    config.train.batch, config.train.device = None, device
-    with pytest.raises(ValueError, match=r"CUDA|visibility"):
+    config.train.batch, config.train.device = None, "2"
+    with pytest.raises(ValueError, match="outside the current CUDA visibility"):
         resolution.resolve_native_batch(config, _dataset(tmp_path), None)

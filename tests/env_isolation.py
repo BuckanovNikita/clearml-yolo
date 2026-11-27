@@ -6,7 +6,7 @@ project (ClearML, Ultralytics, FiftyOne, Hydra) read configuration and caches fr
 tests must never read or write the developer's real files.
 
 Live tests need some real locations (the kubeconfig kubectl reads, weights caches). The
-original values are kept as JSON in ``CY_REAL_ENV``; read them with ``real_env``.
+integration lifecycle restores the original values from ``CY_REAL_ENV`` for child processes.
 """
 
 from __future__ import annotations
@@ -36,12 +36,6 @@ os.environ["XDG_CACHE_HOME"] = str(_FAKE_HOME / ".cache")
 # in progress.
 for _name in [name for name in os.environ if name.startswith("GIT_")]:
     del os.environ[_name]
-
-
-def real_env() -> dict[str, str]:
-    """Return the HOME-related variables as they were before isolation."""
-    recorded: dict[str, str | None] = json.loads(os.environ[REAL_ENV_VARIABLE])
-    return {name: value for name, value in recorded.items() if value is not None}
 
 
 @pytest.hookimpl(tryfirst=True)

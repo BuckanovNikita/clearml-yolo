@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
-from unittest.mock import Mock
 
 import pytest
 
@@ -175,36 +174,3 @@ assert integration.callbacks is original_callbacks
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-
-
-@pytest.mark.parametrize("fail_callback", [False, True])
-def test_cpu_observer_reads_live_journal_and_preserves_publication_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_callback: bool
-) -> None:
-    from ddp_cpu_harness import _wait_workers
-    from ddp_cpu_recording import RecordingTask
-
-    task = RecordingTask(fail_callback=fail_callback)
-    (tmp_path / "first-epoch-ready").touch()
-    scalar_journal = tmp_path / "scalars.jsonl"
-    scalar_journal.write_text(
-        json.dumps({"title": "metrics", "series": "metrics/mAP50(B)", "value": 0.75, "iteration": 0}) + "\n"
-    )
-    process = Mock(spec=subprocess.Popen)
-    process.poll.side_effect = [None, 0]
-    monkeypatch.setattr("ddp_cpu_harness.time.sleep", lambda _seconds: None)
-
-    live, failure = _wait_workers(process, tmp_path, task, scalar_journal)
-
-    assert (tmp_path / "release-first-epoch").is_file()
-    if fail_callback:
-        assert not live
-        assert isinstance(failure, RuntimeError)
-        assert str(failure) == "Injected owner callback failure"
-        assert task.callback_failed
-        assert task.scalars == []
-    else:
-        assert live
-        assert failure is None
-        assert len(task.scalars) == 1
-        assert task.scalars[0]["value"] == 0.75

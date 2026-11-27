@@ -1,5 +1,6 @@
 """RF-DETR boundary tests preserve foreground populations and fail-fast recipes."""
 
+import operator
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -251,7 +252,7 @@ def test_rfdetr_pretrained_backbone_was_actually_loaded(
     value = SimpleNamespace(cpu=lambda: [0.25, 0.5])
     checkpoint = tmp_path / "pretrained.pth"
     actual = value if matches else SimpleNamespace(cpu=lambda: [0.0, 0.0])
-    native_torch = SimpleNamespace(equal=lambda left, right: left == right)
+    native_torch = SimpleNamespace(equal=operator.eq)
     native_io = SimpleNamespace(_safe_torch_load=lambda _: {"model": {key: value}})
 
     monkeypatch.setitem(sys.modules, "torch", native_torch)

@@ -172,8 +172,7 @@ def test_the_scale_inference_ran_at_reaches_the_run_record(
     published: dict[str, pd.DataFrame],
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    """ClearML captures the warning in the console log, where an hour of a run buries it.
-    The table is the same fact somewhere a reviewer can find it later."""
+    """The resolution table preserves the warning alongside the ClearML console log."""
     checkpoint_recording({"imgsz": 1280})
     _predict(tmp_path, 640, workflow_dependencies=workflow_dependencies)
     section = f"{artifact_names.PREDICT_SECTION}/{artifact_names.RESOLUTION_SERIES}"
@@ -191,8 +190,7 @@ def test_the_resolution_travels_with_the_predictions(
     published: dict[str, pd.DataFrame],
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    """The report stage publishes numbers measured at this scale, and reopening the
-    checkpoint to ask a second time is how the two would come to disagree."""
+    """The report uses the scale recorded during prediction."""
     checkpoint_recording({"imgsz": 1280})
     result = _predict(tmp_path, 1280, workflow_dependencies=workflow_dependencies)
     assert result.predictions == tmp_path / "predictions.csv"

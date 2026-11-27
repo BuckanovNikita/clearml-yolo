@@ -1,6 +1,7 @@
 """Contained project writes with unchanged external input and library paths."""
 
 import os
+import tempfile
 from pathlib import Path
 
 from clearml_yolo.adapters.observability.tracing import trace_operation
@@ -14,6 +15,26 @@ from clearml_yolo.adapters.runtime.bootstrap import (
 def write_path(value: str | Path) -> Path:
     """Validate containment before a project-owned write or directory creation."""
     return project_write_path(value)
+
+
+def durable_replace_text(path: Path, payload: str, *, prefix: str) -> None:
+    """Replace a snapshot, syncing both its contents and its directory entry."""
+    parent = write_path(path.parent)
+    descriptor, name = tempfile.mkstemp(prefix=Path(prefix).name, suffix=".tmp", dir=parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(write_path(path))
+        directory = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def validate_output_tree(value: str | Path) -> Path:

@@ -1,3 +1,5 @@
+"""Ground-truth CSV validation, image identity, and annotation consistency."""
+
 import csv
 import hashlib
 from collections.abc import Iterator

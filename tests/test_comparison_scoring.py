@@ -168,15 +168,10 @@ def test_empty_predictions_leave_every_ground_truth_box_undetected() -> None:
     ]
 
 
-def _one_gt_one_cross_class_prediction() -> tuple[pd.DataFrame, pd.DataFrame]:
+@pytest.mark.parametrize("strategy", ["greedy", "iou_prior"])
+def test_cross_class_false_positive_does_not_mark_its_ground_truth_detected(strategy: str) -> None:
     gt = _gt_frame([("img1.jpg", "dog", 0.0, 0.0, 10.0, 10.0)], index=[42])
     preds = _pred_frame([("img1.jpg", "cat", 0.0, 0.0, 10.0, 10.0, 0.9)], index=[3])
-    return gt, preds
-
-
-def test_greedy_cross_class_prediction_preserves_the_ground_truth_miss() -> None:
-    """Class-aware assignment counts a wrong-class prediction as both FP and FN."""
-    gt, preds = _one_gt_one_cross_class_prediction()
 
     outcome = score_split(
         gt,
@@ -184,7 +179,7 @@ def test_greedy_cross_class_prediction_preserves_the_ground_truth_miss() -> None
         ["cat", "dog"],
         {"cat": 0.5, "dog": 0.5},
         iou_threshold=0.5,
-        matching_strategy="greedy",
+        matching_strategy=strategy,
     )
 
     assert outcome.counts == {
@@ -192,27 +187,6 @@ def test_greedy_cross_class_prediction_preserves_the_ground_truth_miss() -> None
         "dog": ClassCounts(tp=0, fp=0, fn=1),
     }
     assert outcome.gt_status["gt_index"].tolist() == [42]
-    assert outcome.gt_status["detected"].tolist() == [False]
-    assert outcome.pred_status["pred_index"].tolist() == [3]
-    assert outcome.pred_status["is_tp"].tolist() == [False]
-
-
-def test_cross_class_false_positive_does_not_mark_its_ground_truth_detected() -> None:
-    gt, preds = _one_gt_one_cross_class_prediction()
-
-    outcome = score_split(
-        gt,
-        preds,
-        ["cat", "dog"],
-        {"cat": 0.5, "dog": 0.5},
-        iou_threshold=0.5,
-        matching_strategy="iou_prior",
-    )
-
-    assert outcome.counts == {
-        "cat": ClassCounts(tp=0, fp=1, fn=0),
-        "dog": ClassCounts(tp=0, fp=0, fn=1),
-    }
     assert outcome.gt_status["detected"].tolist() == [False]
     assert outcome.pred_status["pred_index"].tolist() == [3]
     assert outcome.pred_status["is_tp"].tolist() == [False]

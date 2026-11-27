@@ -11,10 +11,6 @@ from severstal_harness import (
     scenario_overrides,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
-with pytest.MonkeyPatch.context() as import_path:
-    import_path.syspath_prepend(str(ROOT))
-
 
 @pytest.mark.parametrize(
     "selection",

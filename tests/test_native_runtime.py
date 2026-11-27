@@ -211,7 +211,6 @@ def test_worker_disables_callbacks_without_persisting_settings(
     assert integration.callbacks is original_callbacks
     assert os.environ.get("YOLO_CONFIG_DIR") == previous
     assert Path(SETTINGS.file).read_bytes() == settings_bytes
-    assert Path(SETTINGS.file).read_bytes() == settings_bytes
 
 
 def test_native_general_redacts_credentials_without_changing_training_args(

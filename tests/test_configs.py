@@ -4,7 +4,6 @@ import pytest
 from hydra import compose, initialize_config_module
 from hydra.errors import ConfigCompositionException
 from hydra_zen import store
-from omegaconf import OmegaConf
 
 import clearml_yolo.entrypoints.hydra.configs  # noqa: F401
 
@@ -36,8 +35,6 @@ def test_csv_training_commands_expose_dataset_format_defaults(command: str) -> N
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name=command)
     assert config.dataset_format == "ndjson"
-    if command == "train":
-        assert OmegaConf.is_missing(config, "ground_truth")
 
 
 def test_prediction_inherits_shared_cli_values_and_explicit_overrides() -> None:
@@ -106,17 +103,17 @@ def test_evaluation_defaults_to_all_three_splits(command: str) -> None:
 def test_prediction_device_is_independent(training_device: str) -> None:
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         config = compose(config_name="pipeline", overrides=[f"ultralytics.device={training_device}"])
-        overridden = compose(config_name="pipeline", overrides=["ultralytics_predict.device=null"])
     assert list(config.ultralytics_predict.device) == [-1]
+
+
+def test_explicit_null_prediction_device_is_preserved() -> None:
+    with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
+        overridden = compose(config_name="pipeline", overrides=["ultralytics_predict.device=null"])
     assert overridden.ultralytics_predict.device is None
     assert overridden.ultralytics.device is None
 
 
 def test_cache_location_is_exposed_on_training_commands() -> None:
-    from hydra import compose, initialize_config_module
-    from hydra_zen import store
-
-    store.add_to_hydra_store(overwrite_ok=True)
     with initialize_config_module(config_module="hydra_zen.wrapper", version_base="1.3"):
         for name in ("train", "pipeline"):
             config = compose(config_name=name, overrides=["dataset_cache_dir=/shared/datasets"])

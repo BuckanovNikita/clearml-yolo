@@ -3,6 +3,7 @@
 import multiprocessing
 from copy import deepcopy
 from datetime import timedelta
+from operator import itemgetter
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, override
@@ -281,7 +282,7 @@ def test_real_cpu_ranks_finish_unequal_validation_and_synchronize_buffers(tmp_pa
         for process in processes:
             process.join(timeout=10)
             assert process.exitcode == 0
-        records.sort(key=lambda record: record["rank"])
+        records.sort(key=itemgetter("rank"))
         assert records[0]["samples"] == [0, 2, 4]
         assert records[1]["samples"] == [1, 3]
         assert records[0]["buffer"] == records[1]["buffer"]

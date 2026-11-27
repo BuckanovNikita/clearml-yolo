@@ -91,8 +91,7 @@ def _redact_assignments(text: str) -> str:
     pieces: list[str] = []
     index = 0
     while match := _ASSIGNMENT.search(text, index):
-        pieces.append(text[index : match.start()])
-        pieces.append(f"{match['key']}={_REDACTED}")
+        pieces.append(f"{text[index : match.start()]}{match['key']}={_REDACTED}")
         index = _assignment_end(text, match.end())
     pieces.append(text[index:])
     return "".join(pieces)

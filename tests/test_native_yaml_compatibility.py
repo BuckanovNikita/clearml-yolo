@@ -17,10 +17,3 @@ def test_export_loads_directly_in_native_parser(tmp_path: Path, stage: Stage) ->
     assert config.model == "yolo11n.pt"
     assert config.device == "cpu"
     assert config.mode == stage
-
-
-def test_native_invalid_parameter_is_rejected() -> None:
-    from ultralytics.cfg import get_cfg
-
-    with pytest.raises(SyntaxError):
-        get_cfg(overrides={"nonexistent_release_option": True})

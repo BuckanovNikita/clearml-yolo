@@ -766,7 +766,7 @@ def invocation(
             write_progress(task_url=str(task.get_output_log_web_page()))
         if resolved_config is not None:
             _replay_initial_configuration(task, resolved_config)
-        yield task
+        yield task  # noqa: RUF075 - Only successful invocations finalize here; _task_owner handles failures.
         _finalize_preserving_training(state)
 
 
@@ -1010,7 +1010,7 @@ def publish_table(task: Any, name: str, path: Path) -> None:
         record.local_path = str(path.resolve())
     if existing_name is not None:
         record.uploaded = True
-        active.table_remote_by_key[(name, digest)] = existing_name
+        active.table_remote_by_key[name, digest] = existing_name
         return
     remote_name = name
     suffix = 2
@@ -1019,7 +1019,7 @@ def publish_table(task: Any, name: str, path: Path) -> None:
         suffix += 1
     _sync_upload(task, remote_name, path)
     active.table_by_digest[digest] = remote_name
-    active.table_remote_by_key[(name, digest)] = remote_name
+    active.table_remote_by_key[name, digest] = remote_name
     active.table_remote_names.add(remote_name)
     record.uploaded = True
     logger.debug("Published canonical table {} as {}", human_text(name), human_text(remote_name))
@@ -1169,7 +1169,7 @@ def publish_model_assets(task: Any, assets: tuple[ResolvedAsset, ...]) -> None:
         return
     state = _active_state(task, "Model asset provenance publication")
     for asset in assets:
-        state.model_assets[(asset.canonical_url, str(asset.path))] = asset
+        state.model_assets[asset.canonical_url, str(asset.path)] = asset
     _publish_json(
         task,
         "model_assets",

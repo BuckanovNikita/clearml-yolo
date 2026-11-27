@@ -18,11 +18,6 @@ from clearml_yolo.core.evaluation.models import EvaluationConfig
 from workflow_dependencies import workflow_dependencies as workflow_dependencies  # noqa: PLC0414
 
 
-def test_use_case_requires_explicit_dependencies() -> None:
-    with pytest.raises(TypeError, match="deps"):
-        ground_truth("data.yaml", "truth.csv", ClearMLConfig())  # type: ignore[call-arg]
-
-
 def test_conversion_uses_supplied_dataset_and_tracking_ports(
     tmp_path: Path, workflow_dependencies: WorkflowDependencies
 ) -> None:

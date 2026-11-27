@@ -96,16 +96,17 @@ def _scan(directory: Path, result: DedupResult) -> list[_File]:
         try:
             with os.scandir(current) as entries:
                 for entry in entries:
+                    path = Path(entry.path)
                     try:
                         snapshot = entry.stat(follow_symlinks=False)
-                        path = Path(entry.path)
-                        if stat.S_ISDIR(snapshot.st_mode):
-                            pending.append(path)
-                        elif stat.S_ISREG(snapshot.st_mode) and path.suffix.lower() in IMAGE_EXTENSIONS:
-                            files.append(_File(path, snapshot))
-                            result.scanned += 1
                     except OSError as error:
-                        _failure(result, Path(entry.path), error)
+                        _failure(result, path, error)
+                        continue
+                    if stat.S_ISDIR(snapshot.st_mode):
+                        pending.append(path)
+                    elif stat.S_ISREG(snapshot.st_mode) and path.suffix.lower() in IMAGE_EXTENSIONS:
+                        files.append(_File(path, snapshot))
+                        result.scanned += 1
         except OSError as error:
             _failure(result, current, error)
     return sorted(files, key=lambda file: str(file.path))
@@ -150,11 +151,12 @@ def _candidates(files: list[_File], result: DedupResult) -> Iterator[tuple[_File
                     key=lambda source: source.snapshot.st_dev != file.snapshot.st_dev,
                 )
                 for source in sources:
-                    if _equal(source, file):
-                        yield source, file
-                        if source.snapshot.st_dev != file.snapshot.st_dev:
-                            by_digest[digest].append(file)
-                        break
+                    if not _equal(source, file):
+                        continue
+                    yield source, file
+                    if source.snapshot.st_dev != file.snapshot.st_dev:
+                        by_digest[digest].append(file)
+                    break
                 else:
                     by_digest[digest].append(file)
             except OSError as error:

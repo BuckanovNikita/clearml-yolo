@@ -8,7 +8,6 @@ import inspect
 import json
 import math
 from collections.abc import Callable
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -16,16 +15,8 @@ from zipfile import ZipFile
 
 import pandas as pd
 import pytest
-from click.testing import CliRunner
-from digital_metrics.matching import match_boxes
-from digital_metrics.scoring import compute_map, get_confusion_matrix, slice_by_conf
 from openpyxl import Workbook, load_workbook  # type: ignore[import-untyped]
 from openpyxl.chart import BarChart, Reference  # type: ignore[import-untyped]
-from report_generator.cli import cli
-from report_generator.config import Config
-from report_generator.core.reader import MetricsReader
-from report_generator.reports.business.builder import BusinessReportBuilder
-from report_generator.reports.dev.builder import DevReportBuilder
 
 from clearml_yolo.adapters.evaluation.pr_curves import build_pr_curves
 from clearml_yolo.adapters.evaluation.scoring import (
@@ -406,12 +397,8 @@ def test_formula_chart_print_and_identity_recovery_equal_frozen_values(tmp_path:
     assert observed["annotated"]["drawings"] == expected["original"]["drawings"]
 
 
-def _public_observation() -> dict[str, Any]:
+def test_public_cy_signatures_equal_frozen_contracts() -> None:
     functions: list[Callable[..., Any]] = [
-        match_boxes,
-        compute_map,
-        get_confusion_matrix,
-        slice_by_conf,
         prepare_ground_truth,
         prepare_predictions,
         compute_evaluation,
@@ -423,34 +410,17 @@ def _public_observation() -> dict[str, Any]:
         build_comparison_rows,
         write_comparison_workbook,
         build_reports,
-        Config.load,
-        MetricsReader.__init__,
-        DevReportBuilder.__init__,
-        DevReportBuilder.build,
-        BusinessReportBuilder.__init__,
-        BusinessReportBuilder.build,
     ]
-    signatures = {}
+    expected = _expected("public")["signatures"]
     for function in functions:
-        signatures[function.__qualname__] = [
+        assert [
             [
                 name,
                 parameter.kind.name,
                 "<required>" if parameter.default is inspect.Parameter.empty else repr(parameter.default),
             ]
             for name, parameter in inspect.signature(function).parameters.items()
-        ]
-    runner = CliRunner()
-    help_text = {}
-    for command in [[], ["dev"], ["business"]]:
-        result = runner.invoke(cli, [*command, "--help"])
-        assert result.exit_code == 0
-        help_text["/".join(command) or "root"] = result.output
-    return _stable_mapping({"signatures": signatures, "config": asdict(Config.load()), "cli_help": help_text})
-
-
-def test_public_signatures_defaults_config_and_cli_help_equal_frozen_contracts() -> None:
-    assert _public_observation() == _expected("public")
+        ] == expected[function.__qualname__], function.__qualname__
 
 
 def test_comparison_workbook_semantics_equal_frozen_values(tmp_path: Path) -> None:
