@@ -37,7 +37,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "tqdm>=4.66.0",
     # Local dependency copies live in external/; see DOCS.md (Installation and dependencies).
-    "digital-metrics>=0.6.1",
+    "digital-metrics>=0.7.0",
     "report-generator>=0.3.0",
     "ruamel-yaml>=0.18.0,<0.19",
     # Every supported runtime capability is part of the standard installation.
