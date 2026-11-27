@@ -50,6 +50,8 @@ b.jpg,images/train/b.jpg,,,,,,train
 
 ## Зарезервированное имя класса
 
+[`cy-ground-truth`](../commands/cy-ground-truth.md) отклоняет класс `background` ещё при чтении имён классов YOLO-датасета, до записи CSV.
+
 Строку с `instance_label`, равным `background`, команды обрабатывают по-разному:
 
 - `cy-train`, этап обучения `cy` и проверка модели в `cy-export` отклоняют файл при чтении CSV, до открытия изображений и до начала обучения. Сообщение: `Invalid raw_ground_truth dataframe: instance_label at 2: reserved_background_label`.
