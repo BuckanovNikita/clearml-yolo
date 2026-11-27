@@ -36,7 +36,7 @@ _Avoid_: каталог весов
 
 <a id="hydra-output-directory"></a>
 **Hydra output directory**:
-The directory Hydra creates for each launch of a Hydra command, under `CY_HOME/outputs/` for a single run and `CY_HOME/multirun/` for a sweep. It holds the composed configuration and the Hydra log.
+The directory where Hydra writes the composed configuration and log for a launch. By default, a single run writes under `CY_HOME/outputs/` and a sweep under `CY_HOME/multirun/`. Both paths can be configured within the workspace.
 _Russian_: каталог Hydra
 _Avoid_: каталог запуска (that is the run directory)
 
@@ -189,7 +189,7 @@ _Avoid_: новая модель
 
 <a id="baseline"></a>
 **Baseline**:
-The model used as the reference for a comparison. The automatic baseline comes from the latest completed `prod` task in the run’s ClearML project, excluding the current task.
+The reference model for a comparison. For automatic selection, CY looks for another task tagged `prod` in the same ClearML project with status `completed` or `published`. The latest completion time wins, with the latest update breaking ties.
 _Russian_: baseline (модель baseline)
 _Avoid_: базовая модель, прод-модель
 
