@@ -681,7 +681,7 @@ requires-dist = [
     { name = "pytorch-lightning", specifier = "==2.6.6" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "report-generator", specifier = ">=0.3.0" },
-    { name = "requests", specifier = ">=2.32.0" },
+    { name = "requests", specifier = ">=2.32.4" },
     { name = "rfdetr", extras = ["train"], specifier = "==1.11.2" },
     { name = "ruamel-yaml", specifier = ">=0.18.0,<0.19" },
     { name = "safetensors", specifier = ">=0.8.0,<0.9" },
