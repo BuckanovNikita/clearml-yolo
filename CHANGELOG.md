@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.51.8 (2026-11-27)
+
+### Bug Fixes
+
+- **deps**: Raise the hydra-core floor to 1.3.2 (SIP-335)
+  ([`1033bf0`](https://github.com/BuckanovNikita/clearml-yolo/commit/1033bf0743b3e2a00c5108d013332f3d41ef73d1))
+
+
 ## v0.51.7 (2026-11-26)
 
 ### Bug Fixes
