@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.51.9 (2026-11-27)
+
+### Bug Fixes
+
+- Reject the reserved background class during ground truth conversion (SIP-275)
+  ([`0a0bb58`](https://github.com/BuckanovNikita/clearml-yolo/commit/0a0bb584964509b669820b0db1870d7d6e5a2639))
+
+- **deps**: Require requests 2.32.4 for host-scoped netrc credentials
+  ([`e4c5380`](https://github.com/BuckanovNikita/clearml-yolo/commit/e4c538067b116db7a9cb7dbd2f21badb7a583ff3))
+
+### Refactoring
+
+- Prune redundant checks and consolidate batch storage
+  ([`420bfba`](https://github.com/BuckanovNikita/clearml-yolo/commit/420bfba02d96dbb43cdaa90cd6f5fb0a7cd6e1b2))
+
+### Testing
+
+- Remove checks for omitted typed arguments
+  ([`935f0f1`](https://github.com/BuckanovNikita/clearml-yolo/commit/935f0f1cb733c23b00f715dc7b4373de68a46ec7))
+
+
 ## v0.51.8 (2026-11-27)
 
 ### Bug Fixes
