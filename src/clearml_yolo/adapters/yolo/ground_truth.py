@@ -291,14 +291,16 @@ def _yaml_1_1_class_names(yaml_file: Path, installed_count: int) -> dict[int, st
         raise _unusable_names(yaml_file, f"{type(error).__name__}: {error}") from error
 
 
-def _reject_reader_dependent_names(yaml_file: Path, names: dict[int, str]) -> None:
-    """Refuse class names whose text depends on the YAML reader of the installed Ultralytics.
+def _validate_class_names(yaml_file: Path, names: dict[int, str]) -> None:
+    """Reject the reserved label and class names that depend on the installed YAML reader.
 
     Ultralytics 8.4.184 reads data.yaml with PyYAML (YAML 1.1); 8.4.218 uses its own YAML 1.2
     core reader. An unquoted ``yes`` or ``1e3`` then becomes the label ``'yes'`` or ``'1000.0'``
     instead of ``'True'`` or ``'1e3'``, and ``nc: 010`` gives 10 classes instead of 8; a CSV
     rebuilt from the same file would silently stop matching models trained on the old one.
     """
+    if "background" in names.values():
+        raise ValueError(f"{yaml_file} declares the reserved class label 'background'")
     expected = _yaml_1_1_class_names(yaml_file, len(names))
     if expected == names:
         return
@@ -331,7 +333,7 @@ def build_ground_truth(
     yaml_path = Path(data_yaml).expanduser()
     dataset = check_det_dataset(str(yaml_path.resolve()) if yaml_path.exists() else str(data_yaml))
     names: dict[int, str] = {int(index): str(name) for index, name in dataset["names"].items()}
-    _reject_reader_dependent_names(Path(dataset["yaml_file"]), names)
+    _validate_class_names(Path(dataset["yaml_file"]), names)
 
     images: dict[str, list[Path]] = {}
     for split in SPLITS:

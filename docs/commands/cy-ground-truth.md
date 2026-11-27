@@ -39,7 +39,7 @@ cy-ground-truth [--config-dir DIR] [--config-name NAME] [--cfg job] [KEY=VALUE .
 2. Создаёт задачу ClearML.
 3. Публикует файл `data_yaml` в задаче как объект конфигурации ([configuration object](../../GLOSSARY.md#configuration-object)) `dataset`. Ссылки `${...}` в файле разрешаются относительно конфигурации команды (см. [Интерполяции](../configuration/README.md#интерполяции-в-файлах-конфигурации)); дальше используется файл с разрешёнными значениями.
 4. Читает датасет и строит CSV по шагам, описанным в [Как `cy-ground-truth` строит CSV](../formats/datasets.md#как-cy-ground-truth-строит-csv): собирает split, при необходимости выделяет `test` из `val` по `test_fraction` и `seed`, переводит рамки (bounding box) в пиксели.
-   Сам файл `data_yaml` проверяется только на этом шаге, когда задача уже создана.
+   Сам файл `data_yaml` проверяется на этом шаге, когда задача уже создана. Если в `names` есть класс `background`, команда останавливается до записи CSV, даже если в разметке нет объектов этого класса.
 5. Записывает CSV в `output`.
 6. Копирует CSV в `result_publication/gt_csv.csv` рядом с ним и загружает копию в задачу как артефакт `gt_csv` (см. [Публикация](../publication.md#артефакты)).
 
