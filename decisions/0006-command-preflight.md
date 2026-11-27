@@ -1,0 +1,5 @@
+# ADR-0006 · Validate composed settings before owning a remote task
+
+An invalid experiment setting can otherwise leave an empty ClearML task. Each Hydra command checks wrapper keys, project destinations and the command-specific values it can validate from the configuration before creating its task. The owner checks restored Agent inputs too. Checks account for detector-specific projection and supported defaults when optional keys have been removed.
+
+Preflight does not establish that files exist, weights can download or a remote model can resolve. Some use-case checks also remain later, including standalone comparison inference settings and certain training cache/output combinations. Queue admission has a distinct compatibility contract. [Technical contract](../DOCS.md#commands-and-configuration) · [Validators](../src/clearml_yolo/entrypoints/hydra/validation.py) · [Preflight tests](../tests/test_command_preflight.py) · [Original change](https://linear.app/sip-ds-team/issue/SIP-205) · [Known remaining checks](https://linear.app/sip-ds-team/issue/SIP-276)

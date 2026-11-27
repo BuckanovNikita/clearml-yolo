@@ -5,7 +5,8 @@
 predict, evaluate, compare, report and export detectors (YOLO, DEIMv2, RF-DETR, Faster R-CNN,
 FCOS) with ClearML publication. [DOCS.md](DOCS.md) holds architecture, behavior contracts, config
 keys and operations. Read the affected DOCS.md section and the user page that owns the fact before
-changing behavior or configuration.
+changing behavior or configuration. Update the feature's [living ADR and index entry](decisions/README.md)
+in the same PR that changes, adds or removes it.
 
 ## User documentation
 
