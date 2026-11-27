@@ -1,5 +1,0 @@
-# ADR-0002 · Preserve a successful training result across downstream failures
-
-Training can produce a usable checkpoint before a later stage fails. The pipeline establishes training success from a nonempty checkpoint, records the status of each stage, and can complete with warnings while preserving the model. Dependent stages are skipped after an upstream failure. An old predictions file in a reused run directory does not turn that failure into a successful stage.
-
-The JSON outcome is machine-readable and the text summary is for the operator. Failures before successful training, runs using `skip_train`, and interruption keep their failure semantics. The policy belongs to the compound pipeline. A standalone metrics command still fails on a computation error. [Command](../docs/commands/cy.md) · [Outcome record](../src/clearml_yolo/core/pipeline_outcome.py) · [Orchestration](../src/clearml_yolo/application/use_cases/pipeline.py) · [Failure-injection tests](../tests/test_pipeline_outcomes.py)
