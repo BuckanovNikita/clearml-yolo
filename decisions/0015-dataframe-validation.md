@@ -1,0 +1,5 @@
+# ADR-0015 · Validate tables at the stage that consumes them
+
+A raw annotation can be valuable evidence even when its box is invalid for scoring. CY selects a Pandera schema for each stage of ground truth, prediction, publication or result processing. Validation checks the supplied dataframe without rewriting lexical identifiers, converting its cells in place or silently dropping rows. Failures identify the stage and include findings with the original row labels where available.
+
+For example, raw predictions retain invalid geometry so a later filter can explain its disposition, while invalid confidence fails validation. Prepared tables enforce additional identity and geometry constraints. This keeps the [ground truth CSV](0101-ground-truth-csv.md), [prediction CSV](0112-prediction-csv.md) and [evaluation lineage](0134-evaluation-lineage.md) traceable across transformations. [Schemas and findings](../src/clearml_yolo/core/validation/schemas.py) · [Validation and non-mutation cases](../tests/test_dataframe_validation.py) · [Decision history](https://github.com/BuckanovNikita/clearml-yolo/commit/493f0399fc10c2f99ac072335115f754176baa14)

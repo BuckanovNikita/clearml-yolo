@@ -14,6 +14,7 @@ An empty prediction output keeps all headers. Duplicate basenames cannot safely 
 
 ## Evidence
 
+- [Stage-specific dataframe validation](0015-dataframe-validation.md)
 - [Prediction data contract](../src/clearml_yolo/application/contracts.py)
 - [Prediction assembly](../src/clearml_yolo/application/use_cases/predict.py)
 - [Identity and membership validation](../src/clearml_yolo/core/evaluation/policy.py)

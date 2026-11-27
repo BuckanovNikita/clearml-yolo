@@ -14,6 +14,7 @@ Invalid geometry has an explicit disposition. A consumer can trace a match to it
 
 ## Evidence
 
+- [Stage-specific dataframe validation](0015-dataframe-validation.md)
 - [Source IDs and row assembly](../src/clearml_yolo/core/evaluation/result_rows.py)
 - [Source-to-prepared evaluation](../src/clearml_yolo/adapters/evaluation/scoring.py)
 - [Payload and relationship tests](../tests/test_evaluation_payload.py)

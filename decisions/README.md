@@ -38,6 +38,7 @@ Start with a command below, or find a feature by topic. Each record describes th
 - [ADR-0012 · Defer runtime initialization until a capability is invoked](0012-import-effects.md)
 - [ADR-0013 · Sanitize structured values at publication boundaries](0013-credential-redaction.md)
 - [ADR-0014 · Keep native comparison diagnostics in a local archive](0014-native-output-archive.md)
+- [ADR-0015 · Validate tables at the stage that consumes them](0015-dataframe-validation.md)
 
 ## Ground truth and datasets
 

@@ -1,6 +1,6 @@
 # ADR-0234 · Execute a metadata-bound TensorRT engine without Torch
 
-A serving application can instantiate `TensorRTRunner` with engine bytes, matching metadata and a visible CUDA device index. Before inference it validates the digest, TensorRT version, ROIAlign plugin, recorded CUDA runtime when present, tensor signatures and engine profiles. The caller owns scheduling and serializes calls to a runner.
+A serving application can instantiate `TensorRTRunner` with a path to the serialized engine, a matching `ExportMetadata` object and an optional CUDA device index. Before inference it validates the digest, TensorRT version, ROIAlign plugin, recorded CUDA runtime when present, tensor signatures and engine profiles. The caller owns scheduling and serializes calls to a runner.
 
 Inference accepts the declared input tensors and returns detections and counts. Each call owns its allocations and CUDA stream. The NumPy preprocessing helpers handle normalization, resizing and original-coordinate recovery. Unit cases with simulated SDK calls cover validation and cleanup. Actual latency, device memory and predictions require a live engine.
 
