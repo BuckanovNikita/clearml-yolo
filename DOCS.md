@@ -1,8 +1,7 @@
 # clearml-yolo reference
 
-Behavior and contracts that the code does not make obvious. The [feature ADR index](decisions/README.md) links the
-current architectural decisions to their implementations and evidence. Usage is in [README.md](README.md) and
-[docs/](docs/README.md). Rules for changing the code are in [AGENTS.md](AGENTS.md).
+Consult this reference for behavior, configuration and operations. For decisions that span detector development,
+scientific evaluation or experiment operations, use the corresponding entry in `DECISIONS.md`.
 
 ## Architecture and data flow
 
@@ -187,9 +186,8 @@ current architectural decisions to their implementations and evidence. Usage is 
 - Canonical run: complete frozen executable inputs, the replay input. Provenance: origin evidence and hashes supplementing it. Scientific result: prediction, metric, comparison or report tied to its sources.
 - Invocation owner: the execution owning one task, its publications and descendant cleanup. Identity footer: readable model identity after a report's data.
 - Change acceptance = `task acceptance`; release acceptance = `task release-acceptance`. Paired release check: CY and cy-queue proposed versions pass together (avoid "release check").
-- A living Architecture Decision Record (ADR) describes a workflow or subsystem. Its sections explain the capabilities
-  and contracts that work together. The [index](decisions/README.md) maps commands to their sections and explains how to maintain them.
-  Linear and Git preserve decision history.
+- Architecture Decision Record (ADR): a living account of a capability's governing decision, observable consequences
+  and known contract discrepancies. The decision register keeps all entries in one file.
 
 ## History
 

@@ -3,15 +3,16 @@
 `clearml-yolo` (CY) provides Hydra/hydra-zen commands (`cy`, `cy-train`, `cy-predict`, `cy-val`,
 `cy-metrics`, `cy-compare`, `cy-report`, `cy-ground-truth`, `cy-export` and tools) that train,
 predict, evaluate, compare, report and export detectors (YOLO, DEIMv2, RF-DETR, Faster R-CNN,
-FCOS) with ClearML publication. [DOCS.md](DOCS.md) holds architecture, behavior contracts, config
-keys and operations. Read the affected DOCS.md section and the user page that owns the fact before
-changing behavior or configuration. Update the relevant section of the [workflow or subsystem ADR](decisions/README.md)
-in the same PR. Update the index when a command link or the set of records changes.
+FCOS) with ClearML publication.
+
+For a behavior or configuration change, read the affected contract in `DOCS.md` and its owning user page.
+Update the relevant build, evaluation or operations decision in `DECISIONS.md` in the same PR.
+When a command changes, check its navigation entry against the installed entry point.
 
 ## User documentation
 
-- The user documentation is [README.md](README.md) (entry page) and the pages that
-  [docs/README.md](docs/README.md) lists. Each fact has one owning page: the page that index lists
+- The user documentation is `README.md` (entry page) and the pages that
+  `docs/README.md` lists. Each fact has one owning page: the page that index lists
   for its command, config group, file format or topic. Other pages link to the owner; `README.md`,
   `docs/README.md` and `GLOSSARY.md` also restate some facts (for example the command list and
   counts, Python range, install command, weight licences, defaults quoted in glossary entries).
@@ -24,7 +25,7 @@ in the same PR. Update the index when a command link or the set of records chang
   `README.md` and `docs/README.md`; adding, renaming or removing a page updates `docs/README.md`.
   `cy-download-weights` prints the URL of `docs/commands/cy-download-weights.md`: moving that page
   updates the message and its test.
-- [GLOSSARY.md](GLOSSARY.md) defines the user-facing terms in English with their Russian wording
+- `GLOSSARY.md` defines the user-facing terms in English with their Russian wording
   and lists the terms the pages keep in English; developer and contract terms stay in the DOCS.md
   glossary section. User pages use the glossary's Russian wording. A change that introduces,
   renames or narrows a user-facing term updates GLOSSARY.md in the same change.
