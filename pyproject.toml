@@ -1,6 +1,6 @@
 [project]
 name = "clearml-yolo"
-version = "0.51.8"
+version = "0.51.9"
 description = "Composable hydra-zen apps for native detector training, inference, metrics and comparison reports"
 readme = "README.md"
 authors = [
@@ -23,7 +23,7 @@ dependencies = [
     # FiftyOne's Strawberry integration still imports graphql.execution.ExecutionContext.
     "graphql-core>=3.2.0,<3.3",
     "filelock>=3.32.0",
-    "requests>=2.32.0",
+    "requests>=2.32.4",
     "huggingface-hub>=2.2.0,<3",
     "pydantic>=2.10.0",
     "pyyaml>=6.0.2",
@@ -37,7 +37,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "tqdm>=4.66.0",
     # Local dependency copies live in external/; see DOCS.md (Installation and dependencies).
-    "digital-metrics>=0.6.1",
+    "digital-metrics>=0.7.0",
     "report-generator>=0.3.0",
     "ruamel-yaml>=0.18.0,<0.19",
     # Every supported runtime capability is part of the standard installation.

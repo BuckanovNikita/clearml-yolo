@@ -95,6 +95,28 @@ def _rename_classes(dataset_yaml: Path, names: str) -> None:
     dataset_yaml.write_text(text[: text.index("names:")] + f"names: {names}\n", encoding="utf-8")
 
 
+def test_reserved_class_is_rejected_before_creating_output(dataset_yaml: Path, tmp_path: Path) -> None:
+    _rename_classes(dataset_yaml, "[cat, background]")
+    output = tmp_path / "new" / "gt.csv"
+    with pytest.raises(ValueError, match="'background'"):
+        build_ground_truth(dataset_yaml, output)
+    assert not output.parent.exists()
+
+
+def test_unused_reserved_class_is_rejected_before_overwriting_output(dataset_yaml: Path, tmp_path: Path) -> None:
+    _rename_classes(dataset_yaml, "{0: cat, 1: dog, 2: background}")
+    output = tmp_path / "gt.csv"
+    output.write_bytes(b"existing ground truth\n")
+    with pytest.raises(ValueError, match="'background'"):
+        build_ground_truth(dataset_yaml, output)
+    assert output.read_bytes() == b"existing ground truth\n"
+
+
+def test_names_resembling_the_reserved_class_keep_their_text(dataset_yaml: Path, tmp_path: Path) -> None:
+    _rename_classes(dataset_yaml, '["Background", "background "]')
+    assert set(_build(dataset_yaml, tmp_path)["instance_label"]) == {"Background", "background "}
+
+
 def test_quoted_class_names_keep_their_text(dataset_yaml: Path, tmp_path: Path) -> None:
     # Unquoted, YAML 1.1 reads yes as true and YAML 1.2 reads 1e3 as a float; quoted, both keep the text.
     _rename_classes(dataset_yaml, '{0: "yes", 1: "1e3"}')
