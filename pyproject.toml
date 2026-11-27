@@ -23,7 +23,7 @@ dependencies = [
     # FiftyOne's Strawberry integration still imports graphql.execution.ExecutionContext.
     "graphql-core>=3.2.0,<3.3",
     "filelock>=3.32.0",
-    "requests>=2.32.0",
+    "requests>=2.32.4",
     "huggingface-hub>=2.2.0,<3",
     "pydantic>=2.10.0",
     "pyyaml>=6.0.2",
