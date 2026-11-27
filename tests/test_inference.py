@@ -142,8 +142,7 @@ def test_inference_requires_configured_resolution(checkpoint_recording: Any) -> 
 
 
 def test_a_named_resolution_wins_but_is_answered_for(checkpoint_recording: Any, logs: list[str]) -> None:
-    """Scoring a model at a scale it was never shown is a real thing to want and a common
-    thing to do by accident, so it happens but never quietly."""
+    """An explicit inference scale overrides the training scale and triggers a warning."""
     checkpoint_recording({"imgsz": 1280})
 
     resolution = resolution_of("best.pt", 640)
@@ -156,8 +155,7 @@ def test_a_named_resolution_wins_but_is_answered_for(checkpoint_recording: Any, 
 def test_the_resolution_pair_carries_both_numbers_into_the_run_record(
     checkpoint_recording: Any,
 ) -> None:
-    """The two places that keep the pair — ClearML and the dev workbook — must say the same
-    thing, so the table both render is built once."""
+    """ClearML and the development workbook use the same resolution table."""
     checkpoint_recording({"imgsz": 1280})
 
     rows = resolution_of("best.pt", 640).as_table()
@@ -191,8 +189,7 @@ def test_a_checkpoint_that_names_no_resolution_is_refused(checkpoint_recording: 
 
 
 def test_each_box_is_attributed_by_path_not_by_position() -> None:
-    """Ultralytics sorts a manifest, so results do not arrive in the caller's order; only
-    joining on ``Results.path`` keeps every box on the image it was found in."""
+    """Joining on Results.path preserves box ownership when Ultralytics sorts the manifest."""
     DETECTIONS["000012.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
     DETECTIONS["000018.png"] = _boxes(([5, 6, 7, 8], 0.8, 1))
 
@@ -248,8 +245,7 @@ def test_the_whole_run_is_one_predict_call_with_batch_forwarded() -> None:
 
 
 def test_ultralytics_is_handed_a_txt_manifest_of_absolute_paths() -> None:
-    """The ``.txt`` suffix is what routes the source to the loader that honours ``batch``
-    and reports real paths; absolute entries keep the join off the manifest's own parent."""
+    """Absolute paths in a .txt manifest enable batching and resolve independently of the manifest directory."""
     DETECTIONS["a.png"] = _boxes(([1, 2, 3, 4], 0.9, 0))
 
     _predict("best.pt", ["dir/a.png", "/tmp/b.png"], device="cpu")

@@ -16,8 +16,6 @@ not fit. Malformed or duplicate metadata fails without overwriting the file.
 
 import hashlib
 import json
-import os
-import tempfile
 from copy import deepcopy
 from io import StringIO
 from pathlib import Path
@@ -29,7 +27,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import YAMLError
 
-from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
+from clearml_yolo.adapters.storage.filesystem import cy_home, durable_replace_text, write_path
 from clearml_yolo.core.batch_estimation import EstimateCase, PositiveInt, SearchStatus, estimate_key, model_catalogue
 from clearml_yolo.core.batch_sizes import (
     BatchSizeEntry,
@@ -124,7 +122,7 @@ class BatchSizeStore:
                 + json.dumps(metadata.model_dump(mode="json"), ensure_ascii=True)
                 + "\n"
             )
-            self._replace(payload)
+            durable_replace_text(self.path, payload, prefix=".batch-sizes-")
 
     @staticmethod
     def _update(
@@ -154,74 +152,40 @@ class BatchSizeStore:
             from decimal import Decimal
 
             label = f"{gpu.name} [{Decimal(gpu.total_memory_bytes) / 1024**3} GiB]"
-        aliases = {
+        aliases = [
             entry.gpu_label
             for entry in table.entries
             if (entry.gpu_name, entry.total_memory_bytes, entry.image_size, entry.model)
             == (failure.gpu_name, failure.total_memory_bytes, failure.image_size, failure.model)
-        }
-        _detach_paths(document, aliases | {label}, failure.image_size)
-        key = _entry_key(label, failure.image_size, failure.model)
+        ]
+        _detach_paths(document, {*aliases, label}, failure.image_size)
         metadata.capacities[label] = gpu.total_memory_bytes
         metadata.failures = tuple(item for item in metadata.failures if item != failure)
         if case.status == "no_capacity":
-            for entry in table.entries:
-                if (entry.gpu_name, entry.total_memory_bytes, entry.image_size, entry.model) == (
-                    failure.gpu_name,
-                    failure.total_memory_bytes,
-                    failure.image_size,
-                    failure.model,
-                ):
-                    del document[entry.gpu_label][entry.image_size][entry.model]
-                    metadata.measured.pop(_entry_key(entry.gpu_label, entry.image_size, entry.model), None)
-                    metadata.forced.pop(_entry_key(entry.gpu_label, entry.image_size, entry.model), None)
-                    metadata.sources.pop(_entry_key(entry.gpu_label, entry.image_size, entry.model), None)
+            for alias in aliases:
+                del document[alias][failure.image_size][failure.model]
+                key = _entry_key(alias, failure.image_size, failure.model)
+                metadata.measured.pop(key, None)
+                metadata.forced.pop(key, None)
+                metadata.sources.pop(key, None)
             metadata.failures += (failure,)
             return
         if case.per_gpu_batch is None:
             raise ValueError("Usable publication lacks a confirmed per-GPU batch")
-        document.setdefault(label, CommentedMap()).setdefault(failure.image_size, CommentedMap())[failure.model] = (
-            case.per_gpu_batch
-        )
-        metadata.measured[key] = case.per_gpu_batch
-        metadata.forced[key] = case.settings.force
         source = _Source(
             status=case.status,
             diagnostic=case.diagnostic,
             estimate_key=estimate_key(case.profile, case.workload, case.settings),
         )
-        metadata.sources[key] = source
         # Alternate literal labels may denote the same hardware. Refresh every
         # exact alias so a stale smaller value cannot override fresh evidence.
-        for entry in table.entries:
-            if (entry.gpu_name, entry.total_memory_bytes, entry.image_size, entry.model) == (
-                failure.gpu_name,
-                failure.total_memory_bytes,
-                failure.image_size,
-                failure.model,
-            ):
-                document[entry.gpu_label][entry.image_size][entry.model] = case.per_gpu_batch
-                alias_key = _entry_key(entry.gpu_label, entry.image_size, entry.model)
-                metadata.measured[alias_key] = case.per_gpu_batch
-                metadata.forced[alias_key] = case.settings.force
-                metadata.sources[alias_key] = source
-
-    def _replace(self, payload: str) -> None:
-        descriptor, name = tempfile.mkstemp(prefix=".batch-sizes-", suffix=".tmp", dir=self.path.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            temporary.replace(write_path(self.path))
-            directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        finally:
-            temporary.unlink(missing_ok=True)
+        for alias in dict.fromkeys((label, *aliases)):
+            sizes = document.setdefault(alias, CommentedMap())
+            sizes.setdefault(failure.image_size, CommentedMap())[failure.model] = case.per_gpu_batch
+            key = _entry_key(alias, failure.image_size, failure.model)
+            metadata.measured[key] = case.per_gpu_batch
+            metadata.forced[key] = case.settings.force
+            metadata.sources[key] = source
 
 
 def _detach_paths(document: CommentedMap, labels: set[str], size: int) -> None:
@@ -271,8 +235,9 @@ def _entries(document: CommentedMap, metadata: _Metadata) -> tuple[BatchSizeEntr
                     or batch <= 0
                 ):
                     raise ValueError("Models must be canonical and batches positive integers")
-                measured = metadata.measured.get(_entry_key(label, size, model)) == batch
-                source = metadata.sources.get(_entry_key(label, size, model)) if measured else None
+                key = _entry_key(label, size, model)
+                measured = metadata.measured.get(key) == batch
+                source = metadata.sources.get(key) if measured else None
                 result.append(
                     BatchSizeEntry(
                         gpu_label=label,
@@ -282,7 +247,7 @@ def _entries(document: CommentedMap, metadata: _Metadata) -> tuple[BatchSizeEntr
                         model=model,
                         per_gpu_batch=batch,
                         origin="measurement" if measured else "manual",
-                        forced=measured and metadata.forced.get(_entry_key(label, size, model), False),
+                        forced=measured and metadata.forced.get(key, False),
                         source_status=source.status if source else None,
                         source_diagnostic=source.diagnostic if source else "",
                         source_estimate_key=source.estimate_key if source else None,

@@ -74,18 +74,17 @@ def test_train_result_requires_prepared_dataset_paths(tmp_path: Path) -> None:
         TrainResult(weights=tmp_path / "best.pt", save_dir=tmp_path)  # type: ignore[call-arg]
 
 
-@pytest.mark.parametrize("dataset_format", ["ndjson", "flat"])
+@pytest.mark.parametrize("expected_format", ["ndjson", "flat"])
 @pytest.mark.parametrize("device", ["cpu", [0, 1]])
 @pytest.mark.parametrize("cache_identity", [None, "a" * 64])
 def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    dataset_format: DatasetFormat,
+    expected_format: DatasetFormat,
     device: Any,
     cache_identity: str | None,
     workflow_dependencies: WorkflowDependencies,
 ) -> None:
-    expected_format = dataset_format
     prepared_dir = tmp_path / ".datasets" / "asked"
     data = prepared_dir / "data.yaml"
     cleaned = prepared_dir / "cleaned.csv"
@@ -111,15 +110,17 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         assert dataset_format == expected_format
         assert required_splits == ("train", "val", "test")
         calls["locked"] = True
-        yield PreparedDataset(
-            data=data,
-            ground_truth=cleaned,
-            manifest=manifest,
-            dataset_format=expected_format,
-            artifacts=[ndjson, labels],
-            cache_identity=cache_identity,
-        )
-        calls["locked"] = False
+        try:
+            yield PreparedDataset(
+                data=data,
+                ground_truth=cleaned,
+                manifest=manifest,
+                dataset_format=expected_format,
+                artifacts=[ndjson, labels],
+                cache_identity=cache_identity,
+            )
+        finally:
+            calls["locked"] = False
 
     patch_workflow(
         monkeypatch,
@@ -193,7 +194,7 @@ def test_csv_training_uses_prepared_data_and_returns_cleaned_ground_truth(
         },
         clearml=ClearMLConfig(),
         ground_truth="source.csv",
-        dataset_format=dataset_format,
+        dataset_format=expected_format,
         dataset_cache_dir=tmp_path / "cache",
         required_splits=["train", "val", "test"],
         deps=workflow_dependencies,
@@ -382,8 +383,10 @@ def test_native_ddp_events_replay_before_model_finalization(
 
     @contextmanager
     def relay(_task: object, _model: object) -> Iterator[Any]:
-        yield types.SimpleNamespace(replay=lambda _trainer: events.append("replay"))
-        events.append("relay_closed")
+        try:
+            yield types.SimpleNamespace(replay=lambda _trainer: events.append("replay"))
+        finally:
+            events.append("relay_closed")
 
     module = types.ModuleType("ultralytics.models")
     module.YOLO = Model  # type: ignore[attr-defined]

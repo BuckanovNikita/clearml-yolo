@@ -1,5 +1,7 @@
-"""Exact imported matches of native results; database persistence and subsets live in
-tests/integration/fiftyone/test_fiftyone_native_evaluations.py."""
+"""Match imported detections to native evaluation results.
+
+Database persistence and subsets are covered by tests/integration/fiftyone/test_fiftyone_native_evaluations.py.
+"""
 
 from typing import Any
 

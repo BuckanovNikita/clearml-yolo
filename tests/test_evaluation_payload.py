@@ -138,17 +138,17 @@ def test_payload_uses_sliced_matches_and_preserves_backgrounds_and_filtered_boxe
     assert all(box.image_name != "other.jpg" for box in payload.predictions)
 
     by_indices = {(match.gt_index, match.pred_index): match for match in payload.matches}
-    assert by_indices[(100, 200)].status == "TP"
-    assert by_indices[(100, 200)].iou == pytest.approx(1.0)
-    assert by_indices[(101, 201)].status == "FP"
-    assert by_indices[(101, 201)].gt_label == "7"
-    assert by_indices[(101, 201)].pred_label == "8"
-    assert by_indices[(101, 201)].iou == pytest.approx(1.0)
-    assert by_indices[(101, None)].status == "FN"
-    assert by_indices[(None, 202)].status == "FP"
-    assert by_indices[(None, 202)].gt_label == "background"
-    assert by_indices[(None, 202)].iou is None
-    assert by_indices[(103, None)].status == "FN"
+    assert by_indices[100, 200].status == "TP"
+    assert by_indices[100, 200].iou == pytest.approx(1.0)
+    assert by_indices[101, 201].status == "FP"
+    assert by_indices[101, 201].gt_label == "7"
+    assert by_indices[101, 201].pred_label == "8"
+    assert by_indices[101, 201].iou == pytest.approx(1.0)
+    assert by_indices[101, None].status == "FN"
+    assert by_indices[None, 202].status == "FP"
+    assert by_indices[None, 202].gt_label == "background"
+    assert by_indices[None, 202].iou is None
+    assert by_indices[103, None].status == "FN"
     assert all(match.pred_index != 203 for match in payload.matches)
 
 

@@ -130,10 +130,14 @@ exclude = ["^external/", "^(outputs|runs|multirun|build|dist|mutants)/"]
 # These dependencies have no installed typing coverage at the imported boundaries.
 # Keep this list narrow; missing project imports must remain errors.
 module = [
-    "albumentations.*",
+    "albumentations",
+    "albumentations.core",
     "torchvision.*",
-    "pycocotools.*",
-    "faster_coco_eval.*",
+    "pycocotools",
+    "pycocotools.cocoeval",
+    "faster_coco_eval",
+    "faster_coco_eval.core",
+    "faster_coco_eval.core.faster_eval_api",
     "tensorrt",
     "digital_metrics.*",
     "report_generator.*",
@@ -184,9 +188,7 @@ DEP001 = ["tensorrt"]
 # Runtime packages loaded by model families, exporters and third-party trainers rather
 # than imported by clearml_yolo itself; removing them breaks native execution.
 DEP002 = [
-    "aiohttp", "albumentations", "calflops", "cloudpickle", "faster-coco-eval",
-    "graphql-core", "onnx", "onnxruntime", "pycocotools", "pytorch-lightning",
-    "rfdetr", "tensorboard", "timm", "torchvision",
+    "aiohttp", "calflops", "cloudpickle", "graphql-core", "onnxruntime", "tensorboard",
 ]
 # FiftyOne's plotting backends, imported only on FiftyOne's plotting path and provided
 # by the declared fiftyone dependency.

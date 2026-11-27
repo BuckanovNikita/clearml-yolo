@@ -134,7 +134,6 @@ def test_filters_defaults_resume_and_refresh(
     output = capsys.readouterr().out
     assert "table" in output
     assert "gpus=2\tglobal_batch=16" in output
-    assert "table" in output
     assert all(profile.world_size == 1 for profile in probe.probed_profiles)
     cli.main([*arguments, "--refresh"])
     assert probe.calls == calls * 3

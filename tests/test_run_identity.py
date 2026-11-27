@@ -51,8 +51,7 @@ def test_a_run_dir_is_named_after_the_run_id_beneath_the_root(tmp_path: Path) ->
 
 @pytest.mark.parametrize("explicit", [None, Path("runs/handmade")])
 def test_a_resolved_run_dir_is_absolute(explicit: Path | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Hydra runs with chdir=False while ultralytics resolves its project path against the
-    working directory, so a relative path would mean two different places."""
+    """Resolve paths before passing them between Hydra and Ultralytics working directories."""
     monkeypatch.chdir(tmp_path)
     assert resolve_run_dir(Path("runs"), "yolo-run-box", explicit).is_absolute()
 
@@ -84,9 +83,7 @@ def test_latest_is_repointed_at_the_newer_run(tmp_path: Path) -> None:
 
 @pytest.mark.usefixtures("fixed_identity")
 def test_a_run_outside_the_workspace_leaves_latest_where_it_was(tmp_path: Path) -> None:
-    """An agent's run in a scratch directory is deleted by its cleanup, and a link pointing
-    there would dangle; the workspace's shortcut keeps naming the last run that landed in
-    the workspace."""
+    """The workspace shortcut keeps pointing to a local run when an agent uses a temporary directory."""
     root = tmp_path / "workspace" / "runs"
     here = root / "run-here"
     here.mkdir(parents=True)
@@ -130,8 +127,7 @@ DISPLACED_NAME = f"{LATEST_LINK_NAME}-displaced-{HOST}-{PID}"
 def test_a_regular_file_named_latest_is_moved_aside_rather_than_written_over(
     tmp_path: Path,
 ) -> None:
-    """Renaming a symlink over a plain file succeeds on Linux, so whatever a user put at
-    that name survives only because the run moves it instead of replacing it."""
+    """Preserve the existing file before replacing its name with a symlink."""
     occupied = tmp_path / LATEST_LINK_NAME
     occupied.write_text("mine", encoding="utf-8")
     run_dir = tmp_path / "run-a"
@@ -147,8 +143,7 @@ def test_a_regular_file_named_latest_is_moved_aside_rather_than_written_over(
 def test_a_directory_left_at_latest_is_moved_aside_so_the_link_can_be_taken_back(
     tmp_path: Path,
 ) -> None:
-    """A standalone stage in a fresh workspace writes *through* the name and so creates it
-    as an ordinary directory; leaving that alone would freeze the link for every run after."""
+    """A standalone stage can create an ordinary directory at the path reserved for the latest-run link."""
     (tmp_path / LATEST_LINK_NAME).mkdir()
     run_dir = tmp_path / "run-a"
     run_dir.mkdir()
@@ -162,8 +157,7 @@ def test_a_directory_left_at_latest_is_moved_aside_so_the_link_can_be_taken_back
 
 @pytest.mark.usefixtures("fixed_identity")
 def test_a_stage_output_under_latest_survives_the_move_intact(tmp_path: Path) -> None:
-    """The directory that gets moved is one a stage already wrote into, so the move has to
-    carry what it holds rather than merely free the name."""
+    """Moving a former output directory preserves all of its contents."""
     written = tmp_path / LATEST_LINK_NAME / "reports" / "report.html"
     written.parent.mkdir(parents=True)
     written.write_text("mine", encoding="utf-8")

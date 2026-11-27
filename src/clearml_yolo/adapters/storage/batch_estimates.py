@@ -1,13 +1,11 @@
 """Locked atomic storage for validated local batch estimation evidence."""
 
-import os
-import tempfile
 from pathlib import Path
 
 from filelock import FileLock, SoftFileLock
 from pydantic import ValidationError
 
-from clearml_yolo.adapters.storage.filesystem import cy_home, write_path
+from clearml_yolo.adapters.storage.filesystem import cy_home, durable_replace_text, write_path
 from clearml_yolo.core.batch_estimation import EstimateCase, EstimateCatalogue, estimate_key
 
 
@@ -51,21 +49,4 @@ class FileBatchEstimateStore:
                 if estimate_key(prior.profile, prior.workload, prior.settings) != key
             )
             catalogue = EstimateCatalogue(cases=(*cases, case))
-            self._replace(catalogue.model_dump_json(indent=2) + "\n")
-
-    def _replace(self, payload: str) -> None:
-        descriptor, name = tempfile.mkstemp(prefix=".batch-estimates-", suffix=".tmp", dir=self.path.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            temporary.replace(write_path(self.path))
-            directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        finally:
-            temporary.unlink(missing_ok=True)
+            durable_replace_text(self.path, catalogue.model_dump_json(indent=2) + "\n", prefix=".batch-estimates-")

@@ -11,9 +11,9 @@ from test_yolo_probe_precision import _request, restore_native_randomness  # noq
 
 
 @pytest.mark.parametrize("configured_batch", [None, 16, -1, 0.5])
-@pytest.mark.parametrize("trial_batch", [2, 4])
+@pytest.mark.parametrize(("trial_batch", "optimizer"), [(2, "AdamW"), (4, "MuSGD")])
 def test_probe_materializes_trial_batch_through_real_native_validation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured_batch: float | None, trial_batch: int
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configured_batch: float | None, trial_batch: int, optimizer: str
 ) -> None:
     import torch
     from ultralytics import models
@@ -31,9 +31,11 @@ def test_probe_materializes_trial_batch_through_real_native_validation(
     torch.optim.SGD(weights.parameters(), lr=0.01)
     device_type = torch.device
 
-    def cpu_device(*args: Any, **kwargs: Any) -> torch.device:
-        device = device_type(*args, **kwargs)
-        return device_type("cpu") if device.type == "cuda" else device
+    def cpu_device(kind: str, rank: int) -> torch.device:
+        # Redirect the probe's device selection. The native optimizer needs the real type for isinstance().
+        monkeypatch.setattr(torch, "device", device_type)
+        assert (kind, rank) == ("cuda", 0)
+        return device_type("cpu")
 
     observed: list[int] = []
 
@@ -51,10 +53,13 @@ def test_probe_materializes_trial_batch_through_real_native_validation(
     monkeypatch.setattr(torch.cuda, "memory_reserved", lambda _device: 0)
     monkeypatch.setattr(torch.cuda, "max_memory_reserved", lambda _device: 0)
     monkeypatch.setattr(native_validator, "get_cfg", configuration)
-    request = _request(tmp_path, False).model_copy(
+    request = _request(tmp_path, False)
+    request = request.model_copy(
         update={
             "global_batch": trial_batch,
-            "yolo": {"batch": configured_batch, "amp": False, "compile": False, "optimizer": "SGD", "nbs": 2},
+            "profile": request.profile.model_copy(update={"optimizers": ("AdamW", "MuSGD")}),
+            "optimizer": optimizer,
+            "yolo": {"batch": configured_batch, "amp": False, "compile": False, "optimizer": "auto", "nbs": 2},
         }
     )
 

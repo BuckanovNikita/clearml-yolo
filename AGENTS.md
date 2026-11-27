@@ -231,7 +231,8 @@ means deferred; `infra-check` exit 1 is a configuration error.
 - At the start of work, state the worktree path, the current branch and its relation to the default branch; say when remote refs were not fetched.
 - Inspect existing and staged changes before editing. Preserve unrelated work and local overrides; stage only task-owned paths and inspect the staged diff.
 - Report what each executed check establishes and what remains unverified; distinguish mocked checks, live outcomes and historical evidence. Clean up task-owned processes and temporary resources.
-- Tests must exercise product code, never project tooling.
+- Keep a test when a change to CY could make its assertion fail. At an SDK boundary, exercise
+  CY's call or its handling of the result. Test runtime validation at untyped input boundaries.
 - Changes to behavior, interfaces, dependencies, security or operational policy need a fresh independent review after integration and verification. Small wording edits may be self-reviewed.
 - Split large work into independent delegated tasks with explicit write ownership and acceptance evidence; delegated agents do not delegate further.
 - Use Conventional Commits. Commit automatic formatting separately from logic. Local commits within the task scope need no approval.

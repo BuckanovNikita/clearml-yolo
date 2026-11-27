@@ -962,22 +962,6 @@ def test_yolo_synthetic_density_classes_and_geometry_are_bounded(tmp_path: Path)
     assert torch.all(boxes[:, :2] + boxes[:, 2:] / 2 <= 1)
 
 
-@pytest.mark.parametrize(("iterations", "expected"), [(1, "AdamW"), (10001, "MuSGD")])
-def test_recorded_yolo_optimizer_paths_match_installed_native_resolution(iterations: int, expected: str) -> None:
-    import torch
-    from ultralytics.models.yolo.detect import DetectionTrainer
-
-    model = torch.nn.Module()
-    model.model = torch.nn.Sequential(torch.nn.Linear(2, 2))
-    trainer: Any = SimpleNamespace(args=SimpleNamespace(lr0=0.01), data={"nc": 150})
-    optimizer = DetectionTrainer.build_optimizer(  # type: ignore[no-untyped-call]
-        trainer, model, name="auto", iterations=iterations
-    )
-    assert type(optimizer).__name__ == expected
-    assert trainer.args.optimizer == expected
-    assert trainer.args.warmup_bias_lr == 0
-
-
 def test_native_estimator_rejects_multi_gpu_before_discovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
