@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.51.10 (2026-11-27)
+
+### Bug Fixes
+
+- **deps**: Require digital-metrics 0.7.0 or newer (SIP-337)
+  ([`a8045c8`](https://github.com/BuckanovNikita/clearml-yolo/commit/a8045c850b1afb85b472d8eba3606b02713be957))
+
+
 ## v0.51.9 (2026-11-27)
 
 ### Bug Fixes
