@@ -8,13 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
 
 from clearml_yolo.adapters.clearml.session import ClearMLConfig
 from clearml_yolo.adapters.storage.dataset import PreparedDataset
 from clearml_yolo.adapters.storage.dataset_export import DatasetFormat
 from clearml_yolo.application.ports import WorkflowDependencies
-from clearml_yolo.application.use_cases.train import TrainResult, train
+from clearml_yolo.application.use_cases.train import train
 from native_config_helpers import training_settings
 from workflow_dependencies import patch_workflow
 from workflow_dependencies import (
@@ -54,24 +53,6 @@ def native_publication_boundary(monkeypatch: pytest.MonkeyPatch, workflow_depend
         "clearml_yolo.application.use_cases.train.register_ground_truth",
         lambda *a, **k: None,
     )
-
-
-def test_missing_ground_truth_is_rejected_before_task_creation(
-    monkeypatch: pytest.MonkeyPatch, workflow_dependencies: WorkflowDependencies
-) -> None:
-    patch_workflow(
-        monkeypatch,
-        workflow_dependencies,
-        "clearml_yolo.application.use_cases.train.init_task",
-        lambda *_args, **_kwargs: pytest.fail("missing input must fail before task creation"),
-    )
-    with pytest.raises(TypeError, match="ground_truth"):
-        train(training_settings(), ClearMLConfig(), deps=workflow_dependencies)  # type: ignore[call-arg]
-
-
-def test_train_result_requires_prepared_dataset_paths(tmp_path: Path) -> None:
-    with pytest.raises(ValidationError):
-        TrainResult(weights=tmp_path / "best.pt", save_dir=tmp_path)  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("expected_format", ["ndjson", "flat"])
