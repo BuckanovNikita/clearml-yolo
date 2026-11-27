@@ -8,6 +8,8 @@ The package defines the supported Python range, Linux runtime and console comman
 
 The lock identifies the distributions but cannot prove which source checkouts produced the local archives. Git installs can resolve different versions within the declared ranges. When a direct dependency floor changes, check a lowest-direct installation on each supported Python minor as well as the locked environment. The Hydra floor change illustrates why an actual API consumer belongs in that check. [Installation guide](../docs/installation.md) · [Hydra floor decision](https://linear.app/sip-ds-team/issue/SIP-335)
 
+CY requires digital-metrics 0.7.0 or newer for the evaluation APIs it imports, and requests 2.32.4 or newer for host-scoped netrc credentials. These minimums apply to installations from Git as well as to the contributor environment. [Evaluation dependency](https://linear.app/sip-ds-team/issue/SIP-337) · [HTTP dependency](https://linear.app/sip-ds-team/issue/SIP-338)
+
 <details>
 <summary>Sources and verification</summary>
 
