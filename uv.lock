@@ -659,7 +659,7 @@ requires-dist = [
     { name = "calflops", specifier = ">=0.3.2" },
     { name = "clearml", specifier = ">=2.1.6" },
     { name = "cloudpickle", specifier = ">=3.1.1" },
-    { name = "digital-metrics", specifier = ">=0.6.1" },
+    { name = "digital-metrics", specifier = ">=0.7.0" },
     { name = "faster-coco-eval", specifier = "==1.8.0" },
     { name = "fiftyone", specifier = ">=1.22.0,<2" },
     { name = "filelock", specifier = ">=3.32.0" },
