@@ -1,6 +1,12 @@
 # Glossary
 
-Terms that `clearml-yolo` (CY) defines or narrows. Each entry gives the Russian wording the user documentation uses. The documentation keeps these terms in English inside Russian sentences: checkpoint, batch size, split, baseline, preset, backend, IoU, override, multirun, sweep, seed, GPU, CPU, ONNX, TensorRT, YAML, JSON, CSV, and every command, flag, config key, file, column and environment variable name. They appear below only when CY gives them a narrower meaning.
+Use these definitions and Russian wordings when describing clearml-yolo (CY). In Russian prose, keep checkpoint, batch size, split, baseline, preset, backend, IoU, override, multirun, sweep, seed, GPU, CPU, ONNX, TensorRT, YAML, JSON and CSV in English. Preserve command, flag, configuration key, file, column and environment variable names as written.
+
+| Workflow | Start with these terms |
+| --- | --- |
+| Build and deploy a detector | [Ground truth](#ground-truth), [prepared dataset copy](#prepared-dataset-copy), [detector family](#detector-family), [checkpoint descriptor](#checkpoint-descriptor), [TensorRT engine](#tensorrt-engine) |
+| Evaluate checkpoints and compare models | [Prediction provenance](#prediction-provenance), [threshold calibration](#threshold-calibration), [candidate model](#candidate-model), [baseline](#baseline), [comparison manifest](#comparison-manifest) |
+| Operate experiments | [Workspace](#workspace), [pipeline](#pipeline), [ClearML task](#clearml-task), [configuration object](#configuration-object), [publication receipt](#publication-receipt) |
 
 ## Workspace and runs
 
@@ -12,7 +18,7 @@ _Avoid_: домашний каталог, корень проекта
 
 <a id="write-containment-rule"></a>
 **Write containment rule**:
-The rule that every destination a run writes to (run directory, output paths, caches, Hydra directories, `CY_RUNTIME_TEMP_ROOT`) must resolve inside the workspace; a path outside it stops the command with `Project write destination ... must be contained beneath CY_HOME=...`. Input files may live anywhere.
+Every project write, including outputs, caches and runtime scratch, must resolve inside the workspace. Input files may live elsewhere.
 _Russian_: правило записи внутри `CY_HOME`
 _Avoid_: песочница, ограничение путей
 
@@ -24,19 +30,19 @@ _Avoid_: папка эксперимента, output-каталог
 
 <a id="training-directory"></a>
 **Training directory**:
-The Ultralytics project directory where `cy-train` and the training stage of `cy` write checkpoints; `detect/` inside the run directory unless `ultralytics.project` is set.
+The project directory containing a trainer’s outputs and best checkpoint. By default, it is `detect/` inside the run directory.
 _Russian_: каталог обучения
 _Avoid_: каталог весов
 
 <a id="hydra-output-directory"></a>
 **Hydra output directory**:
-The directory Hydra creates for each launch of a Hydra command, under `CY_HOME/outputs/` for a single run and `CY_HOME/multirun/` for a sweep. It holds the composed configuration and the Hydra log; CY does not read it back.
+The directory where Hydra writes the composed configuration and log for a launch. By default, a single run writes under `CY_HOME/outputs/` and a sweep under `CY_HOME/multirun/`. Both paths can be configured within the workspace.
 _Russian_: каталог Hydra
 _Avoid_: каталог запуска (that is the run directory)
 
 <a id="runtime-scratch-directory"></a>
 **Runtime scratch directory**:
-The `.tmp/cy-runtime-*` directory each command process creates under the workspace (under `CY_RUNTIME_TEMP_ROOT` when it is set) for temporary files and, for Hydra commands, the captured logs. CY never deletes it.
+The invocation’s `cy-runtime-*` directory for temporary files and captured Hydra-command logs, under `CY_RUNTIME_TEMP_ROOT` or the workspace’s `.tmp/`. CY retains the directory after the invocation.
 _Russian_: временный каталог (`.tmp/cy-runtime-*`)
 _Avoid_: кэш
 
@@ -50,19 +56,19 @@ _Avoid_: тег sweep, тег запуска
 
 <a id="pipeline"></a>
 **Pipeline**:
-The chain of stages that the `cy` command runs inside one ClearML task: training, prediction, metrics, comparison, report.
+The chain of training, prediction, metrics, comparison and reporting stages that `cy` runs inside one [ClearML task](#clearml-task).
 _Russian_: пайплайн
 _Avoid_: конвейер, workflow
 
 <a id="stage"></a>
 **Stage**:
-One step of the pipeline. Each stage can also be run alone by its own command (`cy-train`, `cy-predict`, `cy-metrics`, `cy-compare`, `cy-report`).
+One of the pipeline’s operations, such as training or comparison. Each of the five main stages also has a standalone command.
 _Russian_: этап
 _Avoid_: шаг, фаза
 
 <a id="pipeline-outcome"></a>
 **Pipeline outcome**:
-The status `cy` records for every stage (`succeeded`, `completed_with_warnings`, `failed`, `skipped`) and for the run as a whole (`succeeded`, `completed_with_warnings`, `failed`) in `pipeline_outcome.json` and `pipeline_outcome.txt`. A failed stage after successful training gives `completed_with_warnings`.
+The per-stage and overall status that `cy` records in `pipeline_outcome.json` and `pipeline_outcome.txt`. A downstream failure after successful training can produce `completed_with_warnings`. An interrupted run fails.
 _Russian_: итог пайплайна
 _Avoid_: результат пайплайна, статус запуска
 
@@ -70,19 +76,19 @@ _Avoid_: результат пайплайна, статус запуска
 
 <a id="detector-family"></a>
 **Detector family**:
-A model library CY can train and run, selected by `model.backend`: `ultralytics`, `deimv2`, `rfdetr`, `fasterrcnn`, `fcos`. Each family has its own presets, settings and checkpoint format.
+A group of detectors with a common backend, presets and settings. CY supports Ultralytics YOLO, DEIMv2, RF-DETR, Faster R-CNN and FCOS.
 _Russian_: семейство моделей
 _Avoid_: фреймворк, тип модели, семейство детекторов
 
 <a id="model-provenance"></a>
 **Model provenance**:
-What CY knows about where a checkpoint came from: the ClearML task or model it was taken from, or the `.identity.json` file next to a local checkpoint. When provenance is unknown, the command needs `model_label`.
+Information connecting a checkpoint to its training source, for example a ClearML task or an identity file next to local weights. A user-supplied model label identifies the model when its provenance is unknown.
 _Russian_: происхождение модели
 _Avoid_: источник весов
 
 <a id="checkpoint-descriptor"></a>
 **Checkpoint descriptor**:
-The detector family, preset, class names and preprocessing that training embeds in a DEIMv2, RF-DETR, Faster R-CNN or FCOS checkpoint, and writes with the checkpoint's SHA-256 to `<checkpoint>.model.json` beside it. Commands that read such a checkpoint require it and check the `model` selection against it.
+The detector family, preset, class names and preprocessing embedded in a DEIMv2, RF-DETR, Faster R-CNN or FCOS checkpoint. Training also writes the descriptor and the checkpoint's SHA-256 to `<checkpoint>.model.json`. A reader can use the embedded descriptor alone and checks the companion file when present.
 _Russian_: описание модели
 _Avoid_: дескриптор, метаданные checkpoint
 
@@ -112,13 +118,13 @@ _Avoid_: прокси, artifactory
 
 <a id="native-cache"></a>
 **Native cache**:
-The directory where a model library keeps its own downloaded weights (for example the Ultralytics weights directory or the Hugging Face cache), as opposed to CY's caches under `.cache/clearml-yolo`.
+The directory a model library uses to look up downloaded weights, such as the Ultralytics weights directory or the Hugging Face cache.
 _Russian_: родной кэш
 _Avoid_: системный кэш
 
 <a id="batch-size-table"></a>
 **Batch size table**:
-The editable file `.config/clearml-yolo/batch-sizes.yaml` that maps a GPU, image size and model to a batch size. `cy-batch-estimate` writes it; training reads it when `batch` is `null`.
+The editable `batch-sizes.yaml` table that maps a GPU profile, image size and model to a per-GPU training batch size. Training looks up this value when `batch` is `null`.
 _Russian_: таблица batch size
 _Avoid_: таблица батчей
 
@@ -126,13 +132,13 @@ _Avoid_: таблица батчей
 
 <a id="ground-truth"></a>
 **Ground truth**:
-In CY, a CSV file with one row per bounding box (or per image without objects) and a `split` column, or a ClearML dataset that holds such a file. It is the only label format the commands read; `cy-ground-truth` builds it from a YOLO dataset.
+The reference labels and split membership supplied as a CSV or a [ClearML dataset reference](#clearml-dataset-reference). The CSV has one row per object box and a membership row for each image without objects.
 _Russian_: разметка (ground truth)
 _Avoid_: аннотации, лейблы
 
 <a id="image-without-objects"></a>
 **Image without objects**:
-A ground truth row with an empty `instance_label` and empty box columns. It keeps an image that has no objects in its split.
+An image represented in ground truth by a membership row with an empty `instance_label` and empty box coordinates. The word `background` is reserved as a class name.
 _Russian_: изображение без объектов
 _Avoid_: фоновая строка, пустая строка
 
@@ -144,7 +150,7 @@ _Avoid_: ID датасета
 
 <a id="prepared-dataset-copy"></a>
 **Prepared dataset copy**:
-The copy of the ground truth and images in the layout a detector family trains from (`ndjson`, `flat` or `coco`), which CY builds once under `dataset_cache_dir` and reuses while the inputs are unchanged.
+The ground truth and images arranged in the native training layout (`ndjson`, `flat` or `coco`). CY can reuse a prepared copy based on the ground truth CSV bytes, ordered image references, format and preparation version. Changing image bytes at the same paths leaves that cache key unchanged.
 _Russian_: рабочая копия датасета
 _Avoid_: кэш датасета, экспорт датасета
 
@@ -170,15 +176,20 @@ _Avoid_: копия пайплайна
 
 ## Evaluation, comparison and reports
 
+<a id="prediction-provenance"></a>
+**Prediction provenance**:
+The record accompanying a prediction CSV that identifies its bytes, the image naming mode and the available model or checkpoint identity. It lets evaluation check that the predictions being scored are the ones that were written.
+_Russian_: файл `.provenance.json`
+
 <a id="candidate-model"></a>
 **Candidate model**:
-The model `cy-compare` tests against the baseline (`candidate_model`); in `cy`, the model trained by the run.
+The model whose results are compared with the baseline. In `cy-compare` it is selected by `candidate_model`. In `cy` it is the checkpoint being evaluated, including when training was skipped.
 _Russian_: модель-кандидат
 _Avoid_: новая модель
 
 <a id="baseline"></a>
 **Baseline**:
-The model the candidate is compared with (`baseline_model`). By default, the latest completed ClearML task tagged `prod` in the run's own ClearML project.
+The reference model for a comparison. For automatic selection, CY looks for another task tagged `prod` in the same ClearML project with status `completed` or `published`. The latest completion time wins, with the latest update breaking ties.
 _Russian_: baseline (модель baseline)
 _Avoid_: базовая модель, прод-модель
 
@@ -188,15 +199,20 @@ A class with a metric (precision or recall) that is significantly worse for the 
 _Russian_: деградация
 _Avoid_: ухудшение, регрессия
 
+<a id="threshold-calibration"></a>
+**Threshold calibration**:
+Selection of confidence thresholds using ground truth and predictions on `val`. Evaluation applies the selected thresholds to the requested splits. In a comparison, each model uses its own thresholds.
+_Russian_: подбор порогов уверенности
+
 <a id="selected-confidence-thresholds"></a>
 **Selected confidence thresholds**:
-The confidence thresholds the metrics stage selects once on the `val` split (`calibration_split` accepts only `val`), per class or global by `evaluation.confidence_optimization`, and then applies unchanged to every split. They are written to `metrics_best_confidences_val.csv` and, in `cy`, attached to the output model.
+The values produced by [threshold calibration](#threshold-calibration), either one per class or one value shared by all classes. CY writes them to `metrics_best_confidences_val.csv` and can attach them to the matching [output model](#output-model) owned by the run.
 _Russian_: подобранные пороги
 _Avoid_: оптимальные пороги, лучшие пороги
 
 <a id="comparison-manifest"></a>
 **Comparison manifest**:
-The `comparison_manifest.json` file `cy-compare` writes into its output directory; `cy-report` reads it to find the comparison workbooks.
+The `comparison_manifest.json` file binding the compared split and the two model roles to their result files. `cy-report` uses it to locate each model’s dashboard.
 _Russian_: манифест сравнения
 _Avoid_: индекс сравнения
 
@@ -206,7 +222,17 @@ The metrics workbooks `full_dashboard_*` and `метрики_дтрк_*` that th
 _Russian_: дашборд
 _Avoid_: панель
 
+<a id="training-example-count"></a>
+**Training example count**:
+The number of annotated objects of a class in the evaluated checkpoint's own training split. Reports use this count to determine whether a class qualifies for that model's aggregates. An unknown count stays unavailable.
+_Russian_: число примеров train
+
 ## Publication
+
+<a id="clearml-task"></a>
+**ClearML task**:
+The ClearML record for one experiment invocation. All stages of a `cy` pipeline share one task. Running a stage as a standalone experiment creates its own task.
+_Russian_: задача ClearML
 
 <a id="configuration-object"></a>
 **Configuration object**:
@@ -216,7 +242,7 @@ _Avoid_: гиперпараметры
 
 <a id="fiftyone-preflight"></a>
 **FiftyOne preflight**:
-The check CY runs in a separate process without a GPU before it publishes to FiftyOne; a failure turns publication off for the run with a warning.
+The check of FiftyOne availability before CY publishes a run. If preflight fails, CY skips the optional publication and records a warning.
 _Russian_: предварительная проверка
 _Avoid_: health check
 
@@ -256,6 +282,6 @@ _Avoid_: профиль оптимизации
 
 <a id="reflink-clone"></a>
 **Reflink clone**:
-A copy-on-write file copy that shares disk blocks with its source. `cy-dedup` replaces duplicate images with reflink clones and never with hard links or copies.
+An independent file whose data blocks are initially shared with another file. `cy-dedup` uses this copy-on-write representation for identical cached images.
 _Russian_: reflink-клон
 _Avoid_: жёсткая ссылка
