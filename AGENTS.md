@@ -212,8 +212,11 @@ means deferred; `infra-check` exit 1 is a configuration error.
   header and the release parser also reads headers inside the squash body; fix any wrong type.
   Allowed types: build, chore, ci, docs, feat, fix, perf, refactor, style, test; the release
   parser silently ignores a malformed header.
-- The release job needs `GITHUB_TOKEN` `contents: write` and repository rules that let it push to
-  `master`; never weaken human protections to grant that. After merge, record on the issue the
+- The `master` ruleset requires PRs, blocks force pushes and deletion, and lists deploy keys as
+  bypass actors. The release job checks out with the write deploy key in secret
+  `RELEASE_DEPLOY_KEY` (`GITHUB_TOKEN` cannot bypass rulesets on a user-owned repository) and needs
+  `contents: write`; never weaken human protections to grant that. Do not add required signatures,
+  linear history or a required status check without changing the release job. After merge, record on the issue the
   release run URL, source and final SHAs, version (or no-version result) and tag. The job
   establishes no native, GPU, upload or pairing outcome.
 - Code releases are commits and annotated `v*` tags only; `weights-*` GitHub Releases only on
